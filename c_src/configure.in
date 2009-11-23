@@ -1,0 +1,38 @@
+AC_INIT(cl_drv.c)
+AC_PREREQ(2.59)
+
+AC_CHECK_FUNC(socketpair,AC_DEFINE(HAVE_SOCKETPAIR,[1],[socketpair present]),[])
+								   
+AC_ARG_WITH(wordsize,
+[  --with-wordsize=32      configure 32 bit mode (default)
+  --with-wordsize=64      configure 64 bit mode ])
+
+if test "x$with_wordsize" == "x"; then
+   with_wordsize=32
+fi
+
+if test "$with_wordsize" == "64"; then
+	CFLAGS="-m64 $CFLAGS"
+	export CFLAGS
+	LDFLAGS="-m64 $LDFLAGS"
+	export LDFLAGS
+else
+	if test "$with_wordsize" == "32"; then	
+		CFLAGS="-m32 $CFLAGS"
+		export CFLAGS
+		LDFLAGS="-m32 $LDFLAGS"
+		export LDFLAGS
+	else
+		AC_MSG_ERROR(bad word size given to --with-wordsize)
+	fi
+fi
+
+AC_CHECK_SIZEOF(char)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
+AC_CHECK_SIZEOF(void *)
+AC_CHECK_SIZEOF(size_t)
+AC_CONFIG_HEADER(config.${with_wordsize}.h:config.h.in)
+AC_OUTPUT()

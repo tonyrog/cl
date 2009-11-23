@@ -1,0 +1,14 @@
+Welcome to the Erlang OpenCL binding
+
+To get started you need erlang, preferably R13. You also need
+GCC and a machine with OpenCL installed. Currently only Mac Os X 10.6.x
+is known to work. Then linux support is on it's way.
+
+To build: just run make
+
+To build examples: Goto the examples directory and run make.
+
+Make sure erlang finds the cl/ebin directory.
+
+
+
