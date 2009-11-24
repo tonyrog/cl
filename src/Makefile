@@ -28,6 +28,8 @@ debug: ERLC_FLAGS += -Ddebug
 
 all: $(TARGET_FILES)
 
+all32: $(TARGET_FILES)
+
 debug: all
 
 release: all

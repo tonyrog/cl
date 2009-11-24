@@ -2,7 +2,7 @@ OSNAME := $(shell uname -s)
 MACHINE := $(shell uname -m)
 CC = gcc
 
-ERLDIR	:= /usr/local/lib/erlang
+ERLDIR	:= $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir()])" -s erlang halt)
 ERL_C_INCLUDE_DIR := $(ERLDIR)/usr/include
 OCL_DIR := $(shell cd ..; pwd)
 
@@ -20,13 +20,13 @@ SSE4      = No
 ifeq ($(TYPE), debug)
 OBJDIR=../obj/debug
 LIBDIR=../lib/debug
-CFLAGS += -fPIC -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -no-cpp-precomp -D_THREAD_SAFE -D_REENTRANT -fno-common 
+CFLAGS += -fPIC -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common 
 endif
 
 ifeq ($(TYPE), release)
 OBJDIR=../obj/release
 LIBDIR=../lib/release
-CFLAGS += -fPIC -O3 -Wall -Wextra -Wswitch-default -Wswitch-enum -no-cpp-precomp -D_THREAD_SAFE -D_REENTRANT -fno-common
+CFLAGS += -fPIC -O3 -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common
 endif
 
 ifeq ($(OSNAME), Linux)
@@ -43,11 +43,11 @@ endif
 ifeq ($(OSNAME), Darwin)
 MAC_OS_X = Yes
 ifeq ($(WORDSIZE), 32)
-CFLAGS += -m32 -DWORDSIZE=32
+CFLAGS += -m32 -DWORDSIZE=32 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m32 -bundle -flat_namespace -undefined suppress
 endif
 ifeq ($(WORDSIZE), 64)
-CFLAGS += -m64 -DWORDSIZE=64
+CFLAGS += -m64 -DWORDSIZE=64 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m64 -bundle -flat_namespace -undefined suppress
 endif
 endif

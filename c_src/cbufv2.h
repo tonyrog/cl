@@ -9,7 +9,9 @@
 #include <memory.h>
 #include <unistd.h>
 #include <sys/types.h>
+#ifdef DARWIN
 #include <machine/endian.h>
+#endif
 
 #define CBUF_USE_PUT_ETF   // pack ETF 
 #define CBUF_USE_PUT_CTI   // pack CTI 

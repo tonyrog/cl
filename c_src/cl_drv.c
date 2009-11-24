@@ -4,7 +4,11 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <sys/socket.h>
+#ifdef DARWIN
 #include <OpenCL/opencl.h>
+#else
+#include <CL/cl.h>
+#endif
 
 #if WORDSIZE==32
 #include "config.32.h"
