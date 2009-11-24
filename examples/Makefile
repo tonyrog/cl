@@ -11,7 +11,7 @@ MODULES = \
 EBIN = ../ebin
 ERLC = erlc
 
-override ERLC_FLAGS = -W 
+override ERLC_FLAGS = -W -pa ../../cl/ebin
 
 OBJS = $(MODULES:%=$(EBIN)/%.beam)
 

@@ -37,7 +37,7 @@ endif
 ifeq ($(WORDSIZE), 64)
 CFLAGS += -m64 -DWORDSIZE=64
 endif
-LD_SHARED	:= $(CC) -shared
+LD_SHARED	:= $(CC) -shared -lOpenCL
 endif
 
 ifeq ($(OSNAME), Darwin)
@@ -132,7 +132,10 @@ configure:	configure.in
 	autoheader; autoconf
 
 clean: 
-	$(MAKE) clean_internal TYPE=release
+	$(MAKE) clean_internal TYPE=release WORDSIZE=32
+	$(MAKE) clean_internal TYPE=debug   WORDSIZE=32
+	$(MAKE) clean_internal TYPE=release WORDSIZE=64
+	$(MAKE) clean_internal TYPE=debug   WORDSIZE=64
 
 # Make cl library
 debug:
@@ -154,7 +157,7 @@ cbuf_test.o:  cbufv2.h
 depend:
 
 clean_internal:
-	-rm -f $(OBJDIR)/*.o
+	-rm -f $(OBJDIR)/$(WORDSIZE)/*.o
 
 $(CL_DRV): $(OCL_LIB) $(CL_OBJS) # $(CL_ASM)
 	$(LD_SHARED) -o $@ $(CL_OBJS) $(LDFLAGS)

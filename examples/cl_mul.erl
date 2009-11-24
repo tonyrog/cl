@@ -66,7 +66,7 @@ dump_data(Bin) ->
     io:format("data=~p\n", [decode_matrix(Bin)]).
 
 test() ->
-    test(cpu).
+    test(all).
     
 test(DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
@@ -122,10 +122,13 @@ run(Data, DevType) ->
 
     %% Enqueue the kernel
     Global = Count,
+    if Local > Count ->  LocalWork = Count;
+       true ->   	 LocalWork = Local
+    end,
     {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
-					     [Global], [Local], [Event1]),
+					     [Global], [LocalWork], [Event1]),
     io:format("nd range [~w, ~w] kernel enqueued\n",
-	      [[Global],[Local]]),
+	      [[Global],[LocalWork]]),
     
     %% Enqueue the read from device memory (wait for kernel to finish)
     {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),

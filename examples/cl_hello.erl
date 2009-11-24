@@ -30,7 +30,7 @@ dump_data(Bin) ->
     io:format("data=~p\n", [[ X || <<X:32/native-float>> <= Bin ]]).
 
 test() ->
-    test(cpu).
+    test(all).
     
 test(DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
