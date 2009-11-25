@@ -34,8 +34,8 @@
 %% @type cl_long() = integer()
 %% @type cl_ulong() = non_neg_integer()
 %% @type cl_half() = float()
-%% type cl_float() :: float()
-%% @type cl_double() :: float()
+%% @type cl_float() = float()
+%% @type cl_double() = float()
 
 -type cl_char() :: integer().
 -type cl_uchar() :: non_neg_integer().
