@@ -29,12 +29,25 @@
 
 setup(DevType) ->
     cl:start(),
-    {ok,[Platform|_]} = cl:get_platform_ids(),
-    {ok,DeviceList}   = cl:get_device_ids(Platform,DevType),
-    {ok,Context}      = cl:create_context(DeviceList),
-    #cl { platform = Platform,
-	  devices  = DeviceList,
-	  context  = Context }.
+    {ok,Ps} = cl:get_platform_ids(),
+    setup(DevType, Ps).
+
+setup(DevType, [Platform|Ps]) ->
+    case cl:get_device_ids(Platform,DevType) of
+	{ok,DeviceList} ->
+	    {ok,Context}      = cl:create_context(DeviceList),
+	    #cl { platform = Platform,
+		  devices  = DeviceList,
+		  context  = Context };
+	{error, device_not_found} ->
+	    setup(DevType, Ps);
+	Other ->
+	    Other
+    end;
+setup(DevType, []) ->
+    {error, {device_not_found, DevType}}.
+    
+
 %%
 %% @doc setup a clu context with all devices.
 %%
@@ -78,8 +91,8 @@ build_source(E, Source) ->
     {ok,Program} = cl:create_program_with_source(E#cl.context,Source),
     case cl:build_program(Program, E#cl.devices, "") of
 	ok ->
-	    Logs = get_program_logs(Program),
-	    io:format("Logs: ~s\n", [Logs]),
+	    %%Logs = get_program_logs(Program),
+	    %%io:format("Logs: ~s\n", [Logs]),
 	    {ok,Program};
 	Error ->
 	    Logs = get_program_logs(Program),
@@ -167,11 +180,11 @@ apply_kernel_args(Kernel, Args) ->
 
 
 apply_args(Kernel, I, [{local,Size}|As]) ->
-    io:format("kernel set arg ~w size to ~p\n", [I,Size]),
+    %%io:format("kernel set arg ~w size to ~p\n", [I,Size]),
     cl:set_kernel_arg_size(Kernel,I,Size),
     apply_args(Kernel,I+1,As);
 apply_args(Kernel,I,[A|As]) ->
-    io:format("kernel set arg ~w to ~p\n", [I,A]),
+    %%io:format("kernel set arg ~w to ~p\n", [I,A]),
     cl:set_kernel_arg(Kernel,I,A),
     apply_args(Kernel,I+1,As);
 apply_args(_Kernel, _I, []) -> 

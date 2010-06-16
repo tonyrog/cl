@@ -31,7 +31,9 @@ test(DevType) ->
 		    test_queue(E, Device)  end, 
 	    E#cl.devices),
 
-    test_sampler(E),
+    foreach(fun(Device) ->
+		    test_sampler(E, Device)  end, 
+	    E#cl.devices),
 
     test_program(E#cl.context, E#cl.devices),
 
@@ -125,21 +127,28 @@ test_buffer(E) ->
 
     
 
-test_sampler(E) ->
-    %% Sampler1
-    {ok,Sampler1} = cl:create_sampler(E#cl.context,true,clamp,nearest),
-    io:format("Sampler1: ~p\n", [Sampler1]),
-    {ok,Sampler1Info} = cl:get_sampler_info(Sampler1),
-    io:format("Sampler1Info: ~p\n", [Sampler1Info]),
-    cl:release_sampler(Sampler1),
-
-    %% Sampler2
-    {ok,Sampler2} = cl:create_sampler(E#cl.context,false,repeat,linear),
-    io:format("Sampler2: ~p\n", [Sampler2]),
-    {ok,Sampler2Info} = cl:get_sampler_info(Sampler2),
-    io:format("Sampler2Info: ~p\n", [Sampler2Info]),
-    cl:release_sampler(Sampler2),
-    ok.
+test_sampler(E, Device) ->
+    {ok,DeviceInfo} = cl:get_device_info(Device),
+    Name = proplists:get_value(name, DeviceInfo),
+    case proplists:get_value(image_support, DeviceInfo) of
+	true ->
+	    %% Sampler1
+	    {ok,Sampler1} = cl:create_sampler(E#cl.context,true,clamp,nearest),
+	    io:format("Sampler1: ~p\n", [Sampler1]),
+	    {ok,Sampler1Info} = cl:get_sampler_info(Sampler1),
+	    io:format("Sampler1Info: ~p\n", [Sampler1Info]),
+	    cl:release_sampler(Sampler1),
+	    
+	    %% Sampler2
+	    {ok,Sampler2} = cl:create_sampler(E#cl.context,false,repeat,linear),
+	    io:format("Sampler2: ~p\n", [Sampler2]),
+	    {ok,Sampler2Info} = cl:get_sampler_info(Sampler2),
+	    io:format("Sampler2Info: ~p\n", [Sampler2Info]),
+	    cl:release_sampler(Sampler2),
+	    ok;
+	false ->
+	    io:format("No image support for device ~s ~n",[Name])	    
+    end.
 
 
 
