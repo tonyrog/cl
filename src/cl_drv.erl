@@ -174,7 +174,7 @@ init(Args) ->
 	    Tab  = ets:new(?CL_REG, [named_table, public, set]),
 	    {ok, #state{ port = Port, tab  = Tab }};
 	{error,Error} ->
-	    io:format("Error: ~s\n", [erl_ddll:format_error_int(Error)]),
+	    error_logger:format("CL Error: ~s\n", [erl_ddll:format_error_int(Error)]),
 	    {stop, Error}
     end.
 
@@ -427,9 +427,9 @@ is_string(_) -> false.
 %% decode reply data
 decode(Data = <<131,_/binary>>) ->
     binary_to_term(Data);
-decode(Data) -> 
-    ?dbg_hard("deocde: data = ~p\n", [Data]),
-    decode(Data, []).
+decode(Debug) -> 
+    ?dbg_hard("decode: data = ~p\n", [Debug]),
+    decode(Debug, []).
     
 decode(<<>>, [Hd]) -> 
     ?dbg_hard("deocde = ~p\n", [Hd]),

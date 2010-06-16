@@ -153,6 +153,22 @@ static inline void* memcpy_n2b(void* dst, void* src, size_t len)
 #endif
 }
 
+// copy src to dst. native-endian to little-endian
+// src is a buffer holding a number in native endian order 
+// dst is a buffer holding a number in little endian order
+//
+static inline void* memcpy_n2l(void* dst, void* src, size_t len)
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+    return memcpy(dst, src, len);
+#else
+    u_int8_t* sp = ((u_int8_t*) src) + len;
+    u_int8_t* dp = (u_int8_t*) dst;
+    while(len--)
+	*dp++ = *--sp;
+    return dst;
+#endif
+}
 
 // Number of bytes written/read to current segment
 static inline size_t cbuf_seg_used(cbuf_t* cp)
@@ -823,12 +839,12 @@ static inline int etf_put_u64(cbuf_t* cp,u_int8_t sign,u_int64_t value)
 {
     u_int8_t* p;
 
-    if (!(p = cbuf_seg_alloc(cp, 13)))
+    if (!(p = cbuf_seg_alloc(cp, 11)))
 	return 0;
     p[0] = SMALL_BIG_EXT;
     p[1] = 8;
     p[2] = sign;
-    memcpy_n2b(&p[3], &value, 8);
+    memcpy_n2l(&p[3], &value, 8);
     return 1;
 }
 
