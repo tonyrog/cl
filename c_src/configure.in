@@ -34,5 +34,15 @@ AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(void *)
 AC_CHECK_SIZEOF(size_t)
+
+if test X"$ac_cv_sizeof_void_p" == X"0" ; then
+   CL_BUILD=false
+else
+   CL_BUILD=true
+fi
+AC_SUBST(CL_BUILD)
+
+AC_MSG_NOTICE(Size void $ac_cv_sizeof_void_p)
 AC_CONFIG_HEADER(config.${with_wordsize}.h:config.h.in)
+AC_CONFIG_FILES(config.${with_wordsize}.build:config.build.in)
 AC_OUTPUT()

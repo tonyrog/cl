@@ -17,6 +17,13 @@ SSE2      = No
 SSE3      = No
 SSE4      = No
 
+ifeq ($(WORDSIZE), 64)
+include config.64.build
+endif
+ifeq ($(WORDSIZE), 32)
+include config.32.build
+endif
+
 ifeq ($(TYPE), debug)
 OBJDIR=../obj/debug
 LIBDIR=../lib/debug
@@ -147,7 +154,14 @@ clean_debug:
 release:
 	$(MAKE) driver TYPE=release
 
+ifeq ($(CL_BUILD), false)
+driver: 
+	@echo 
+	@echo Skipping driver for wordsize=$(WORDSIZE), not supported on this system
+	@echo 
+else
 driver: $(CL_DRV)
+endif
 
 cbuf_test: cbuf_test.o
 	$(CC) -o $@ cbuf_test.o
