@@ -74,26 +74,62 @@ typedef int (*get_fn_t)(cbuf_t*,void*,void*);
 
 #if SIZEOF_SIZE_T == 4
 #define SIZE_T             UINT32
-#define get_size(in, ptr)  get_uint32((in),(u_int32_t*)(ptr))
-#define get_size_fn        (get_fn_t) get_uint32
+static inline int put_size(cbuf_t* out, size_t sz)
+{
+    u_int64_t value = (u_int64_t) sz;
+    return cbuf_put_uint64(out, value);
+}
+
+static inline int get_size(cbuf_t* in, size_t* ptr)
+{
+    u_int64_t value;
+    if (!get_uint64(in, &value))
+	return 0;
+    *ptr = (size_t) value;
+    return 1;
+}
+
 #elif SIZEOF_SIZE_T == 8
 #define SIZE_T             UINT64
-#define get_size(in, ptr)  get_uint64((in),(u_int64_t*)(ptr))
-#define get_size_fn        (get_fn_t) get_uint64
+
+static inline int put_size(cbuf_t* out, size_t sz)
+{
+    return cbuf_put_uint64(out, (u_int64_t)sz);
+}
+
+static inline int get_size(cbuf_t* in, size_t* ptr)
+{
+    return get_uint64(in, (u_int64_t*)ptr);
+}
+
 #endif
 
 #if SIZEOF_VOID_P == 4
-#define POINTER_T          UINT32
 typedef u_int32_t          pointer_t;
-#define put_pointer(out, ptr) cbuf_put_uint32((out),(u_int32_t)(ptr))
-#define get_pointer(in, ptr)  get_uint32((in),(u_int32_t*)(ptr))
-#define get_pointer_fn      get_uint32
+static inline int put_pointer(cbuf_t* out, pointer_t ptr)
+{
+    u_int64_t value = (u_int64_t) ptr;
+    return cbuf_put_uint64(out, value);
+}
+static inline int get_pointer(cbuf_t* in, pointer_t* ptr)
+{
+    u_int64_t value;
+    if (!get_uint64(in, &value))
+	return 0;
+    *ptr = (pointer_t) value;
+    return 1;
+}
 #elif SIZEOF_VOID_P == 8
-#define POINTER_T          UINT64
 typedef u_int64_t          pointer_t;
-#define put_pointer(out, ptr) cbuf_put_uint64((out),(u_int64_t)(ptr))
-#define get_pointer(in, ptr)  get_uint64((in),(u_int64_t*)(ptr))
-#define get_pointer_fn        get_uint64
+
+static inline int put_pointer(cbuf_t* out, pointer_t ptr)
+{
+    return cbuf_put_uint64(out, ptr);
+}
+static inline int get_pointer(cbuf_t* in, pointer_t* ptr)
+{
+    return get_uint64(in, ptr);
+}
 #else
 #error "check configure, unable to determine SIZEOF_VOID_P"
 #endif
@@ -117,7 +153,7 @@ typedef u_int64_t          pointer_t;
 #define OCL_BOOL           OCL_UINT //  not always same size as in kernel
 #define OCL_STRING         STRING4
 #define OCL_BITFIELD       OCL_ULONG
-#define OCL_POINTER        POINTER_T
+#define OCL_POINTER        POINTER
 #define OCL_SIZE           SIZE_T
 #define OCL_HANDLE         HANDLE
 
@@ -211,6 +247,8 @@ typedef u_int64_t          pointer_t;
 #define ECL_ENQUEUE_MARKER               0x3C
 #define ECL_ENQUEUE_WAIT_FOR_EVENT       0x3D
 #define ECL_ENQUEUE_BARRIER              0x3E
+#define ECL_SET_KERNEL_ARG_POINTER_T     0x3F
+#define ECL_SET_KERNEL_ARG_SIZE_T        0x40
 
 /*
  * Environment keeps track on all allocated objects
@@ -622,7 +660,7 @@ ecl_info_t device_info[] =
     /* 2E */  { "profile", CL_DEVICE_PROFILE, false, OCL_STRING, STRING, 0 },
     /* 2F */  { "version", CL_DEVICE_VERSION, false, OCL_STRING, STRING, 0 },
     /* 30 */  { "extensions", CL_DEVICE_EXTENSIONS, false, OCL_STRING, STRING, 0 },
-    /* 31 */  { "platform", CL_DEVICE_PLATFORM, false, OCL_PLATFORM_ID, POINTER_T, 0 }
+    /* 31 */  { "platform", CL_DEVICE_PLATFORM, false, OCL_PLATFORM_ID, POINTER, 0 }
 };
 
 #define ECL_DEVICE_INFO_NUM  ((int)(sizeof(device_info)/sizeof(ecl_info_t)))
@@ -644,7 +682,7 @@ ecl_info_t platform_info[] =
 ecl_info_t context_info[] =
 {
     /* 0 */ { "reference_count", CL_CONTEXT_REFERENCE_COUNT, false, OCL_UINT, UINT, 0 },
-    /* 1 */ { "devices", CL_CONTEXT_DEVICES, true, OCL_HANDLE, POINTER_T, 0 },
+    /* 1 */ { "devices", CL_CONTEXT_DEVICES, true, OCL_HANDLE, POINTER, 0 },
     /* 2 */ { "properties", CL_CONTEXT_PROPERTIES, true, OCL_INT, INT, 0 }
 };
 
@@ -652,8 +690,8 @@ ecl_info_t context_info[] =
 
 ecl_info_t queue_info[] = 
 {
-    /* 0 */ { "context", CL_QUEUE_CONTEXT, false, OCL_HANDLE, POINTER_T, 0 },
-    /* 1 */ { "device",  CL_QUEUE_DEVICE, false, OCL_HANDLE, POINTER_T, 0 },
+    /* 0 */ { "context", CL_QUEUE_CONTEXT, false, OCL_HANDLE, POINTER, 0 },
+    /* 1 */ { "device",  CL_QUEUE_DEVICE, false, OCL_HANDLE, POINTER, 0 },
     /* 2 */ { "reference_count", CL_QUEUE_REFERENCE_COUNT, false, OCL_UINT, UINT, 0 },
     /* 3 */ { "properties", CL_QUEUE_PROPERTIES, false, OCL_QUEUE_PROPERTIES, BITFIELD, kv_command_queue_properties }
 };
@@ -666,10 +704,10 @@ ecl_info_t mem_info[] =
     /* 1 */ { "flags", CL_MEM_FLAGS, false, OCL_MEM_FLAGS, BITFIELD, kv_mem_flags },
     /* 2 */ { "size",  CL_MEM_SIZE,  false, OCL_SIZE, SIZE_T, 0 },
     // FIXME: pointer!! map it ?
-    /* 3 */ { "host_ptr", CL_MEM_HOST_PTR, false, OCL_POINTER, POINTER_T, 0 }, 
+    /* 3 */ { "host_ptr", CL_MEM_HOST_PTR, false, OCL_POINTER, POINTER, 0 }, 
     /* 4 */ { "map_count", CL_MEM_MAP_COUNT, false, OCL_UINT, UINT, 0 },
     /* 5 */ { "reference_count", CL_MEM_REFERENCE_COUNT, false, OCL_UINT, UINT, 0 },
-    /* 6 */ { "context", CL_MEM_CONTEXT, false, OCL_HANDLE, POINTER_T, 0 }
+    /* 6 */ { "context", CL_MEM_CONTEXT, false, OCL_HANDLE, POINTER, 0 }
 };
 
 #define ECL_MEM_INFO_NUM ((int)(sizeof(mem_info)/sizeof(ecl_info_t)))
@@ -677,7 +715,7 @@ ecl_info_t mem_info[] =
 ecl_info_t sampler_info[] = 
 {
     { "reference_count", CL_SAMPLER_REFERENCE_COUNT, false, OCL_UINT, UINT, 0},
-    { "context", CL_SAMPLER_CONTEXT, false,  OCL_HANDLE, POINTER_T, 0 },
+    { "context", CL_SAMPLER_CONTEXT, false,  OCL_HANDLE, POINTER, 0 },
     { "normalized_coords", CL_SAMPLER_NORMALIZED_COORDS, false, OCL_BOOL, BOOLEAN, 0 },
     {  "addressing_mode", CL_SAMPLER_ADDRESSING_MODE, false, OCL_SAMPLER_ADDRESSING_MODE, ENUM, kv_addressing_mode },
     { "filter_mode", CL_SAMPLER_FILTER_MODE, false, OCL_SAMPLER_FILTER_MODE, ENUM, kv_filter_mode }
@@ -687,9 +725,9 @@ ecl_info_t sampler_info[] =
 
 ecl_info_t program_info[] = {
     { "reference_count", CL_PROGRAM_REFERENCE_COUNT, false, OCL_UINT, UINT, 0 },
-    { "context", CL_PROGRAM_CONTEXT, false, OCL_HANDLE, POINTER_T, 0},
+    { "context", CL_PROGRAM_CONTEXT, false, OCL_HANDLE, POINTER, 0},
     { "num_devices", CL_PROGRAM_NUM_DEVICES, false, OCL_UINT, UINT, 0},
-    { "devices", CL_PROGRAM_DEVICES, true, OCL_HANDLE, POINTER_T, 0 },
+    { "devices", CL_PROGRAM_DEVICES, true, OCL_HANDLE, POINTER, 0 },
     { "source", CL_PROGRAM_SOURCE, false, OCL_STRING, STRING, 0 },
     { "binary_sizes", CL_PROGRAM_BINARY_SIZES, true, OCL_SIZE, SIZE_T, 0 },
     { "binaries", CL_PROGRAM_BINARIES, true, OCL_STRING, STRING, 0 }
@@ -709,8 +747,8 @@ ecl_info_t kernel_info[] = {
     { "function_name", CL_KERNEL_FUNCTION_NAME, false, OCL_STRING, STRING, 0 },
     { "num_args", CL_KERNEL_NUM_ARGS, false, OCL_UINT, UINT, 0},
     { "reference_count", CL_KERNEL_REFERENCE_COUNT, false, OCL_UINT, UINT, 0 },
-    { "context", CL_KERNEL_CONTEXT, false, OCL_HANDLE, POINTER_T, 0},
-    { "program", CL_KERNEL_PROGRAM, false, OCL_HANDLE, POINTER_T, 0}
+    { "context", CL_KERNEL_CONTEXT, false, OCL_HANDLE, POINTER, 0},
+    { "program", CL_KERNEL_PROGRAM, false, OCL_HANDLE, POINTER, 0}
 };
 
 #define ECL_KERNEL_INFO_NUM ((int)(sizeof(kernel_info)/sizeof(ecl_info_t)))
@@ -725,7 +763,7 @@ ecl_info_t workgroup_info[] = {
 
 
 ecl_info_t event_info[] = {
-    { "command_queue",  CL_EVENT_COMMAND_QUEUE, false, OCL_HANDLE, POINTER_T, 0},
+    { "command_queue",  CL_EVENT_COMMAND_QUEUE, false, OCL_HANDLE, POINTER, 0},
     { "command_type",   CL_EVENT_COMMAND_TYPE, false,  OCL_UINT, ENUM, kv_command_type },
     { "reference_count", CL_EVENT_REFERENCE_COUNT, false, OCL_UINT, UINT, 0 },
     { "execution_status", CL_EVENT_COMMAND_EXECUTION_STATUS, false, OCL_INT, ENUM, kv_execution_status }
@@ -1148,6 +1186,7 @@ static void put_element(cbuf_t* data, u_int8_t tag, void* ptr, ecl_kv_t* kv)
     case UINT16: cbuf_put_uint16(data, *((cl_ushort*)ptr)); break;
     case UINT32: cbuf_put_uint32(data, *((cl_uint*)ptr)); break;
     case UINT64: cbuf_put_uint64(data, *((cl_ulong*)ptr)); break;
+    case POINTER: put_pointer(data, *((pointer_t*)ptr)); break;
     case BOOLEAN: cbuf_put_boolean(data, (u_int8_t) *((cl_uint*)ptr)); break;
     case STRING1:
     case STRING4: {
@@ -2088,7 +2127,7 @@ static void ecl_create_program_with_binary(ecl_env_t* env, cbuf_t* arg, cbuf_t* 
 	(ctx = context_object(env, chandle)) &&
 	get_array(arg,(get_fn_t)get_device,device_list,
 		  sizeof(cl_device_id), &num_devices,env) &&
-	get_size(arg, &num_binaries) &&
+ 	get_size(arg, &num_binaries) &&
 	(num_binaries == num_devices)) {
 	cl_program program;
 	cl_int status;
@@ -2148,7 +2187,71 @@ clean_up:
     }
 }
 
+// This is tricky to type check
+// <Kernel:Ptr, Index:32, ArgSize:32, Argument/binary>>
+// type = POINTER | SIZE | 
+//
+static int ecl_set_kernel_arg(ecl_env_t* env, int type, cbuf_t* arg)
+{
+    pointer_t handle;
+    u_int32_t arg_index;
+    u_int32_t arg_size;
+    size_t    arg_len;
+    ecl_object_t* obj;
+    int err = CL_INVALID_VALUE;
 
+    if (get_pointer(arg, &handle) &&
+	get_uint32(arg, &arg_index) &&
+	get_uint32(arg, &arg_size) &&
+	((obj = kernel_object(env, handle)) != 0)) {
+	u_int8_t* arg_ptr = 0;
+	u_int8_t  arg_alloc = 0;
+	u_int8_t  arg_buf[64];
+
+	arg_len = cbuf_r_avail(arg);
+	switch(type) {
+	case 0:
+	    if (arg_len) {
+		if (cbuf_seg_r_avail(arg) == arg_len)
+		    arg_ptr = cbuf_seg_ptr(arg);
+		else {
+		    if (arg_len <= 64)
+			arg_ptr = arg_buf;
+		    else {
+			if (!(arg_ptr = driver_alloc(arg_len)))
+			    return CL_OUT_OF_HOST_MEMORY;
+			arg_alloc = 1;
+		    }
+		    cbuf_read(arg, arg_ptr, arg_len);
+		}
+	    }
+	    break;
+	case POINTER:
+	    if ((arg_len != 8) || !get_pointer(arg, (pointer_t*)&arg_buf[0]))
+		return err;
+	    arg_size = sizeof(pointer_t); // real size!!!
+	    arg_ptr = arg_buf;
+	    break;
+	case USIZE:
+	    if ((arg_len != 8) || !get_size(arg, (size_t*)&arg_buf[0]))
+		return err;
+	    arg_size = sizeof(size_t); // real size!!!
+	    arg_ptr = arg_buf;	    
+	    break;
+	default:
+	    return err;
+	}
+	DBG("set_kernel_arg:index=%d,size=%d,len=%ld",
+	    arg_index,arg_size,arg_len);
+	err = clSetKernelArg(obj->kernel,
+			     (cl_uint) arg_index,
+			     arg_size,
+			     arg_ptr);
+	if (arg_alloc)
+	    driver_free(arg_ptr);
+    }
+    return err;
+}
 
 
 static int ecl_drv_ctl(ErlDrvData d, 
@@ -2916,39 +3019,17 @@ static int ecl_drv_ctl(ErlDrvData d,
     }
 
     case ECL_SET_KERNEL_ARG: {
-	// This is tricky to type check
-	// <Kernel:Ptr, Index:32, ArgSize:32, Argument/binary>>
-	pointer_t handle;
-	u_int32_t arg_index;
-	u_int32_t arg_size;
-	size_t    arg_len;
-	ecl_object_t* obj;
+	err = ecl_set_kernel_arg(env, 0, &arg);
+	break;
+    }
 
-	if (get_pointer(&arg, &handle) &&
-	    get_uint32(&arg, &arg_index) &&
-	    get_uint32(&arg, &arg_size) &&
-	    ((obj = kernel_object(env, handle)) != 0)) {
-	    u_int8_t* arg_ptr = 0;
+    case ECL_SET_KERNEL_ARG_POINTER_T: {
+	err = ecl_set_kernel_arg(env, POINTER, &arg);
+	break;
+    }
 
-	    arg_len = cbuf_r_avail(&arg);
-	    if (arg_len) {
-		if (cbuf_seg_r_avail(&arg) == arg_len)
-		    arg_ptr = cbuf_seg_ptr(&arg);
-		else {
-		    if (!(arg_ptr = driver_alloc(arg_len)))
-			RETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
-		    cbuf_read(&arg, arg_ptr, arg_len);
-		}
-	    }
-	    DBG("set_kernel_arg:index=%d,size=%d,len=%ld",
-		arg_index,arg_size,arg_len);
-	    err = clSetKernelArg(obj->kernel,
-				 (cl_uint) arg_index,
-				 arg_size,
-				 arg_ptr);
-	    if (arg_ptr && (arg_ptr != cbuf_seg_ptr(&arg)))
-		driver_free(arg_ptr);
-	}
+    case ECL_SET_KERNEL_ARG_SIZE_T: {
+	err = ecl_set_kernel_arg(env, USIZE, &arg);
 	break;
     }
 
@@ -3087,8 +3168,8 @@ static int ecl_drv_ctl(ErlDrvData d,
     }
 
     case ECL_ENQUEUE_ND_RANGE_KERNEL: {
-	// <<Queue:Ptr, Kernel:Ptr, WorkDim:32,
-	//   Global:32,..Global:32, Local:32 ... Local:32,
+	// <<Queue:Ptr, Kernel:Ptr, WorkDim:size_t,
+	//   Global:size_t,..Global:size_t, Local:size_t ... Local:size_t,
 	//   NumEvents:32, Event1:Ptr .. EventN:Ptr>>
 	pointer_t  qh;
 	pointer_t  kh;
@@ -3110,11 +3191,11 @@ static int ecl_drv_ctl(ErlDrvData d,
 	    cl_event wait_list[MAX_WAIT_LIST];
 	    size_t num_wait = MAX_WAIT_LIST;
 
-	    if (!get_narray(&arg, get_size_fn, global_work_size, sizeof(size_t),
-			    work_dim, 0))
+	    if (!get_narray(&arg,(get_fn_t)get_size,
+			    global_work_size, sizeof(size_t), work_dim, 0))
 		RETURN_ERROR(err);
-	    if (!get_narray(&arg, get_size_fn, local_work_size, sizeof(size_t),
-			    work_dim, 0))
+	    if (!get_narray(&arg, (get_fn_t)get_size, 
+			    local_work_size, sizeof(size_t), work_dim, 0))
 		RETURN_ERROR(err);
 	    if (!get_array(&arg,(get_fn_t)get_event,wait_list,sizeof(cl_event),
 			   &num_wait,env))
@@ -3126,8 +3207,8 @@ static int ecl_drv_ctl(ErlDrvData d,
 	    {
 		int i;
 		for (i = 0; i < (int)work_dim; i++) {
-		    printf("global[%d] = %ld\n", i, global_work_size[i]);
-		    printf("local[%d] = %ld\n", i,  local_work_size[i]);
+		    printf("global[%d] = %ld\r\n", i, global_work_size[i]);
+		    printf("local[%d] = %ld\r\n", i,  local_work_size[i]);
 		}
 	    }
 #endif
@@ -3180,7 +3261,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 	
     case ECL_ENQUEUE_WAIT_FOR_EVENT: {
 	// <<Queue:Ptr,
-	//   NumEvents:32, Event1:Ptr .. EventN:Ptr>>
+	//   NumEvents:size_t, Event1:Ptr .. EventN:Ptr>>
 	pointer_t  qh;
 	ecl_object_t* qobj;
 	cl_event wait_list[MAX_WAIT_LIST];
@@ -3212,7 +3293,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 
     case ECL_ENQUEUE_READ_BUFFER: {
 	// <<Queue:Ptr, Mem:Ptr, Offset:32, Cb:32, 
-	//   NumEvents:32 Event1:Ptr, ..EventN:Ptr>>
+	//   NumEvents:size_t Event1:Ptr, ..EventN:Ptr>>
 	pointer_t  qh;
 	pointer_t  mh;
 	ecl_object_t* qobj;

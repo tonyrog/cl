@@ -99,6 +99,8 @@
 -define(ECL_ENQUEUE_MARKER,               16#3C).
 -define(ECL_ENQUEUE_WAIT_FOR_EVENT,       16#3D).
 -define(ECL_ENQUEUE_BARRIER,              16#3E).
+-define(ECL_SET_KERNEL_ARG_POINTER_T,     16#3F).
+-define(ECL_SET_KERNEL_ARG_SIZE_T,        16#40).
 
 %% Platform info
 -define(ECL_PLATFORM_PROFILE,    16#00).

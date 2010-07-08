@@ -165,8 +165,6 @@ init(Args) ->
     LibDir = code:lib_dir(cl),
     Path = filename:join([LibDir,"lib",DPath,W]),
     ?dbg("Load driver '~s' from: '~s'\n", [Driver, Path]),
-    WPath = filename:join([LibDir,"ebin",W]),
-    code:add_path(WPath),
     case erl_ddll:load_driver(Path, Driver) of
 	ok ->
 	    Port = erlang:open_port({spawn, Driver}, [binary]),

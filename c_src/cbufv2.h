@@ -88,8 +88,9 @@ typedef struct
 #define TUPLE_END      22  // tuple end 
 #define ENUM           23  // Encoded as INT32
 #define BITFIELD       24  // Encoded as UINT64
-#define HANDLE         25  // Encoded pointer 32/64 bit
-
+#define HANDLE         25  // Encoded pointer 64 bit
+#define POINTER        26  // Always coded as UINT64
+#define USIZE          27  // size_t - Encoded as 64bit
 // External Term Format (ETF)
 // Version 131
 #ifdef CBUF_USE_PUT_ETF
@@ -685,6 +686,7 @@ static inline size_t cbuf_sizeof(u_int8_t tag)
     case ENUM:      return sizeof(int32_t);
     case BITFIELD:  return sizeof(int64_t);
     case HANDLE:    return sizeof(intptr_t);
+    case POINTER:   return sizeof(u_int64_t);
     default: return 0;
     }
 }

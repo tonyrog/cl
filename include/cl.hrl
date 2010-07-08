@@ -4,11 +4,8 @@
 -ifndef(__CL_HRL__).
 -define(__CL_HRL__, true).
 
-
-
-%% FIXME: split encoder/decoder part that use this definition
--define(POINTER_SIZE, 32).
--define(SIZE_SIZE,    32).
+-define(POINTER_SIZE, 64).  %% casted by driver
+-define(SIZE_SIZE,    64).  %% casted by driver
 
 %% transport types
 -define(u_int8_t(X),    X:8/native-unsigned-integer).

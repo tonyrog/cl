@@ -130,18 +130,18 @@ all:	all32 all64
 nif32:	config.32.h
 	$(MAKE) nif TYPE=release WORDSIZE=32
 
-all32:	config.32.h
+all32:	config.32.build
 	$(MAKE) driver TYPE=release WORDSIZE=32
 	$(MAKE) driver TYPE=debug   WORDSIZE=32
 
-all64:	config.64.h
+all64:	config.64.build
 	$(MAKE) driver TYPE=release WORDSIZE=64
 	$(MAKE) driver TYPE=debug   WORDSIZE=64
 
-config.32.h:	configure
+config.32.build:	configure
 	./configure --with-wordsize=32
 
-config.64.h:	configure
+config.64.build:	configure
 	./configure --with-wordsize=64
 
 configure:	configure.in

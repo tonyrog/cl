@@ -1473,6 +1473,19 @@ create_kernels_in_program(Program) ->
 %% impossible for the user to tell with certainty when he may safely
 %% release user allocated resources associated with OpenCL objects
 %% such as the cl_mem backing store used with CL_MEM_USE_HOST_PTR.
+
+set_kernel_arg(Kernel,Index,{'pointer',Ptr}) ->
+    cl_drv:call(?ECL_SET_KERNEL_ARG_POINTER_T,
+		<<?pointer_t(Kernel),
+		  ?u_int32_t(Index),
+		  ?u_int32_t(8),
+		  ?pointer_t(Ptr)>>);
+set_kernel_arg(Kernel,Index,{'size',Sz}) ->
+    cl_drv:call(?ECL_SET_KERNEL_ARG_SIZE_T,
+		<<?pointer_t(Kernel),
+		  ?u_int32_t(Index),
+		  ?u_int32_t(8),
+		  ?size_t(Sz)>>);
 set_kernel_arg(Kernel,Index,Argument) ->
     Arg = encode_argument(Argument),
     Size  = byte_size(Arg),
@@ -1907,8 +1920,6 @@ encode_argument({'ulong',X}) -> <<?cl_ulong(X)>>;
 encode_argument({'half',X}) -> <<?cl_half(X)>>;
 encode_argument({'float',X}) -> <<?cl_float(X)>>;
 encode_argument({'double',X}) -> <<?cl_double(X)>>;
-encode_argument({'pointer',X}) -> <<?cl_pointer(X)>>;
-encode_argument({'size',X}) -> <<?cl_size(X)>>;
 
 encode_argument({'char2',{X1,X2}}) ->
     <<?cl_char2(X1,X2)>>;    
