@@ -102,8 +102,14 @@ endif
 
 CL_DRV = $(LIBDIR)/$(WORDSIZE)/cl_drv.so
 
-CL_OBJS = \
+CL_NIF = $(LIBDIR)/$(WORDSIZE)/cl_nif.so
+
+CL_DRV_OBJS = \
 	$(OBJDIR)/$(WORDSIZE)/cl_drv.o \
+	$(OBJDIR)/$(WORDSIZE)/cl_hash.o
+
+CL_NIF_OBJS = \
+	$(OBJDIR)/$(WORDSIZE)/cl_nif.o \
 	$(OBJDIR)/$(WORDSIZE)/cl_hash.o
 
 CL_ASM = \
@@ -113,6 +119,9 @@ CL_ASM = \
 OCL_SIMD_OBJS = $(SIMD_OBJS:%=$(OBJDIR)/%)
 
 all:	all32 all64
+
+nif32:	config.32.h
+	$(MAKE) nif TYPE=release WORDSIZE=32
 
 all32:	config.32.h
 	$(MAKE) driver TYPE=release WORDSIZE=32
@@ -149,6 +158,8 @@ release:
 
 driver: $(CL_DRV)
 
+nif: $(CL_NIF)
+
 cbuf_test: cbuf_test.o
 	$(CC) -o $@ cbuf_test.o
 
@@ -159,8 +170,11 @@ depend:
 clean_internal:
 	-rm -f $(OBJDIR)/$(WORDSIZE)/*.o
 
-$(CL_DRV): $(OCL_LIB) $(CL_OBJS) # $(CL_ASM)
-	$(LD_SHARED) -o $@ $(CL_OBJS) $(LDFLAGS)
+$(CL_DRV): $(OCL_LIB) $(CL_DRV_OBJS) # $(CL_ASM)
+	$(LD_SHARED) -o $@ $(CL_DRV_OBJS) $(LDFLAGS)
+
+$(CL_NIF): $(OCL_LIB) $(CL_NIF_OBJS) # $(CL_ASM)
+	$(LD_SHARED) -o $@ $(CL_NIF_OBJS) $(LDFLAGS)
 
 $(OBJDIR)/$(WORDSIZE)/cl_drv.o: cbufv2.h cl_hash.h
 

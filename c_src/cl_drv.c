@@ -25,18 +25,24 @@
 
 #define ECL_REPLY_TYPE CBUF_FLAG_PUT_ETF
 
+#define ECL_USE_ASYNC
+
+// Tricky and buggy
+// #define ASYNC_BUILD_PROGRAM
+// #define ASYNC_CONTEXT_NOTIFY
+
+
 #ifdef DEBUG
-#define DBG(fmt,...) \
-    fprintf(stderr, fmt "\r\n", __VA_ARGS__)
-#define CBUF_DBG(buf,msg)
 // #define CBUF_DBG(buf,msg) cbuf_print((buf),(msg))
-#else
-#define DBG(fmt,...) 
 #define CBUF_DBG(buf,msg)
+#define DBG(...) cl_emit_error(__FILE__,__LINE__,__VA_ARGS__)
+#else
+#define CBUF_DBG(buf,msg)
+#define DBG(...)
 #endif
 
 // debug async events
-#define A_DBG(fmt,...) DBG(fmt,__VA_ARGS__)
+#define A_DBG(...) DBG(__VA_ARGS__)
 
 
 typedef int (*get_fn_t)(cbuf_t*,void*,void*);
@@ -248,6 +254,8 @@ const char* ecl_command_name[8] =
   "???"
 };
 
+#define LCAST(n) ((long)(n))
+
 
 typedef struct {
     ecl_command_type_t type;    // command type
@@ -261,6 +269,7 @@ typedef struct {
 } ecl_command_t;
 
 typedef enum {
+    ECL_RESPONSE_NONE=0,
     ECL_RESPONSE_EVENT_STATUS=1,
     ECL_RESPONSE_EVENT_BIN=2,
     ECL_RESPONSE_FINISH=3,
@@ -293,14 +302,23 @@ typedef struct {
     };
     ErlDrvBinary* bin;            // optionsl binary argument data
 } ecl_response_t;
-    
+
+typedef union {
+    ecl_command_t  command;
+    ecl_response_t response;
+} ecl_async_t;
+
+#ifdef ECL_USE_ASYNC
+static void ecl_async_invoke(ecl_async_t*);
+static void ecl_async_free(ecl_async_t*);
+#endif
 
 /* environment */
 typedef struct ocl_env {
     ErlDrvPort  port;   // Port reference
     lhash_t     ref;    // NativePointer => EclObject -> NativPointer
     ErlDrvTid   tid;    // Event thread dispatcher
-    ErlDrvEvent evt[2]; // Thread events evt[0]=main size, evt[1]=thread side
+    int         evt[2]; // Thread events evt[0]=main size, evt[1]=thread side
     u_int32_t   eref;   // event reference for event replies
 } ecl_env_t;
 
@@ -805,6 +823,26 @@ ecl_class_t ecl_class_event =
     event_info
 };
 
+#ifdef DEBUG
+#include <stdarg.h>
+static void cl_emit_error(char* file, int line, ...);
+
+static void cl_emit_error(char* file, int line, ...)
+{
+    va_list ap;
+    char* fmt;
+
+    va_start(ap, line);
+    fmt = va_arg(ap, char*);
+
+    fprintf(stderr, "%s:%d: ", file, line); 
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\r\n");
+    va_end(ap);
+}
+#endif
+
+
 static inline void ecl_object_destroy(ecl_object_t* obj)
 {
     if (obj) {
@@ -1057,6 +1095,7 @@ static void       ecl_drv_output(ErlDrvData data, ErlDrvEvent event);
 static ErlDrvData ecl_drv_start(ErlDrvPort, char* command);
 static int        ecl_drv_ctl(ErlDrvData,unsigned int,char*, int,char**,int);
 static void       ecl_drv_timeout(ErlDrvData);
+static void       ecl_drv_ready_async(ErlDrvData, ErlDrvThreadData);
 
 
 ErlDrvEntry  ecl_drv = {
@@ -1072,7 +1111,7 @@ ErlDrvEntry  ecl_drv = {
     ecl_drv_ctl,
     ecl_drv_timeout,               /* timeout */
     ecl_drv_commandv,
-    NULL,                           /* read_async */
+    ecl_drv_ready_async,            /* ready_async */
     NULL,                           /* flush */
     NULL,                           /* call */
     NULL,                           /* event */
@@ -1139,7 +1178,7 @@ static void put_element(cbuf_t* data, u_int8_t tag, void* ptr, ecl_kv_t* kv)
 		kv++;
 	    }
 	}
-	cbuf_put_list_end(data);
+	cbuf_put_list_end(data, n);
 	break;
     }
 
@@ -1170,7 +1209,8 @@ static void put_value(cbuf_t* data, ecl_env_t* env, ecl_info_t* iptr,
     if (iptr->is_array) {
 	// arrays are return as lists of items
 	size_t elem_size = cbuf_sizeof(iptr->info_type);
-	cbuf_put_list_begin(data, (len / elem_size));
+	size_t n = (len / elem_size);
+	cbuf_put_list_begin(data, n);
 	while (len > 0) {
 	    if (iptr->info_type == HANDLE) {
 		void* ptr = *((void**) dptr);
@@ -1181,7 +1221,7 @@ static void put_value(cbuf_t* data, ecl_env_t* env, ecl_info_t* iptr,
 	    len -= elem_size;
 	    dptr += elem_size;
 	}
-	cbuf_put_list_end(data);
+	cbuf_put_list_end(data, n);
     }
     else {
 	if (iptr->info_type == HANDLE) {
@@ -1248,8 +1288,8 @@ cl_int put_program_binaries(cbuf_t* out, cl_program program)
     cbuf_put_list_begin(out, num_devices);
     for (i = 0; i < (int)num_devices; i++)
 	cbuf_put_binary(out, binaries[i], sizes[i]);
-    cbuf_put_list_end(out);
-    cbuf_put_tuple_end(out);    
+    cbuf_put_list_end(out, num_devices);
+    cbuf_put_tuple_end(out, 2);    
 cleanup:
     for (i = 0; i < (int)num_devices; i++)
 	free(binaries[i]);
@@ -1274,7 +1314,7 @@ cl_int put_object_info(cbuf_t* out, ecl_object_t* obj, cl_uint info_arg)
 	cbuf_put_tag_ok(out);
 	put_value(out, obj->env, &obj->cl->info_vec[info_arg], 
 		  buf, returned_size);
-	cbuf_put_tuple_end(out);
+	cbuf_put_tuple_end(out, 2);
     }    
     return err;
 }
@@ -1310,14 +1350,21 @@ int get_array(cbuf_t* in,get_fn_t get, void* array, size_t width,
 // Main side send/recv
 int ecl_send_command(ecl_env_t* env, ecl_command_t* cmd)
 {
-    return write((int)env->evt[0], cmd, sizeof(ecl_command_t));
+#ifdef ECL_USE_ASYNC
+    ecl_async_t* async_data = driver_alloc(sizeof(ecl_async_t));
+    async_data->command = *cmd;
+    return driver_async(env->port, 0, (void (*)(void*)) ecl_async_invoke, 
+			async_data, (void (*)(void*)) ecl_async_free);
+#else
+    return write(env->evt[0], cmd, sizeof(ecl_command_t));
+#endif
 }
 
 int ecl_async_wait_event(ecl_object_t* obj)
 {
     ecl_command_t cmd;
 
-    cmd.type  = ECL_COMMAND_WAIT_STATUS;    
+    cmd.type  = ECL_COMMAND_WAIT_STATUS;
     cmd.event = obj->event;
     cmd.caller = driver_caller(obj->env->port);
     cmd.bin   = 0;
@@ -1358,23 +1405,22 @@ int ecl_async_finish(ecl_object_t* obj, u_int32_t eref)
     return ecl_send_command(obj->env, &cmd);
 }
 
-
 int ecl_recv_response(ecl_env_t* env, ecl_response_t* resp)
 {
-    return read((int)env->evt[0], resp, sizeof(ecl_response_t));
+    return read(env->evt[0], resp, sizeof(ecl_response_t));
 }
 
 // Thread side send/recv
 int ecl_recv_command(ecl_env_t* env, ecl_command_t* cmd)
 {
-    return read((int)env->evt[1], cmd, sizeof(ecl_command_t));
+    return read(env->evt[1], cmd, sizeof(ecl_command_t));
 }
 
 int ecl_send_response(ecl_env_t* env, ecl_response_t* resp)
 {
     A_DBG("ecl_send_response: resp.type=%s, resp.eref=%u",
 	  ecl_response_name[resp->type], resp->eref);
-    return write((int)env->evt[1], resp, sizeof(ecl_response_t));
+    return write(env->evt[1], resp, sizeof(ecl_response_t));
 }
 
 // translate status into an atom, or fail
@@ -1395,7 +1441,60 @@ int ecl_event_status(ecl_kv_t* kv, cl_int status, ErlDrvTermData* ptr)
 //
 // Thread dispatch loop, wait for events and report to main thread
 //
-void* ecl_drv_dispatch(void* arg)
+void ecl_invoke(ecl_command_t* cmd, ecl_response_t* resp)
+{
+    ecl_command_type_t type = cmd->type;
+    
+    resp->caller = cmd->caller;
+    resp->bin    = cmd->bin;
+    resp->eref   = cmd->eref;
+
+    A_DBG("ecl_invoke: cmd=%s, cmd_ref=%u",
+	  ecl_command_name[type], cmd->eref);
+    switch(type) {
+    case ECL_COMMAND_WAIT_STATUS:
+    case ECL_COMMAND_WAIT_BIN: {
+	size_t info_size;
+	resp->err = clWaitForEvents(1, &cmd->event);
+	clGetEventInfo(cmd->event, CL_EVENT_COMMAND_EXECUTION_STATUS,
+		       sizeof(cl_int), &resp->status, &info_size);
+	resp->event = cmd->event;
+	if (type == ECL_COMMAND_WAIT_STATUS)
+	    resp->type = ECL_RESPONSE_EVENT_STATUS;
+	else if (type == ECL_COMMAND_WAIT_BIN)
+	    resp->type = ECL_RESPONSE_EVENT_BIN;
+	break;
+    }
+	
+    case ECL_COMMAND_FINISH:
+	resp->err = clFinish(cmd->queue);
+	resp->queue = cmd->queue;
+	resp->type = ECL_RESPONSE_FINISH;
+	break;
+
+    default:
+	resp->type = ECL_RESPONSE_NONE;
+	resp->err = CL_INVALID_OPERATION;
+	break;
+    }
+}
+
+#ifdef ECL_USE_ASYNC
+static void ecl_async_invoke(ecl_async_t* data)
+{
+    ecl_response_t resp;
+    ecl_invoke(&data->command, &resp);
+    // This copy could be avoided if we are carful in ecl_invoke!!!
+    data->response = resp;
+}
+
+static void ecl_async_free(ecl_async_t* data)
+{
+    driver_free(data);
+}
+#else
+
+static void* ecl_drv_dispatch(void* arg)
 {
     ecl_env_t* env = (ecl_env_t*) arg;
     ecl_command_t cmd;
@@ -1406,46 +1505,16 @@ void* ecl_drv_dispatch(void* arg)
 
     while((n = ecl_recv_command(env, &cmd)) == sizeof(ecl_command_t)) {
 	ecl_response_t resp;
-	size_t info_size;
-
-	resp.caller = cmd.caller;
-	resp.bin    = cmd.bin;
-	resp.eref   = cmd.eref;
-
-	A_DBG("ecl_drv_dispatch: cmd=%s, cmd_ref=%u",
-	      ecl_command_name[cmd.type], cmd.eref);
-	switch(cmd.type) {
-	case ECL_COMMAND_WAIT_STATUS:
-	case ECL_COMMAND_WAIT_BIN:
-	    resp.err = clWaitForEvents(1, &cmd.event);
-	    clGetEventInfo(cmd.event, CL_EVENT_COMMAND_EXECUTION_STATUS,
-			   sizeof(cl_int), &resp.status, &info_size);
-	    resp.event = cmd.event;
-	    if (cmd.type == ECL_COMMAND_WAIT_STATUS)
-		resp.type = ECL_RESPONSE_EVENT_STATUS;
-	    else if (cmd.type == ECL_COMMAND_WAIT_BIN)
-		resp.type = ECL_RESPONSE_EVENT_BIN;
-	    ecl_send_response(env, &resp);
-	    break;
-	case ECL_COMMAND_FINISH:
-	    resp.err = clFinish(cmd.queue);
-	    resp.queue = cmd.queue;
-	    resp.type = ECL_RESPONSE_FINISH;
-	    ecl_send_response(env, &resp);
-	    break;
-	default:
-	    err = 0;
-	    break;
-	}
+	ecl_invoke(&cmd, &resp);
+	ecl_send_response(env, &resp);
     }
     err = errno;
     A_DBG("ecl_drv_dispatch: closed err=%d", err);
-    close((int) env->evt[1]);
-    return (void*) err;
+    close(env->evt[1]);
+    return (void*) LCAST(err);
 }
+#endif
 
-// #define ASYNC_BUILD_PROGRAM
-// #define ASYNC_CONTEXT_NOTIFY
 
 typedef struct
 {
@@ -1525,13 +1594,24 @@ static ErlDrvData ecl_drv_start(ErlDrvPort port, char* command)
 	env->eref = 0xFEEDBABE;  // random start
 	lhash_init(&env->ref, "ref", 2, &func);
 	set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
+	env->evt[0] = -1;
+	env->evt[1] = -1;
+#ifdef ECL_USE_ASYNC
+	{
+	    ErlDrvSysInfo info;
+	    driver_system_info(&info,sizeof(ErlDrvSysInfo));
+	    if (info.async_threads == 0) {
+		fprintf(stderr, "cl_drv: WARNING: missing +A option (async driver calls!)\r\n");
+	    }
+	}
+#else
 #ifdef HAVE_SOCKETPAIR
 	{
 	    int sockets[2];
 	    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0)
 		return ERL_DRV_ERROR_ERRNO;
-	    env->evt[0] = (ErlDrvEvent) sockets[0];
-	    env->evt[1] =  (ErlDrvEvent) sockets[1];
+	    env->evt[0] =  sockets[0];
+	    env->evt[1] =  sockets[1];
 	}
 #else
 #error "cl_drv: currently need socketpair"
@@ -1543,7 +1623,8 @@ static ErlDrvData ecl_drv_start(ErlDrvPort port, char* command)
 				  0) < 0) {
 	    return ERL_DRV_ERROR_ERRNO;
 	}
-	driver_select(port, env->evt[0], ERL_DRV_READ, 1);
+	driver_select(port, (ErlDrvEvent)LCAST(env->evt[0]), ERL_DRV_READ, 1);
+#endif
 	return (ErlDrvData) env;
     }
     return ERL_DRV_ERROR_ERRNO;
@@ -1552,11 +1633,12 @@ static ErlDrvData ecl_drv_start(ErlDrvPort port, char* command)
 static void ecl_drv_stop(ErlDrvData d)
 {
     ecl_env_t* env = (ecl_env_t*) d;
+#ifndef ECL_USE_ASYNC
     void* resp;
-
-    driver_select(env->port, env->evt[0], ERL_DRV_READ, 0);
+    driver_select(env->port, (ErlDrvEvent)LCAST(env->evt[0]), ERL_DRV_READ, 0);
     close((int) env->evt[0]);
     erl_drv_thread_join(env->tid, &resp);
+#endif
     lhash_delete(&env->ref);
     driver_free(env);
 }
@@ -1568,6 +1650,158 @@ static void ecl_drv_command(ErlDrvData d, char* buf, int len)
     (void) len;
 }
 
+static void ecl_response(ecl_env_t* env, ecl_response_t* resp)
+{
+    ErlDrvTermData term_data[16];
+    // ecl_object_t* obj;
+    int i = 0;
+
+    A_DBG("ecl_drv_input: resp->type=%s resp->ref=%u",
+	  ecl_response_name[resp->type], resp->eref);
+    // Send {cl_event,Event,Status} to caller
+    switch(resp->type) {
+    case ECL_RESPONSE_NONE: {
+	// response to bad command
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("cl_reply");
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = resp->eref;	
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("error");
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom(fmt_error(resp->err));
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 2;
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
+	driver_send_term(env->port, resp->caller, term_data, i);
+	break;
+    }
+
+    case ECL_RESPONSE_FINISH: {
+	int i = 0;  // max 12 words
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("cl_reply");
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = resp->eref;
+	if (!resp->err) {
+	    term_data[i++] = ERL_DRV_ATOM;
+	    term_data[i++] = driver_mk_atom("ok");
+	}
+	else {
+	    term_data[i++] = ERL_DRV_ATOM;
+	    term_data[i++] = driver_mk_atom("error");
+	    term_data[i++] = ERL_DRV_ATOM;
+	    term_data[i++] = driver_mk_atom(fmt_error(resp->err));
+	    term_data[i++] = ERL_DRV_TUPLE;
+	    term_data[i++] = 2;
+	}
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
+	driver_send_term(env->port, resp->caller, term_data, i);
+	break;
+    }
+
+    case ECL_RESPONSE_BUILD: { // 8 words
+	term_data[0] = ERL_DRV_ATOM;
+	term_data[1] = driver_mk_atom("cl_reply");
+	term_data[2] = ERL_DRV_UINT;
+	term_data[3] = resp->eref;
+	term_data[4] = ERL_DRV_ATOM;
+	term_data[5] = driver_mk_atom("ok");
+	term_data[6] = ERL_DRV_TUPLE;
+	term_data[7] = 3;
+	driver_send_term(env->port, resp->caller, term_data, 8);
+	break;
+    }
+
+    case ECL_RESPONSE_CONTEXT: { // 9 words
+	term_data[0] = ERL_DRV_ATOM;
+	term_data[1] = driver_mk_atom("cl_error");
+	term_data[2] = ERL_DRV_UINT;
+	term_data[3] = resp->eref;
+	term_data[4] = ERL_DRV_STRING;
+	term_data[5] = (ErlDrvTermData)resp->errinfo;
+	term_data[6] = strlen(resp->errinfo);
+	term_data[7] = ERL_DRV_TUPLE;
+	term_data[8] = 3;
+	if (!resp->caller)
+	    driver_output_term(env->port, term_data, 9);
+	else
+	    driver_send_term(env->port, resp->caller, term_data, 9);
+	driver_free(resp->errinfo);
+	break;
+    }
+
+    case ECL_RESPONSE_EVENT_STATUS: { // max 8 words
+	term_data[0] = ERL_DRV_ATOM;
+	term_data[1] = driver_mk_atom("cl_event");
+	term_data[2] = ERL_DRV_UINT;
+	term_data[3] = EPTR_HANDLE(resp->event);
+	ecl_event_status(kv_execution_status,resp->status,&term_data[4]);
+	term_data[6] = ERL_DRV_TUPLE;
+	term_data[7] = 3;
+	/* get_event_info wont work! is this better?
+	   if ((obj = event_object(env, EPTR_HANDLE(resp->event))))
+	   ecl_object_release(obj);
+	*/
+	driver_send_term(env->port, resp->caller, term_data, 8);
+	if (resp->bin)
+	    driver_free_binary(resp->bin);
+	break;
+    }
+
+    case ECL_RESPONSE_EVENT_BIN: { // max 10 words
+	// This response is initially from clEnqueueReadBuffer
+	// so if everythings is ok then pass the binary back to
+	// the caller. Otherwise send an error.
+	// Send {cl_event,Event,Bin|Status}
+	term_data[0] = ERL_DRV_ATOM;
+	term_data[1] = driver_mk_atom("cl_event");
+	term_data[2] = ERL_DRV_UINT;
+	term_data[3] = EPTR_HANDLE(resp->event);
+	/* get_event_info wont work! is this better ?
+	   if ((obj = event_object(env, EPTR_HANDLE(resp->event))))
+	   ecl_object_release(obj);
+	*/
+	if (resp->status == CL_COMPLETE) {
+	    term_data[4] = ERL_DRV_BINARY;
+	    term_data[5] = (ErlDrvTermData) resp->bin;
+	    term_data[6] = resp->bin->orig_size;
+	    term_data[7] = 0;
+	    term_data[8] = ERL_DRV_TUPLE;
+	    term_data[9] = 3;
+	    driver_send_term(env->port, resp->caller, term_data, 10);
+	    driver_free_binary(resp->bin);
+	}
+	else {
+	    driver_free_binary(resp->bin);
+	    ecl_event_status(kv_execution_status,resp->status,
+			     &term_data[4]);
+	    term_data[6] = ERL_DRV_TUPLE;
+	    term_data[7] = 3;
+	    driver_send_term(env->port, resp->caller, term_data, 8);
+	}
+	return;
+    }
+	
+	
+    default:
+	A_DBG("ecl_drv_input: warning: unkown response type = %d",
+	      resp->type);
+	return;
+    }
+}
+
+
+static void ecl_drv_ready_async(ErlDrvData d, ErlDrvThreadData thread_data)
+{
+    ecl_env_t* env = (ecl_env_t*) d;
+    ecl_response_t* resp = (ecl_response_t*) thread_data;
+    ecl_response(env, resp);
+    driver_free(resp);
+}
+
 
 // When the thread dispatcher has some thing ready we will wake up
 // at this point. send to original caller
@@ -1577,132 +1811,12 @@ static void ecl_drv_command(ErlDrvData d, char* buf, int len)
 static void ecl_drv_input(ErlDrvData d, ErlDrvEvent handle)
 {
     ecl_env_t* env = (ecl_env_t*) d;
-    if (handle == env->evt[0]) {
+    if (handle == (ErlDrvEvent)LCAST(env->evt[0])) {
 	ecl_response_t resp;
 	int n;
-	A_DBG("ecl_drv_input: ready handle=%d", (int) handle);	
-	if ((n = ecl_recv_response(env, &resp)) == sizeof(ecl_response_t)) {
-	    ErlDrvTermData term_data[16];
-	    // ecl_object_t* obj;
-
-	    A_DBG("ecl_drv_input: resp.type=%s resp.ref=%u",
-		  ecl_response_name[resp.type], resp.eref);
-            // Send {cl_event,Event,Status} to caller
-	    switch(resp.type) {
-	    case ECL_RESPONSE_FINISH: {
-		int i = 0;  // max 12 words
-		term_data[i++] = ERL_DRV_ATOM;
-		term_data[i++] = driver_mk_atom("cl_reply");
-		term_data[i++] = ERL_DRV_UINT;
-		term_data[i++] = resp.eref;
-		if (!resp.err) {
-		    term_data[i++] = ERL_DRV_ATOM;
-		    term_data[i++] = driver_mk_atom("ok");
-		}
-		else {
-		    term_data[i++] = ERL_DRV_ATOM;
-		    term_data[i++] = driver_mk_atom("error");
-		    term_data[i++] = ERL_DRV_ATOM;
-		    term_data[i++] = driver_mk_atom(fmt_error(resp.err));
-		    term_data[i++] = ERL_DRV_TUPLE;
-		    term_data[i++] = 2;
-		}
-		term_data[i++] = ERL_DRV_TUPLE;
-		term_data[i++] = 3;
-		driver_send_term(env->port, resp.caller, term_data, i);
-		return;
-	    }
-
-	    case ECL_RESPONSE_BUILD: { // 8 words
-		term_data[0] = ERL_DRV_ATOM;
-		term_data[1] = driver_mk_atom("cl_reply");
-		term_data[2] = ERL_DRV_UINT;
-		term_data[3] = resp.eref;
-		term_data[4] = ERL_DRV_ATOM;
-		term_data[5] = driver_mk_atom("ok");
-		term_data[6] = ERL_DRV_TUPLE;
-		term_data[7] = 3;
-		driver_send_term(env->port, resp.caller, term_data, 8);
-		return;
-	    }
-
-	    case ECL_RESPONSE_CONTEXT: { // 9 words
-		term_data[0] = ERL_DRV_ATOM;
-		term_data[1] = driver_mk_atom("cl_error");
-		term_data[2] = ERL_DRV_UINT;
-		term_data[3] = resp.eref;
-		term_data[4] = ERL_DRV_STRING;
-		term_data[5] = (ErlDrvTermData)resp.errinfo;
-		term_data[6] = strlen(resp.errinfo);
-		term_data[7] = ERL_DRV_TUPLE;
-		term_data[8] = 3;
-		if (!resp.caller)
-		    driver_output_term(env->port, term_data, 9);
-		else
-		    driver_send_term(env->port, resp.caller, term_data, 9);
-		driver_free(resp.errinfo);
-		return;
-	    }
-
-	    case ECL_RESPONSE_EVENT_STATUS: { // max 8 words
-		term_data[0] = ERL_DRV_ATOM;
-		term_data[1] = driver_mk_atom("cl_event");
-		term_data[2] = ERL_DRV_UINT;
-		term_data[3] = EPTR_HANDLE(resp.event);
-		ecl_event_status(kv_execution_status,resp.status,&term_data[4]);
-		term_data[6] = ERL_DRV_TUPLE;
-		term_data[7] = 3;
-		/* get_event_info wont work! is this better?
-		if ((obj = event_object(env, EPTR_HANDLE(resp.event))))
-		    ecl_object_release(obj);
-		*/
-		driver_send_term(env->port, resp.caller, term_data, 8);
-		if (resp.bin)
-		    driver_free_binary(resp.bin);
-		return;
-	    }
-
-	    case ECL_RESPONSE_EVENT_BIN: { // max 10 words
-		// This response is initially from clEnqueueReadBuffer
-		// so if everythings is ok then pass the binary back to
-		// the caller. Otherwise send an error.
-		// Send {cl_event,Event,Bin|Status}
-		term_data[0] = ERL_DRV_ATOM;
-		term_data[1] = driver_mk_atom("cl_event");
-		term_data[2] = ERL_DRV_UINT;
-		term_data[3] = EPTR_HANDLE(resp.event);
-		/* get_event_info wont work! is this better ?
-		if ((obj = event_object(env, EPTR_HANDLE(resp.event))))
-		    ecl_object_release(obj);
-		*/
-		if (resp.status == CL_COMPLETE) {
-		    term_data[4] = ERL_DRV_BINARY;
-		    term_data[5] = (ErlDrvTermData) resp.bin;
-		    term_data[6] = resp.bin->orig_size;
-		    term_data[7] = 0;
-		    term_data[8] = ERL_DRV_TUPLE;
-		    term_data[9] = 3;
-		    driver_send_term(env->port, resp.caller, term_data, 10);
-		    driver_free_binary(resp.bin);
-		}
-		else {
-		    driver_free_binary(resp.bin);
-		    ecl_event_status(kv_execution_status,resp.status,
-				     &term_data[4]);
-		    term_data[6] = ERL_DRV_TUPLE;
-		    term_data[7] = 3;
-		    driver_send_term(env->port, resp.caller, term_data, 8);
-		}
-		return;
-	    }
-
-
-	    default:
-		A_DBG("ecl_drv_input: warning: unkown response type = %d",
-		      resp.type);
-		return;
-	    }
-	}
+	A_DBG("ecl_drv_input: ready handle=%ld", LCAST(handle));	
+	if ((n = ecl_recv_response(env, &resp)) == sizeof(ecl_response_t))
+	    ecl_response(env, &resp);
     }
 }
 
@@ -1724,7 +1838,7 @@ static inline void put_error(cbuf_t* out, cl_int err)
     cbuf_put_tuple_begin(out, 2);
     cbuf_put_tag_error(out);
     cbuf_put_atom(out, fmt_error(err));
-    cbuf_put_tuple_end(out);
+    cbuf_put_tuple_end(out, 2);
 }
 
 // Write EVENT,event-ref:32
@@ -1733,7 +1847,7 @@ static inline void put_event(cbuf_t* out, u_int32_t ref)
     cbuf_put_tuple_begin(out, 2);
     cbuf_put_tag_event(out);
     cbuf_put_uint32(out, ref);
-    cbuf_put_tuple_end(out);
+    cbuf_put_tuple_end(out, 2);
 }
 
 // Write OK Object-Handle
@@ -1743,7 +1857,7 @@ static inline void put_object(cbuf_t* out, ecl_object_t* obj)
     cbuf_put_tuple_begin(out, 2);
     cbuf_put_tag_ok(out);
     put_pointer(out, handle);
-    cbuf_put_tuple_end(out);
+    cbuf_put_tuple_end(out, 2);
 }
 
 #define RETURN_OK()       do { put_ok(&reply); goto done; } while(0)
@@ -2077,8 +2191,8 @@ static int ecl_drv_ctl(ErlDrvData d,
 		ecl_object_t* obj = EclPlatform(env, platform_id[i]);
 		put_pointer(&reply, ecl_handle(obj));
 	    }
-	    cbuf_put_list_end(&reply);
-	    cbuf_put_tuple_end(&reply);
+	    cbuf_put_list_end(&reply, num_platforms);
+	    cbuf_put_tuple_end(&reply, 2);
 	    goto done;
 	}
 	break;
@@ -2121,8 +2235,8 @@ static int ecl_drv_ctl(ErlDrvData d,
 		ecl_object_t* dobj = EclDevice(env, device_id[i]);
 		put_pointer(&reply, ecl_handle(dobj));
 	    }
-	    cbuf_put_list_end(&reply);
-	    cbuf_put_tuple_end(&reply);
+	    cbuf_put_list_end(&reply,num_devices);
+	    cbuf_put_tuple_end(&reply,2);
 	    goto done;
 	}
 	break;
@@ -2153,7 +2267,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 		    cbuf_put_tag_ok(&reply);
 		    put_value(&reply, env, &platform_info[info_arg],
 			      buf, returned_size);
-		    cbuf_put_tuple_end(&reply);
+		    cbuf_put_tuple_end(&reply, 2);
 		    goto done;
 		}
 	    }
@@ -2366,7 +2480,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 		cbuf_put_tag_ok(&reply);
 		put_element(&reply, BITFIELD, &old_properties,
 			    kv_command_queue_properties);
-		cbuf_put_tuple_end(&reply);
+		cbuf_put_tuple_end(&reply, 2);
 		goto done;
 	    }
 	}
@@ -2692,7 +2806,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 		    cbuf_put_tag_ok(&reply);
 		    put_value(&reply, env, &build_info[info_arg],
 			      buf, returned_size);
-		    cbuf_put_tuple_end(&reply);
+		    cbuf_put_tuple_end(&reply, 2);
 		    goto done;
 		}
 	    }
@@ -2765,8 +2879,8 @@ static int ecl_drv_ctl(ErlDrvData d,
 		    put_pointer(&reply, ecl_handle(kobj[i]));
 		    i++;
 		}
-		cbuf_put_list_end(&reply);
-		cbuf_put_tuple_end(&reply);
+		cbuf_put_list_end(&reply, num_kernels_ret);
+		cbuf_put_tuple_end(&reply, 2);
 		goto done;
 	    }
 	}
@@ -2883,7 +2997,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 		    cbuf_put_tag_ok(&reply);
 		    put_value(&reply, env, &workgroup_info[info_arg],
 			      buf, returned_size);
-		    cbuf_put_tuple_end(&reply);
+		    cbuf_put_tuple_end(&reply, 2);
 		    goto done;
 		}
 	    }

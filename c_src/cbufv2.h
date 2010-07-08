@@ -13,8 +13,11 @@
 #include <machine/endian.h>
 #endif
 
+#define UNUSED __attribute__((unused))
+
 #define CBUF_USE_PUT_ETF   // pack ETF 
 #define CBUF_USE_PUT_CTI   // pack CTI 
+#define CBUF_USE_PUT_TRM   // pack DrvTerm
 
 #define CBUF_FLAG_HEAP     0x01  // allocated heap memory
 #define CBUF_FLAG_BINARY   0x02  // ErlDrvBinary 
@@ -36,14 +39,27 @@ typedef struct {
     ErlDrvBinary* bp; // reference when segment is in a binary
 } cbuf_segment_t;
 
+#define CBUF_MIN_HEAP 64
+
+// Memory for extra non relocatable data
+typedef struct _cbuf_heap_t {
+    struct _cbuf_heap_t* next;  // chained heap
+    size_t    size;             // size of heap
+    u_int8_t* ptr;              // heap top 
+    u_int8_t* end;              // end of heap
+    u_int8_t  base[0];          // base area
+} cbuf_heap_t;
+    
+
 typedef struct
 {
     u_int8_t  flags;         // allocation flags
     size_t    ip;            // poistion in current segment
     size_t    iv;
-    size_t    vlen;         // used length of v
-    size_t    vsize;        // actual length of v
-    cbuf_segment_t* v;      // current segment
+    size_t    vlen;          // used length of v
+    size_t    vsize;         // actual length of v
+    cbuf_heap_t* h;          // heap segments
+    cbuf_segment_t* v;       // current segment
     cbuf_segment_t  dv[CBUF_VEC_SIZE];
 } cbuf_t;
 
@@ -302,7 +318,7 @@ static int cbuf_vec_grow(cbuf_t* cp)
 
 // Terminate current segment (patch iov_len)
 // add new segment and increase iv
-static int cbuf_seg_add(cbuf_t* cp)
+static UNUSED int cbuf_seg_add(cbuf_t* cp)
 {
     cp->v[cp->iv].len = cp->ip;
     cp->iv++;
@@ -332,6 +348,27 @@ static inline u_int8_t* cbuf_seg_alloc(cbuf_t* cp, size_t len)
     cp->v[cp->iv].len = cp->ip;
     return ptr;
 }
+
+static u_int8_t* cbuf_heap_alloc(cbuf_t* cp, size_t len)
+{
+    if (cp->h && (cp->h->ptr + len < cp->h->end)) {
+	u_int8_t* ptr = cp->h->ptr;
+	cp->h->ptr += len;
+	return ptr;
+    }
+    else {
+	cbuf_heap_t* hp;
+	size_t sz = (len > CBUF_MIN_HEAP) ? len : CBUF_MIN_HEAP;
+	hp = (cbuf_heap_t*) driver_alloc(sizeof(cbuf_heap_t) + sz);
+	hp->size = sz;
+	hp->ptr = hp->base + len;
+	hp->end = hp->base + sz;
+	hp->next = cp->h;
+	cp->h = hp;
+	return hp->base;
+    }
+}
+
 
 // segmented read & handle end of segment pointer
 static int cbuf_seg_read(cbuf_t* cp, void* ptr, size_t len)
@@ -367,7 +404,7 @@ static inline int cbuf_read(cbuf_t* cp, void* ptr, size_t len)
 // Write data into segments
 // FIXME: add code to expand segments
 //
-static int cbuf_seg_write(cbuf_t* cp, void* ptr, size_t len)
+static UNUSED int cbuf_seg_write(cbuf_t* cp, void* ptr, size_t len)
 {
     size_t n;
     while((cp->iv < cp->vlen) && len && ((n=cbuf_seg_w_avail(cp)) < len)) {
@@ -447,7 +484,7 @@ static void cbuf_init(cbuf_t* cp, void* buf, size_t len,
     cp->v[0].len   = len;
     cp->v[0].size  = len;
     cp->v[0].bp    = 0;
-
+    cp->h     = 0;
     cp->iv    = 0;           // current vector index
     cp->ip    = skip;        // current position in current vector
 }
@@ -470,13 +507,14 @@ static void cbuf_initv(cbuf_t* cp, ErlIOVec* vec)
 	cp->v[i].len   = vec->iov[i].iov_len;
 	cp->v[i].bp    = vec->binv[i];
     }
+    cp->h  = 0;
     cp->iv = 0;
     cp->ip = 0;
 }
 
 
 // Create cbuf as a binary 
-static cbuf_t* cbuf_new_bin(u_int8_t* buf,size_t len,size_t skip)
+static UNUSED cbuf_t* cbuf_new_bin(u_int8_t* buf,size_t len,size_t skip)
 {
     cbuf_t* cp;
     ErlDrvBinary* bp;
@@ -495,7 +533,7 @@ static cbuf_t* cbuf_new_bin(u_int8_t* buf,size_t len,size_t skip)
 }
 
 /* allocate a combi cbuf_t and buffer (non growing) */
-static cbuf_t* cbuf_new(u_int8_t* buf, u_int32_t len, u_int32_t skip)
+static UNUSED cbuf_t* cbuf_new(u_int8_t* buf, u_int32_t len, u_int32_t skip)
 {
     cbuf_t* cp;
     char*   bp;
@@ -530,6 +568,14 @@ static void cbuf_final(cbuf_t* cp)
     }
     if (cp->v != cp->dv)
 	driver_free(cp->v);
+    if (cp->h) {
+	cbuf_heap_t* hp = cp->h;
+	while(hp) {
+	    cbuf_heap_t* hpn = hp->next;
+	    driver_free(hp);
+	    hp = hpn;
+	}
+    }
 }
 
 static inline void cbuf_free(cbuf_t* cp)
@@ -574,7 +620,7 @@ static void cbuf_forward(cbuf_t* cp, size_t len)
 }
 
 // skip backward 
-static void cbuf_backward(cbuf_t* cp, size_t len)
+static UNUSED void cbuf_backward(cbuf_t* cp, size_t len)
 {
     while(len) {
 	size_t n = cbuf_seg_used(cp);
@@ -694,8 +740,9 @@ static inline int cbuf_cti_put_tuple_begin(cbuf_t* cp, size_t n)
     return cbuf_twrite(cp, TUPLE, 0, 0);    
 }
 
-static inline int cbuf_cti_put_tuple_end(cbuf_t* cp)
+static inline int cbuf_cti_put_tuple_end(cbuf_t* cp, size_t n)
 {
+    (void) n;
     return cbuf_twrite(cp, TUPLE_END, 0, 0);    
 }
 
@@ -705,8 +752,9 @@ static inline int cbuf_cti_put_list_begin(cbuf_t* cp, size_t n)
     return cbuf_twrite(cp, LIST, 0, 0);        
 }
 
-static inline int cbuf_cti_put_list_end(cbuf_t* cp)
+static inline int cbuf_cti_put_list_end(cbuf_t* cp, size_t n)
 {
+    (void) n;
     return cbuf_twrite(cp, LIST_END, 0, 0);
 }
 
@@ -780,6 +828,16 @@ static inline int cbuf_cti_put_string(cbuf_t* cp, const char* string, int n)
     }
     return 1;
 }
+
+static inline int cbuf_cti_put_bin(cbuf_t* cp, ErlDrvBinary* bin, size_t len, size_t offset)
+{
+    (void) cp;
+    (void) bin;
+    (void) len;
+    (void) offset;
+    return 0;  // FIXME
+}
+
 
 static inline int cbuf_cti_put_binary(cbuf_t* cp, const u_int8_t* buf, u_int32_t len)
 {
@@ -967,9 +1025,10 @@ static inline int cbuf_etf_put_tuple_begin(cbuf_t* cp, size_t n)
     return 1;
 }
 
-static inline int cbuf_etf_put_tuple_end(cbuf_t* cp)
+static inline int cbuf_etf_put_tuple_end(cbuf_t* cp, size_t n)
 {
     (void) cp;
+    (void) n;
     return 1;
 }
 
@@ -984,9 +1043,11 @@ static inline int cbuf_etf_put_list_begin(cbuf_t* cp, size_t n)
 }
 
 // proper list end!
-static inline int cbuf_etf_put_list_end(cbuf_t* cp)
+static inline int cbuf_etf_put_list_end(cbuf_t* cp, size_t n)
 {
     u_int8_t* p;
+    (void) n;
+
     if (!(p = cbuf_seg_alloc(cp, 1)))
 	return 0;
     p[0] = NIL_EXT;
@@ -1029,7 +1090,16 @@ static inline int cbuf_etf_put_string(cbuf_t* cp, const char* string, int n)
     return 1;
 }
 
-// FIXME - if vectored interface add as binary part
+static inline int cbuf_etf_put_bin(cbuf_t* cp, ErlDrvBinary* bin, size_t len, size_t offset)
+{
+    (void)cp;
+    (void)bin;
+    (void)len;
+    (void)offset;
+    return 0;  // FIXME
+}
+
+// FIXME - if vector interface add as binary part
 static inline int cbuf_etf_put_binary(cbuf_t* cp, const u_int8_t* buf, 
 				      u_int32_t len)
 {
@@ -1044,6 +1114,181 @@ static inline int cbuf_etf_put_binary(cbuf_t* cp, const u_int8_t* buf,
 }
 
 #endif // CBUF_USE_PUT_ETF
+
+#ifdef CBUF_USE_PUT_TRM
+
+static inline int trm_put_2(cbuf_t* cp, ErlDrvTermData tag, ErlDrvTermData value)
+{
+    ErlDrvTermData* p;
+
+    if (!(p = (ErlDrvTermData*) cbuf_seg_alloc(cp, sizeof(ErlDrvTermData)*2)))
+	return 0;    
+    p[0] = tag;
+    p[1] = value;
+    return 1;
+}
+
+static inline int trm_put_3(cbuf_t* cp, ErlDrvTermData tag, 
+			    ErlDrvTermData value1, ErlDrvTermData value2)
+{
+    ErlDrvTermData* p;
+
+    if (!(p = (ErlDrvTermData*) cbuf_seg_alloc(cp, sizeof(ErlDrvTermData)*3)))
+	return 0;    
+    p[0] = tag;
+    p[1] = value1;
+    p[2] = value2;
+    return 1;
+}
+
+static inline int trm_put_4(cbuf_t* cp, ErlDrvTermData tag, 
+			    ErlDrvTermData value1, ErlDrvTermData value2,
+			    ErlDrvTermData value3)
+{
+    ErlDrvTermData* p;
+
+    if (!(p = (ErlDrvTermData*) cbuf_seg_alloc(cp, sizeof(ErlDrvTermData)*4)))
+	return 0;    
+    p[0] = tag;
+    p[1] = value1;
+    p[2] = value2;
+    p[3] = value3;
+    return 1;
+}
+
+static inline int trm_put_uint(cbuf_t* cp, ErlDrvUInt value)
+{
+    return trm_put_2(cp, ERL_DRV_UINT, (ErlDrvTermData) value);
+}
+
+static inline int trm_put_sint(cbuf_t* cp, ErlDrvSInt value)
+{
+    return trm_put_2(cp, ERL_DRV_INT, (ErlDrvTermData) value);
+}
+
+
+static inline int cbuf_trm_put_int8(cbuf_t* cp, int8_t value)
+{
+    return trm_put_sint(cp, (ErlDrvSInt) value);
+}
+
+static inline int cbuf_trm_put_int16(cbuf_t* cp, int16_t value)
+{
+    return trm_put_sint(cp, (ErlDrvSInt) value);
+}
+
+static inline int cbuf_trm_put_int32(cbuf_t* cp, int32_t value)
+{
+    return trm_put_sint(cp, (ErlDrvSInt) value);
+}
+
+static inline int cbuf_trm_put_int64(cbuf_t* cp, int64_t value)
+{
+    ErlDrvSInt64* ptr = (ErlDrvSInt64*)cbuf_heap_alloc(cp,sizeof(ErlDrvSInt64));
+    *ptr = value;
+    return trm_put_2(cp, ERL_DRV_INT64, (ErlDrvTermData) ptr);
+}
+
+static inline int cbuf_trm_put_float32(cbuf_t* cp, float value)
+{
+    double* ptr = (double*) cbuf_heap_alloc(cp, sizeof(double));
+    *ptr = (double) value;
+    return trm_put_2(cp, ERL_DRV_FLOAT, (ErlDrvTermData) ptr);
+}
+
+static inline int cbuf_trm_put_float64(cbuf_t* cp, double value)
+{
+    double* ptr = (double*) cbuf_heap_alloc(cp, sizeof(double));
+    *ptr = value;
+    return trm_put_2(cp, ERL_DRV_FLOAT, (ErlDrvTermData) ptr);
+}
+
+static inline int cbuf_trm_put_uint8(cbuf_t* cp, u_int8_t value)
+{
+    return trm_put_uint(cp, (ErlDrvUInt) value);
+}
+
+static inline int cbuf_trm_put_uint16(cbuf_t* cp, u_int16_t value)
+{
+    return trm_put_uint(cp, (ErlDrvUInt) value);
+}
+
+static inline int cbuf_trm_put_uint32(cbuf_t* cp, u_int32_t value)
+{
+    return trm_put_uint(cp, (ErlDrvUInt) value);
+}
+
+static inline int cbuf_trm_put_uint64(cbuf_t* cp, u_int64_t value)
+{
+    ErlDrvUInt64* ptr = (ErlDrvUInt64*)cbuf_heap_alloc(cp,sizeof(ErlDrvUInt64));
+    *ptr = value;
+    return trm_put_2(cp, ERL_DRV_UINT64, (ErlDrvTermData) ptr);
+}
+
+static inline int cbuf_trm_put_atom(cbuf_t* cp, const char* value)
+{
+    return trm_put_2(cp, ERL_DRV_ATOM, (ErlDrvTermData) driver_mk_atom((char*)value));
+}
+
+static inline int cbuf_trm_put_tuple_begin(cbuf_t* cp, size_t n)
+{
+    (void) cp;
+    (void) n;
+    return 1;
+}
+
+static inline int cbuf_trm_put_tuple_end(cbuf_t* cp, size_t n) 
+{
+    return trm_put_2(cp, ERL_DRV_TUPLE, (ErlDrvTermData) n);
+}
+
+static inline int cbuf_trm_put_list_begin(cbuf_t* cp, size_t n)
+{
+    (void) cp;
+    (void) n;
+    return 1;
+}
+
+static inline int cbuf_trm_put_list_end(cbuf_t* cp, size_t n)
+{
+    return trm_put_2(cp, ERL_DRV_LIST, (ErlDrvTermData) n);
+}
+
+static inline int cbuf_trm_put_tag_ok(cbuf_t* cp)
+{
+    return cbuf_trm_put_atom(cp, "ok");
+}
+
+static inline int cbuf_trm_put_tag_error(cbuf_t* cp)
+{
+    return cbuf_trm_put_atom(cp, "error");
+}
+
+static inline int cbuf_trm_put_tag_event(cbuf_t* cp)
+{
+    return cbuf_trm_put_atom(cp, "event");
+}
+
+static inline int cbuf_trm_put_string(cbuf_t* cp, const char* string, int n)
+{
+    return trm_put_3(cp, ERL_DRV_STRING, (ErlDrvTermData) string,
+		     (ErlDrvTermData) n);
+}
+
+static inline int cbuf_trm_put_bin(cbuf_t* cp, ErlDrvBinary* bin, size_t len, size_t offset)
+{
+    return trm_put_4(cp, ERL_DRV_BINARY, (ErlDrvTermData) bin, 
+		     (ErlDrvTermData) len, (ErlDrvTermData) offset);
+}
+
+static inline int cbuf_trm_put_binary(cbuf_t* cp, const u_int8_t* buf, u_int32_t len)
+{
+    return trm_put_3(cp, ERL_DRV_BUF2BINARY, (ErlDrvTermData) buf,
+		     (ErlDrvTermData) len);
+}
+
+
+#endif
 
 // Select ETF or CTI both in runtime and compile time
 #if defined(CBUF_USE_PUT_ETF) && defined(CBUF_USE_PUT_CTI)
@@ -1066,6 +1311,12 @@ static inline int cbuf_etf_put_binary(cbuf_t* cp, const u_int8_t* buf,
 	((((cp)->flags & CBUF_FLAG_PUT_MASK) == CBUF_FLAG_PUT_CTI) ?	\
 	 (cbuf_cti_put_##what((cp),(arg1),(arg2))) : 0))
 
+#define cbuf_put_value3(what,cp,arg1,arg2,arg3) (			\
+	(((cp)->flags & CBUF_FLAG_PUT_MASK) == CBUF_FLAG_PUT_ETF) ?	\
+	(cbuf_etf_put_##what((cp),(arg1),(arg2),(arg3))) :		\
+	((((cp)->flags & CBUF_FLAG_PUT_MASK) == CBUF_FLAG_PUT_CTI) ?	\
+	 (cbuf_cti_put_##what((cp),(arg1),(arg2),(arg3))) : 0))
+
 #elif defined(CBUF_USE_PUT_ETF)
 
 #define cbuf_put(what,cp) 				 \
@@ -1074,6 +1325,8 @@ static inline int cbuf_etf_put_binary(cbuf_t* cp, const u_int8_t* buf,
     (cbuf_etf_put_##what((cp),(arg)))
 #define cbuf_put_value2(what,cp,arg1,arg2)		\
     (cbuf_etf_put_##what((cp),(arg1),(arg2)))
+#define cbuf_put_value3(what,cp,arg1,arg2,arg3)	\
+    (cbuf_etf_put_##what((cp),(arg1),(arg2),(arg3)))
 
 #elif defined(CBUF_USE_PUT_CTI)
 
@@ -1083,9 +1336,11 @@ static inline int cbuf_etf_put_binary(cbuf_t* cp, const u_int8_t* buf,
     (cbuf_cti_put_##what((cp),(arg)))
 #define cbuf_put_value2(what,cp,arg1,arg2)	\
     (cbuf_cti_put_##what((cp),(arg1),(arg2)))
+#define cbuf_put_value3(what,cp,arg1,arg2)	\
+    (cbuf_cti_put_##what((cp),(arg1),(arg2),(arg3)))
 
 #else 
-#error "must use either CTI or ETF"
+#error "must use either CTI, ETF or TRM"
 #endif
 
 static inline int cbuf_put_boolean(cbuf_t* cp, u_int8_t value)
@@ -1149,9 +1404,9 @@ static inline int cbuf_put_tuple_begin(cbuf_t* cp, size_t n)
     return cbuf_put_value(tuple_begin, cp, n);
 }
 
-static inline int cbuf_put_tuple_end(cbuf_t* cp) 
+static inline int cbuf_put_tuple_end(cbuf_t* cp, size_t n) 
 {
-    return cbuf_put(tuple_end, cp);
+    return cbuf_put_value(tuple_end, cp, n);
 }
 
 static inline int cbuf_put_list_begin(cbuf_t* cp, size_t n)
@@ -1159,9 +1414,9 @@ static inline int cbuf_put_list_begin(cbuf_t* cp, size_t n)
     return cbuf_put_value(list_begin, cp, n);
 }
 
-static inline int cbuf_put_list_end(cbuf_t* cp)
+static inline int cbuf_put_list_end(cbuf_t* cp, size_t n)
 {
-    return cbuf_put(list_end, cp);
+    return cbuf_put_value(list_end, cp, n);
 }
 
 static inline int cbuf_put_begin(cbuf_t* cp)
@@ -1191,6 +1446,11 @@ static inline int cbuf_put_tag_event(cbuf_t* cp)
 static inline int cbuf_put_string(cbuf_t* cp, const char* value, int n)
 {
     return cbuf_put_value2(string, cp, value, n);
+}
+
+static inline int cbuf_put_bin(cbuf_t* cp, ErlDrvBinary* bin, size_t len, size_t offset)
+{
+    return cbuf_put_value3(bin, cp, bin, len, offset);
 }
 
 static inline int cbuf_put_binary(cbuf_t* cp, const u_int8_t* buf, u_int32_t len)
@@ -1234,7 +1494,6 @@ static inline int get_uint32(cbuf_t* cp, u_int32_t* val)
 {
     return cbuf_read(cp, val, sizeof(*val));
 }
-
 
 static inline int get_uint64(cbuf_t* cp, u_int64_t* val)
 {
