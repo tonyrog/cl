@@ -22,7 +22,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--import(lists, [foreach/2, seq/2]).
+-import(lists, [foreach/2, seq/2, map/2]).
 
 -include("../include/cl.hrl").
 -include("cl_int.hrl").
@@ -68,12 +68,14 @@ stop() ->
 
 create(Code, CodeDestroy, Args) ->
     case call(Code, Args) of
-	{ok,Handle} when is_integer(Handle) ->  %% single new object
+	{ok,Handle={object,_,_}} ->  %% single new object
 	    gen_server:cast(?CL_SERVER, {create,self(),Handle,CodeDestroy}),
 	    {ok, Handle};
 	{ok,Handles} when is_list(Handles) ->  %% list of new objects
-	    foreach(fun(Handle) ->
-			    gen_server:cast(?CL_SERVER, {create,self(),Handle,CodeDestroy})
+	    foreach(fun(Handle={object,_,_}) ->
+			    gen_server:cast(?CL_SERVER, 
+					    {create,self(),Handle,
+					     CodeDestroy})
 		    end, Handles),
 	    {ok,Handles};
 	Error -> Error
@@ -81,19 +83,21 @@ create(Code, CodeDestroy, Args) ->
 
 async_create(Code, CodeDestroy, Args) ->
     case async_call(Code, Args) of
-	{ok,Handle} when is_integer(Handle) ->  %% single new object
+	{ok,Handle={object,_,_}} -> %% single new object
 	    gen_server:cast(?CL_SERVER, {create,self(),Handle,CodeDestroy}),
 	    {ok, Handle};
 	{ok,Handles} when is_list(Handles) ->  %% list of new objects
-	    foreach(fun(Handle) ->
-			    gen_server:cast(?CL_SERVER, {create,self(),Handle,CodeDestroy})
+	    foreach(fun(Handle={object,_,_}) ->
+			    gen_server:cast(?CL_SERVER, 
+					    {create,self(),Handle,
+					     CodeDestroy})
 		    end, Handles),
 	    {ok,Handles};
 	Error -> Error
     end.
 
-release(Code, Handle) ->
-    case call(Code, <<?cl_pointer(Handle)>>) of
+release(Code, Handle={object,_,Ptr}) ->
+    case call(Code, <<?cl_pointer(Ptr)>>) of
 	ok ->
 	    gen_server:cast(?CL_SERVER, {release,self(),Handle}),
 	    ok;
@@ -101,15 +105,14 @@ release(Code, Handle) ->
 	    Error
     end.
 
-retain(Code, Handle) ->
-    case call(Code, <<?cl_pointer(Handle)>>) of
+retain(Code, Handle={object,_,Ptr}) ->
+    case call(Code, <<?cl_pointer(Ptr)>>) of
 	ok ->
 	    gen_server:cast(?CL_SERVER, {retain,self(),Handle}),
 	    ok;
 	Error ->
 	    Error
     end.
-
 
 call(Code, Args) ->
     Reply = erlang:port_control(?CL_PORT, Code, Args),
@@ -197,13 +200,13 @@ handle_call(_Request, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-handle_cast({create,Pid,Handle,ReleaseCode}, State) ->
+handle_cast({create,Pid,{object,_,Handle},ReleaseCode}, State) ->
     Mon = start_monitor(Pid),
     ets:insert_new(?CL_REG, {Handle,ReleaseCode,1}),
     ets:insert_new(?CL_REG, {Mon, {Pid,Handle}}),
     ets:insert_new(?CL_REG, {{Pid,Handle}, Mon, 1}),
     {noreply, State};
-handle_cast({retain,Pid,Handle}, State) ->
+handle_cast({retain,Pid,{object,_,Handle}}, State) ->
     try ets:update_counter(?CL_REG,{Pid,Handle},{3,1}) of
 	_N ->
 	    {noreply,State}
@@ -215,7 +218,7 @@ handle_cast({retain,Pid,Handle}, State) ->
 	    ets:insert_new(?CL_REG, {{Pid,Handle}, Mon, 1}),
 	    {noreply,State}
     end;
-handle_cast({release,Pid,Handle}, State) ->
+handle_cast({release,Pid,{object,_,Handle}}, State) ->
     try ets:update_counter(?CL_REG,{Pid,Handle},{3,-1}) of
 	0 ->
 	    [{_,Mon,_}] = ets:lookup(?CL_REG, {Pid,Handle}),
@@ -463,6 +466,9 @@ decode(Data, Stack) ->
             decode(Rest, [I|Stack]);
         <<?UINT64, ?u_int64_t(I), Rest/binary>> ->
             ?dbg_hard("UINT64:~w",[I]),
+            decode(Rest, [I|Stack]);
+        <<?POINTER, ?u_int64_t(I), Rest/binary>> ->
+            ?dbg_hard("POINTER:~w",[I]),
             decode(Rest, [I|Stack]);
         <<?INT8, ?int8_t(I), Rest/binary>> ->
             ?dbg_hard("INT8:~w",[I]),

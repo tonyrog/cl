@@ -183,25 +183,25 @@
 	?cl_double(X9), ?cl_double(X10), ?cl_double(X11), ?cl_double(X12),
 	?cl_double(X13), ?cl_double(X14), ?cl_double(X15), ?cl_double(X16)).
 
-%% @type cl_platform_id() = non_neg_integer()
-%% @type cl_device_id()   = non_neg_integer()
-%% @type cl_context()     = non_neg_integer()
-%% @type cl_queue()       = non_neg_integer()
-%% @type cl_mem()         = non_neg_integer()
-%% @type cl_sampler()     = non_neg_integer()
-%% @type cl_program()     = non_neg_integer()
-%% @type cl_kernel()      = non_neg_integer()
-%% @type cl_event()       = non_neg_integer()
+%% @type cl_platform_id() = { {'object', 1, non_neg_integer() } }
+%% @type cl_device_id()   = { {'object', 2, non_neg_integer() } }
+%% @type cl_context()     = { {'object', 3, non_neg_integer() } }
+%% @type cl_queue()       = { {'object', 4, non_neg_integer() } }
+%% @type cl_mem()         = { {'object', 5, non_neg_integer() } }
+%% @type cl_sampler()     = { {'object', 6, non_neg_integer() } }
+%% @type cl_program()     = { {'object', 7, non_neg_integer() } }
+%% @type cl_kernel()      = { {'object', 8, non_neg_integer() } }
+%% @type cl_event()       = { {'object', 9, non_neg_integer() } }
 
--type cl_platform_id() :: non_neg_integer().
--type cl_device_id()   :: non_neg_integer().
--type cl_context()     :: non_neg_integer().
--type cl_queue()       :: non_neg_integer().
--type cl_mem()         :: non_neg_integer().
--type cl_sampler()     :: non_neg_integer().
--type cl_program()     :: non_neg_integer().
--type cl_kernel()      :: non_neg_integer().
--type cl_event()       :: non_neg_integer().
+-type cl_platform_id() :: { {'object', 1, non_neg_integer() } }.
+-type cl_device_id()   :: { {'object', 2, non_neg_integer() } }.
+-type cl_context()     :: { {'object', 3, non_neg_integer() } }.
+-type cl_queue()       :: { {'object', 4, non_neg_integer() } }.
+-type cl_mem()         :: { {'object', 5, non_neg_integer() } }.
+-type cl_sampler()     :: { {'object', 6, non_neg_integer() } }.
+-type cl_program()     :: { {'object', 7, non_neg_integer() } }.
+-type cl_kernel()      :: { {'object', 8, non_neg_integer() } }.
+-type cl_event()       :: { {'object', 9, non_neg_integer() } }.
 
 %% @type cl_error()  =  {
 %%     'device_not_found' |

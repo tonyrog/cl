@@ -748,6 +748,11 @@ static inline int cbuf_cti_put_uint64(cbuf_t* cp, u_int64_t value)
     return cbuf_twrite(cp, UINT64, &value, sizeof(value));
 }
 
+static inline int cbuf_cti_put_pointer(cbuf_t* cp, u_int64_t value)
+{
+    return cbuf_twrite(cp, POINTER, &value, sizeof(value));
+}
+
 /* put special tag like TUPLE/LIST/TUPLE_END/TUPLE_END 
  * REPLY_OK/REPLY_ERROR/REPLY_EVENT etc
  */
@@ -1009,6 +1014,7 @@ static inline int cbuf_etf_put_uint64(cbuf_t* cp, u_int64_t value)
     return etf_put_u64(cp, 0, value);
 }
 
+
 static inline int cbuf_etf_put_begin(cbuf_t* cp)
 {
     u_int8_t* p;
@@ -1070,6 +1076,11 @@ static inline int cbuf_etf_put_list_end(cbuf_t* cp, size_t n)
 	return 0;
     p[0] = NIL_EXT;
     return 1;
+}
+
+static inline int cbuf_etf_put_pointer(cbuf_t* cp, u_int64_t value)
+{
+    return etf_put_u64(cp, 0, value);
 }
 
 static inline int cbuf_etf_put_tag_ok(cbuf_t* cp)
@@ -1385,6 +1396,7 @@ static inline int cbuf_put_int64(cbuf_t* cp, int64_t value)
 {
     return cbuf_put_value(int64, cp, value);
 }
+
 static inline int cbuf_put_float32(cbuf_t* cp, float value)
 {
     return cbuf_put_value(float32, cp, value);
@@ -1410,6 +1422,11 @@ static inline int cbuf_put_uint32(cbuf_t* cp, u_int32_t value)
 static inline int cbuf_put_uint64(cbuf_t* cp, u_int64_t value)
 {
     return cbuf_put_value(uint64, cp, value);
+}
+
+static inline int cbuf_put_pointer(cbuf_t* cp, u_int64_t value)
+{
+    return cbuf_put_value(pointer, cp, value);
 }
 
 static inline int cbuf_put_atom(cbuf_t* cp, const char* value)

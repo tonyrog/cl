@@ -33,7 +33,19 @@
 -define(ENUM,           23).
 -define(BITFIELD,       24).
 -define(HANDLE,         25).
+-define(POINTER,        26).
+-define(USIZE,          27).
 
+%% object type codes
+-define(PLATFORM_TYPE, 1).
+-define(DEVICE_TYPE,   2).
+-define(CONTEXT_TYPE,  3).
+-define(QUEUE_TYPE,    4).
+-define(MEM_TYPE,      5).
+-define(SAMPLER_TYPE,  6).
+-define(PROGRAM_TYPE,  7).
+-define(KERNEL_TYPE,   8).
+-define(EVENT_TYPE,    9).
 %%
 %% Commands
 %%

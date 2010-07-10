@@ -106,11 +106,7 @@ static inline int get_size(cbuf_t* in, size_t* ptr)
 
 #if SIZEOF_VOID_P == 4
 typedef u_int32_t          pointer_t;
-static inline int put_pointer(cbuf_t* out, pointer_t ptr)
-{
-    u_int64_t value = (u_int64_t) ptr;
-    return cbuf_put_uint64(out, value);
-}
+
 static inline int get_pointer(cbuf_t* in, pointer_t* ptr)
 {
     u_int64_t value;
@@ -119,17 +115,16 @@ static inline int get_pointer(cbuf_t* in, pointer_t* ptr)
     *ptr = (pointer_t) value;
     return 1;
 }
+
 #elif SIZEOF_VOID_P == 8
+
 typedef u_int64_t          pointer_t;
 
-static inline int put_pointer(cbuf_t* out, pointer_t ptr)
-{
-    return cbuf_put_uint64(out, ptr);
-}
 static inline int get_pointer(cbuf_t* in, pointer_t* ptr)
 {
     return get_uint64(in, ptr);
 }
+
 #else
 #error "check configure, unable to determine SIZEOF_VOID_P"
 #endif
@@ -884,8 +879,8 @@ static void cl_emit_error(char* file, int line, ...)
 static inline void ecl_object_destroy(ecl_object_t* obj)
 {
     if (obj) {
-	// fprintf(stderr, "destroy: %s handle=%d\r\n", 
-	//   ecl_type_name[obj->cl->type], EPTR_HANDLE(obj->opaque));
+	DBG("ecl_object_destroy: %s handle=%d",
+	    ecl_type_name[obj->cl->type], EPTR_HANDLE(obj->opaque));
 	if (obj->opaque) {
 	    if (obj->cl->release)
 		obj->cl->release(obj->opaque);
@@ -1186,7 +1181,7 @@ static void put_element(cbuf_t* data, u_int8_t tag, void* ptr, ecl_kv_t* kv)
     case UINT16: cbuf_put_uint16(data, *((cl_ushort*)ptr)); break;
     case UINT32: cbuf_put_uint32(data, *((cl_uint*)ptr)); break;
     case UINT64: cbuf_put_uint64(data, *((cl_ulong*)ptr)); break;
-    case POINTER: put_pointer(data, *((pointer_t*)ptr)); break;
+    case POINTER: cbuf_put_pointer(data, *((pointer_t*)ptr)); break;
     case BOOLEAN: cbuf_put_boolean(data, (u_int8_t) *((cl_uint*)ptr)); break;
     case STRING1:
     case STRING4: {
@@ -1240,6 +1235,16 @@ static void put_element(cbuf_t* data, u_int8_t tag, void* ptr, ecl_kv_t* kv)
     }
 }
 
+static inline void put_object(cbuf_t* out, ecl_object_t* obj)
+{
+    pointer_t handle = ecl_handle(obj);
+    cbuf_put_tuple_begin(out, 3);
+    cbuf_put_atom(out, "object");
+    cbuf_put_uint8(out, obj->cl->type);
+    cbuf_put_pointer(out, handle);
+    cbuf_put_tuple_end(out, 3);
+}
+
 static void put_value(cbuf_t* data, ecl_env_t* env, ecl_info_t* iptr,
 		      void* buf, size_t len)
 {
@@ -1253,10 +1258,12 @@ static void put_value(cbuf_t* data, ecl_env_t* env, ecl_info_t* iptr,
 	while (len > 0) {
 	    if (iptr->info_type == HANDLE) {
 		void* ptr = *((void**) dptr);
-		pointer_t handle = ecl_ptr(env, ptr);
-		*((void**)dptr) = (void*)handle;
+		void* key = (void*) EPTR_HANDLE(ptr);
+		ecl_object_t* obj = (ecl_object_t*) lhash_lookup(&env->ref,key);
+		put_object(data, obj);
 	    }
-	    put_element(data, iptr->extern_type, dptr, iptr->extern_info);
+	    else 
+		put_element(data, iptr->extern_type, dptr, iptr->extern_info);
 	    len -= elem_size;
 	    dptr += elem_size;
 	}
@@ -1265,10 +1272,12 @@ static void put_value(cbuf_t* data, ecl_env_t* env, ecl_info_t* iptr,
     else {
 	if (iptr->info_type == HANDLE) {
 	    void* ptr = *((void**) dptr);
-	    pointer_t handle = ecl_ptr(env, ptr);
-	    *((void**)dptr) = (void*)handle;
+	    void* key = (void*) EPTR_HANDLE(ptr);
+	    ecl_object_t* obj = (ecl_object_t*) lhash_lookup(&env->ref,key);
+	    put_object(data, obj);
 	}
-	put_element(data, iptr->extern_type, dptr, iptr->extern_info);
+	else
+	    put_element(data, iptr->extern_type, dptr, iptr->extern_info);
     }
 }
 
@@ -1691,20 +1700,19 @@ static void ecl_drv_command(ErlDrvData d, char* buf, int len)
 
 static void ecl_response(ecl_env_t* env, ecl_response_t* resp)
 {
-    ErlDrvTermData term_data[16];
+    ErlDrvTermData term_data[32];
     // ecl_object_t* obj;
-    int i = 0;
 
     A_DBG("ecl_drv_input: resp->type=%s resp->ref=%u",
 	  ecl_response_name[resp->type], resp->eref);
-    // Send {cl_event,Event,Status} to caller
     switch(resp->type) {
     case ECL_RESPONSE_NONE: {
+	int i = 0;
 	// response to bad command
 	term_data[i++] = ERL_DRV_ATOM;
 	term_data[i++] = driver_mk_atom("cl_reply");
 	term_data[i++] = ERL_DRV_UINT;
-	term_data[i++] = resp->eref;	
+	term_data[i++] = resp->eref;
 	term_data[i++] = ERL_DRV_ATOM;
 	term_data[i++] = driver_mk_atom("error");
 	term_data[i++] = ERL_DRV_ATOM;
@@ -1718,7 +1726,7 @@ static void ecl_response(ecl_env_t* env, ecl_response_t* resp)
     }
 
     case ECL_RESPONSE_FINISH: {
-	int i = 0;  // max 12 words
+	int i = 0;
 	term_data[i++] = ERL_DRV_ATOM;
 	term_data[i++] = driver_mk_atom("cl_reply");
 	term_data[i++] = ERL_DRV_UINT;
@@ -1741,85 +1749,108 @@ static void ecl_response(ecl_env_t* env, ecl_response_t* resp)
 	break;
     }
 
-    case ECL_RESPONSE_BUILD: { // 8 words
-	term_data[0] = ERL_DRV_ATOM;
-	term_data[1] = driver_mk_atom("cl_reply");
-	term_data[2] = ERL_DRV_UINT;
-	term_data[3] = resp->eref;
-	term_data[4] = ERL_DRV_ATOM;
-	term_data[5] = driver_mk_atom("ok");
-	term_data[6] = ERL_DRV_TUPLE;
-	term_data[7] = 3;
-	driver_send_term(env->port, resp->caller, term_data, 8);
+    case ECL_RESPONSE_BUILD: {
+	int i = 0;
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("cl_reply");
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = resp->eref;
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("ok");
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
+	driver_send_term(env->port, resp->caller, term_data, i);
 	break;
     }
 
-    case ECL_RESPONSE_CONTEXT: { // 9 words
-	term_data[0] = ERL_DRV_ATOM;
-	term_data[1] = driver_mk_atom("cl_error");
-	term_data[2] = ERL_DRV_UINT;
-	term_data[3] = resp->eref;
-	term_data[4] = ERL_DRV_STRING;
-	term_data[5] = (ErlDrvTermData)resp->errinfo;
-	term_data[6] = strlen(resp->errinfo);
-	term_data[7] = ERL_DRV_TUPLE;
-	term_data[8] = 3;
+    case ECL_RESPONSE_CONTEXT: {
+	int i = 0;
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("cl_error");
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = resp->eref;
+	term_data[i++] = ERL_DRV_STRING;
+	term_data[i++] = (ErlDrvTermData)resp->errinfo;
+	term_data[i++] = strlen(resp->errinfo);
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
 	if (!resp->caller)
-	    driver_output_term(env->port, term_data, 9);
+	    driver_output_term(env->port, term_data, i);
 	else
-	    driver_send_term(env->port, resp->caller, term_data, 9);
+	    driver_send_term(env->port, resp->caller, term_data, i);
 	driver_free(resp->errinfo);
 	break;
     }
 
-    case ECL_RESPONSE_EVENT_STATUS: { // max 8 words
-	term_data[0] = ERL_DRV_ATOM;
-	term_data[1] = driver_mk_atom("cl_event");
-	term_data[2] = ERL_DRV_UINT;
-	term_data[3] = EPTR_HANDLE(resp->event);
-	ecl_event_status(kv_execution_status,resp->status,&term_data[4]);
-	term_data[6] = ERL_DRV_TUPLE;
-	term_data[7] = 3;
+    case ECL_RESPONSE_EVENT_STATUS: {
+	int i = 0;
+	// {cl_event,{pointer,Event},Status}
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("cl_event");
+
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("object");
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = (ErlDrvTermData) EVENT_TYPE;
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = (ErlDrvTermData) EPTR_HANDLE(resp->event);
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
+
+	ecl_event_status(kv_execution_status,resp->status,&term_data[i]);
+	i += 2;
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
 	/* get_event_info wont work! is this better?
 	   if ((obj = event_object(env, EPTR_HANDLE(resp->event))))
 	   ecl_object_release(obj);
 	*/
-	driver_send_term(env->port, resp->caller, term_data, 8);
+	driver_send_term(env->port, resp->caller, term_data, i);
 	if (resp->bin)
 	    driver_free_binary(resp->bin);
 	break;
     }
 
-    case ECL_RESPONSE_EVENT_BIN: { // max 10 words
+    case ECL_RESPONSE_EVENT_BIN: {
+	int i = 0;
 	// This response is initially from clEnqueueReadBuffer
 	// so if everythings is ok then pass the binary back to
 	// the caller. Otherwise send an error.
-	// Send {cl_event,Event,Bin|Status}
-	term_data[0] = ERL_DRV_ATOM;
-	term_data[1] = driver_mk_atom("cl_event");
-	term_data[2] = ERL_DRV_UINT;
-	term_data[3] = EPTR_HANDLE(resp->event);
+	// Send {cl_event,{pointer,Event},Bin|Status}
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("cl_event");
+
+	term_data[i++] = ERL_DRV_ATOM;
+	term_data[i++] = driver_mk_atom("object");
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = (ErlDrvTermData) EVENT_TYPE;
+	term_data[i++] = ERL_DRV_UINT;
+	term_data[i++] = (ErlDrvTermData) EPTR_HANDLE(resp->event);
+	term_data[i++] = ERL_DRV_TUPLE;
+	term_data[i++] = 3;
+
 	/* get_event_info wont work! is this better ?
 	   if ((obj = event_object(env, EPTR_HANDLE(resp->event))))
 	   ecl_object_release(obj);
 	*/
 	if (resp->status == CL_COMPLETE) {
-	    term_data[4] = ERL_DRV_BINARY;
-	    term_data[5] = (ErlDrvTermData) resp->bin;
-	    term_data[6] = resp->bin->orig_size;
-	    term_data[7] = 0;
-	    term_data[8] = ERL_DRV_TUPLE;
-	    term_data[9] = 3;
-	    driver_send_term(env->port, resp->caller, term_data, 10);
+	    term_data[i++] = ERL_DRV_BINARY;
+	    term_data[i++] = (ErlDrvTermData) resp->bin;
+	    term_data[i++] = resp->bin->orig_size;
+	    term_data[i++] = 0;
+	    term_data[i++] = ERL_DRV_TUPLE;
+	    term_data[i++] = 3;
+	    driver_send_term(env->port, resp->caller, term_data, i);
 	    driver_free_binary(resp->bin);
 	}
 	else {
 	    driver_free_binary(resp->bin);
 	    ecl_event_status(kv_execution_status,resp->status,
-			     &term_data[4]);
-	    term_data[6] = ERL_DRV_TUPLE;
-	    term_data[7] = 3;
-	    driver_send_term(env->port, resp->caller, term_data, 8);
+			     &term_data[i]);
+	    i += 2;
+	    term_data[i++] = ERL_DRV_TUPLE;
+	    term_data[i++] = 3;
+	    driver_send_term(env->port, resp->caller, term_data, i);
 	}
 	return;
     }
@@ -1866,13 +1897,13 @@ static void ecl_drv_output(ErlDrvData d, ErlDrvEvent e)
 }
 
 // Write OK
-static inline void put_ok(cbuf_t* out)
+static inline void ret_ok(cbuf_t* out)
 {
     cbuf_put_tag_ok(out);
 }
 
 // Write ERROR,ATOM,String
-static inline void put_error(cbuf_t* out, cl_int err)
+static inline void ret_error(cbuf_t* out, cl_int err)
 {
     cbuf_put_tuple_begin(out, 2);
     cbuf_put_tag_error(out);
@@ -1881,7 +1912,7 @@ static inline void put_error(cbuf_t* out, cl_int err)
 }
 
 // Write EVENT,event-ref:32
-static inline void put_event(cbuf_t* out, u_int32_t ref)
+static inline void ret_event(cbuf_t* out, u_int32_t ref)
 {
     cbuf_put_tuple_begin(out, 2);
     cbuf_put_tag_event(out);
@@ -1889,23 +1920,27 @@ static inline void put_event(cbuf_t* out, u_int32_t ref)
     cbuf_put_tuple_end(out, 2);
 }
 
+
+//
 // Write OK Object-Handle
-static inline void put_object(cbuf_t* out, ecl_object_t* obj)
+// {ok, {object,Type,Ptr}}
+//
+static inline void ret_object(cbuf_t* out, ecl_object_t* obj)
 {
-    pointer_t handle = ecl_handle(obj);
+
     cbuf_put_tuple_begin(out, 2);
     cbuf_put_tag_ok(out);
-    put_pointer(out, handle);
+    put_object(out, obj);
     cbuf_put_tuple_end(out, 2);
 }
 
-#define RETURN_OK()       do { put_ok(&reply); goto done; } while(0)
-#define RETURN_ERROR(err) do { put_error(&reply,(err)); goto done; } while(0)
-#define RETURN_OBJ(obj)   do { put_object(&reply,(obj)); goto done; } while(0)
-#define RETURN_EVENT(eref) do { put_event(&reply,(eref)); goto done; } while(0)
-#define FRETURN_OK()       do { put_ok(reply); return; } while(0)
-#define FRETURN_ERROR(err) do { put_error(reply,(err)); return; } while(0)
-#define FRETURN_OBJ(obj)   do { put_object(reply,(obj)); return; } while(0)
+#define RETURN_OK()        do { ret_ok(&reply); goto done; } while(0)
+#define RETURN_ERROR(err)  do { ret_error(&reply,(err)); goto done; } while(0)
+#define RETURN_OBJ(obj)    do { ret_object(&reply,(obj)); goto done; } while(0)
+#define RETURN_EVENT(eref) do { ret_event(&reply,(eref)); goto done; } while(0)
+#define FRETURN_OK()       do { ret_ok(reply); return; } while(0)
+#define FRETURN_ERROR(err) do { ret_error(reply,(err)); return; } while(0)
+#define FRETURN_OBJ(obj)   do { ret_object(reply,(obj)); return; } while(0)
 
 //
 // ECL_CREATE_BUFFER
@@ -2144,7 +2179,7 @@ static void ecl_create_program_with_binary(ecl_env_t* env, cbuf_t* arg, cbuf_t* 
 		}
 		else if (cbuf_r_avail(arg) >= lengths[i]) {
 		    if (!(binaries[i] = driver_alloc(lengths[i]))) {
-			put_error(reply,  CL_OUT_OF_HOST_MEMORY);
+			ret_error(reply,  CL_OUT_OF_HOST_MEMORY);
 			goto clean_up;
 		    }
 		    allocated[i] = 1;
@@ -2152,12 +2187,12 @@ static void ecl_create_program_with_binary(ecl_env_t* env, cbuf_t* arg, cbuf_t* 
 		}
 	    }
 	    else {
-		put_error(reply, err);
+		ret_error(reply, err);
 		goto clean_up;
 	    }
 	}
 	if (!cbuf_eob(arg)) {
-	    put_error(reply, err);	    
+	    ret_error(reply, err);	    
 	    goto clean_up;
 	}
 
@@ -2173,10 +2208,10 @@ static void ecl_create_program_with_binary(ecl_env_t* env, cbuf_t* arg, cbuf_t* 
 	    
 	    if (!(obj = EclProgramCreate(env,program))) {
 		clReleaseProgram(program);
-		put_error(reply, CL_OUT_OF_HOST_MEMORY);
+		ret_error(reply, CL_OUT_OF_HOST_MEMORY);
 		goto clean_up;
 	    }
-	    put_object(reply, obj);
+	    ret_object(reply, obj);
 	}
     }
 
@@ -2195,14 +2230,14 @@ static int ecl_set_kernel_arg(ecl_env_t* env, int type, cbuf_t* arg)
 {
     pointer_t handle;
     u_int32_t arg_index;
-    u_int32_t arg_size;
+    size_t    arg_size;
     size_t    arg_len;
     ecl_object_t* obj;
     int err = CL_INVALID_VALUE;
 
     if (get_pointer(arg, &handle) &&
 	get_uint32(arg, &arg_index) &&
-	get_uint32(arg, &arg_size) &&
+	get_size(arg, &arg_size) &&
 	((obj = kernel_object(env, handle)) != 0)) {
 	u_int8_t* arg_ptr = 0;
 	u_int8_t  arg_alloc = 0;
@@ -2241,7 +2276,7 @@ static int ecl_set_kernel_arg(ecl_env_t* env, int type, cbuf_t* arg)
 	default:
 	    return err;
 	}
-	DBG("set_kernel_arg:index=%d,size=%d,len=%ld",
+	DBG("set_kernel_arg:index=%d,size=%zd,len=%zd",
 	    arg_index,arg_size,arg_len);
 	err = clSetKernelArg(obj->kernel,
 			     (cl_uint) arg_index,
@@ -2292,7 +2327,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 	    cbuf_put_list_begin(&reply, num_platforms);
 	    for (i = 0; i < num_platforms; i++) {
 		ecl_object_t* obj = EclPlatform(env, platform_id[i]);
-		put_pointer(&reply, ecl_handle(obj));
+		put_object(&reply, obj);
 	    }
 	    cbuf_put_list_end(&reply, num_platforms);
 	    cbuf_put_tuple_end(&reply, 2);
@@ -2336,7 +2371,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 	    cbuf_put_list_begin(&reply, num_devices);
 	    for (i = 0; i < num_devices; i++) {
 		ecl_object_t* dobj = EclDevice(env, device_id[i]);
-		put_pointer(&reply, ecl_handle(dobj));
+		put_object(&reply, dobj);
 	    }
 	    cbuf_put_list_end(&reply,num_devices);
 	    cbuf_put_tuple_end(&reply,2);
@@ -2979,7 +3014,7 @@ static int ecl_drv_ctl(ErlDrvData d,
 			cbuf_put_begin(&reply);  // reinit respose header
 			RETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
 		    }
-		    put_pointer(&reply, ecl_handle(kobj[i]));
+		    put_object(&reply, kobj[i]);
 		    i++;
 		}
 		cbuf_put_list_end(&reply, num_kernels_ret);
@@ -3427,12 +3462,12 @@ static void ecl_drv_commandv(ErlDrvData d, ErlIOVec* ev)
 	    ecl_enqueue_write_buffer(env, &arg, &reply);
 	    break;
 	default:
-	    put_error(&reply, CL_INVALID_VALUE);	    
+	    ret_error(&reply, CL_INVALID_VALUE);	    
 	    break;
 	}
     }
     else {
-	put_error(&reply, CL_INVALID_VALUE);
+	ret_error(&reply, CL_INVALID_VALUE);
     }
     cbuf_put_end(&reply);  // put response footer
 

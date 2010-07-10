@@ -108,7 +108,7 @@ run(Data, DevType) ->
     {ok,Kernel} = cl:create_kernel(Program, "mul4x4"),
     io:format("kernel created: ~p\n", [Kernel]),
 
-    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),Count]),
+    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
     io:format("kernel args set\n"),
 
     %% Write data into input array 

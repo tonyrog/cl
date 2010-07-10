@@ -381,7 +381,7 @@ get_device_ids() ->
 -spec get_device_ids(Platform::cl_platform_id(),Type::cl_device_types()) ->
     {'ok',[cl_device_id()]} | {'error',cl_error()}.
 
-get_device_ids(Platform, Type) ->
+get_device_ids({object,?PLATFORM_TYPE,Platform}, Type) ->
     TypeID = encode_device_types(Type),
     cl_drv:call(?ECL_GET_DEVICE_IDS,
 		 << ?pointer_t(Platform), ?u_int32_t(TypeID) >> ).
@@ -564,10 +564,10 @@ device_info() ->
 %% <dt>'queue_properties'</dt> <dd> <p>Describes the command-queue
 %% properties supported by the device.  This is a bit-field that
 %% describes one or more of the following values:</p>
-%% <p>CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE</p>
-%% <p>CL_QUEUE_PROFILING_ENABLE</p> <p>These properties are described in
+%% <p>'out_of_order_exec_mode_enable'</p>
+%% <p>'profiling_enable'</p> <p>These properties are described in
 %% the table for create_queue/3 .  The mandated minimum capability is
-%% CL_QUEUE_PROFILING_ENABLE.</p> </dd>
+%% 'profiling_enable'.</p> </dd>
 %%
 %% <dt>'name'</dt> <dd> <p>Device name string.</p> </dd>
 %%
@@ -660,7 +660,7 @@ get_device_info(Device) ->
     {'ok', cl_context()} | {'error', cl_error()}.
 
 create_context(DeviceList) ->
-    DeviceData = encode_pointer_array(DeviceList),
+    DeviceData = encode_pointer_array(DeviceList,?DEVICE_TYPE),
     cl_drv:create(?ECL_CREATE_CONTEXT,
 		   ?ECL_RELEASE_CONTEXT,
 		  DeviceData ).
@@ -761,6 +761,8 @@ get_context_info(Context) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Command Queue (Queue)
+%% @type cl_queue_property() = { 'out_of_order_exec_mode_enable' | 
+%%			         'profiling_enabled' }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -type cl_queue_property() :: { 'out_of_order_exec_mode_enable' | 
 			       'profiling_enabled' }.
@@ -789,7 +791,7 @@ get_context_info(Context) ->
 %% execute in-order or out-of-order. The properties argument in
 %% clCreateCommandQueue can be used to specify the execution order.
 %%
-%% If the CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE property of a
+%% If the 'out_of_order_exec_mode_enable' property of a
 %% command-queue is not set, the commands enqueued to a command-queue
 %% execute in order. For example, if an application calls
 %% clEnqueueNDRangeKernel to execute kernel A followed by a
@@ -798,13 +800,13 @@ get_context_info(Context) ->
 %% executed. If the memory objects output by kernel A are inputs to
 %% kernel B then kernel B will see the correct data in memory objects
 %% produced by execution of kernel A. If the
-%% CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE property of a commandqueue
+%% 'out_of_order_exec_mode_enable' property of a commandqueue
 %% is set, then there is no guarantee that kernel A will finish before
 %% kernel B starts execution.
 %%
 %% Applications can configure the commands enqueued to a command-queue
 %% to execute out-of-order by setting the
-%% CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE property of the
+%% 'out_of_order_exec_mode_enable' property of the
 %% command-queue. This can be specified when the command-queue is
 %% created or can be changed dynamically using
 %% clCreateCommandQueue. In out-of-order execution mode there is no
@@ -833,7 +835,7 @@ get_context_info(Context) ->
 %% are enqueued after clEnqueueNDRangeKernel, clEnqueueTask or
 %% clEnqueueNativeKernel commands are not guaranteed to wait for
 %% kernels scheduled for execution to have completed (if the
-%% CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE property is set). To ensure
+%% 'out_of_order_exec_mode_enable' property is set). To ensure
 %% correct ordering of commands, the event object returned by
 %% clEnqueueNDRangeKernel, clEnqueueTask or clEnqueueNativeKernel can
 %% be used to enqueue a wait for event or a barrier command can be
@@ -843,11 +845,12 @@ get_context_info(Context) ->
 		   Properties::[cl_queue_property()]) ->
     {'ok', cl_queue()} | {'error', cl_error()}.
 
-create_queue(Context,Device,Properties) ->
+create_queue({object,?CONTEXT_TYPE,Context},
+	     {object,?DEVICE_TYPE,Device},Properties) ->
     Prop = encode_queue_properties(Properties),
     cl_drv:create(?ECL_CREATE_QUEUE,
 		   ?ECL_RELEASE_QUEUE,
-		   << ?pointer_t(Context), ?pointer_t(Device), ?u_int32_t(Prop)>>).
+		  << ?pointer_t(Context), ?pointer_t(Device), ?u_int32_t(Prop)>>).
 
 %%
 %% @spec set_queue_property(Queue::cl_queue(),
@@ -857,13 +860,13 @@ create_queue(Context,Device,Properties) ->
 %% @doc Enable or disable the properties of a command-queue.
 %%
 %% As specified for create_queue/3, the
-%% CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE command-queue property
+%% 'out_of_order_exec_mode_enable' command-queue property
 %% determines whether the commands in a command-queue are executed
 %% in-order or out-of-order. Changing this command-queue property will
 %% cause the OpenCL implementation to block until all previously
 %% queued commands in command_queue have completed. This can be an
 %% expensive operation and therefore changes to the
-%% CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE property should be only done
+%% 'out_of_order_exec_mode_enable' property should be only done
 %% when absolutely necessary.
 %%
 %% It is possible that a device(s) becomes unavailable after a context
@@ -880,7 +883,7 @@ create_queue(Context,Device,Properties) ->
                          Enable::boolean()) ->
     'ok' | {'error', cl_error()}.
 
-set_queue_property(Queue, Properties, Enable) ->
+set_queue_property({object,?QUEUE_TYPE,Queue}, Properties, Enable) ->
     Prop = encode_queue_properties(Properties),
     Ena  = encode_bool(Enable),
     cl_drv:call(?ECL_SET_QUEUE_PROPERTY,
@@ -960,12 +963,12 @@ get_queue_info(Queue) ->
 		    Size::non_neg_integer()) ->
     {'ok', cl_mem()} | {'error', cl_error()}.
 
-create_buffer(Context,Flags,Size) ->
+create_buffer({object,?CONTEXT_TYPE,Context},Flags,Size) ->
     FlagBits = encode_mem_flags(Flags),
     %% also: async_create
     cl_drv:create(?ECL_CREATE_BUFFER, 
 		   ?ECL_RELEASE_MEM_OBJECT, 
-		   <<?pointer_t(Context), 
+		  <<?pointer_t(Context), 
 		    ?u_int32_t(FlagBits), 
 		    ?u_int32_t(Size)>>).
 
@@ -979,7 +982,7 @@ create_buffer(Context,Flags,Size) ->
 		    Size::non_neg_integer(),Data::binary()) ->
     {'ok', cl_mem()} | {'error', cl_error()}.
 
-create_buffer(Context,Flags,Size,Data) ->
+create_buffer({object,?CONTEXT_TYPE,Context},Flags,Size,Data) ->
     FlagData = encode_mem_flags(Flags),
     cl_drv:create(?ECL_CREATE_BUFFER, 
 		   ?ECL_RELEASE_MEM_OBJECT, 
@@ -1021,6 +1024,9 @@ retain_mem_object(Mem) ->
 %%
 %% @doc Used to get <c>InfoType</c> information that is common to all memory objects
 %% (buffer and image objects).
+-spec get_mem_object_info(Mem::cl_mem(), Info::cl_mem_info_key()) ->
+    {'ok', term()} | {'error', cl_error()}.
+
 get_mem_object_info(Mem, InfoType) ->
     get_info(?ECL_GET_MEM_OBJECT_INFO, Mem, InfoType, fun mem_info_map/1).
 %%
@@ -1064,7 +1070,7 @@ get_mem_object_info(Mem) ->
 		     FilterMode::cl_filter_mode()) -> 
     {'ok', cl_sampler()} | {'error', cl_error()}.
 
-create_sampler(Context, Normalized, AddressingMode, FilterMode) ->
+create_sampler({object,?CONTEXT_TYPE,Context}, Normalized, AddressingMode, FilterMode) ->
     Norm = encode_bool(Normalized),
     Addr = encode_addressing_mode(AddressingMode),
     Filt = encode_filter_mode(FilterMode),
@@ -1158,7 +1164,7 @@ get_sampler_info(Sampler) ->
 				 Source::iodata()) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
-create_program_with_source(Context, Source) ->
+create_program_with_source({object,?CONTEXT_TYPE,Context}, Source) ->
     Data = if is_binary(Source) -> Source;
 	      is_list(Source) -> list_to_binary(Source)
 	   end,
@@ -1202,8 +1208,8 @@ create_program_with_source(Context, Source) ->
 				 BinaryList::[binary()]) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
-create_program_with_binary(Context, DeviceList, BinaryList) ->
-    DeviceData = encode_pointer_array(DeviceList),
+create_program_with_binary({object,?CONTEXT_TYPE,Context}, DeviceList, BinaryList) ->
+    DeviceData = encode_pointer_array(DeviceList,?DEVICE_TYPE),
     BinaryData = encode_async_binary_array(BinaryList),
     %% also: async_create
     cl_drv:create(?ECL_CREATE_PROGRAM_WITH_BINARY,
@@ -1354,8 +1360,8 @@ release_program(Program) ->
 %% Make all warnings into errors.
 %% </p></dd>
 %%</dl>
-build_program(Program, DeviceList, Options) ->
-    DevData = encode_pointer_array(DeviceList),
+build_program({object,?PROGRAM_TYPE,Program}, DeviceList, Options) ->
+    DevData = encode_pointer_array(DeviceList,?DEVICE_TYPE),
     cl_drv:call(?ECL_BUILD_PROGRAM,
 		 <<?pointer_t(Program),
 		  DevData/binary,
@@ -1389,11 +1395,11 @@ program_build_info() ->
     build_info_keys().
 
 %% @doc Returns specific build information for each device in the program object. 
-get_program_build_info(Program, Device, Info) ->
+get_program_build_info(Program, {object,?DEVICE_TYPE,Device}, Info) ->
     get_info(?ECL_GET_PROGRAM_BUILD_INFO, Program, 
 	     <<?pointer_t(Device)>>, Info, fun build_info_map/1).
 %% @doc Returns all build information for each device in the program object. 
-get_program_build_info(Program, Device) ->
+get_program_build_info(Program, {object,?DEVICE_TYPE,Device}) ->
     get_info_list(?ECL_GET_PROGRAM_BUILD_INFO, Program,
 		  <<?pointer_t(Device)>>, 
 		  build_info_keys(), fun build_info_map/1).
@@ -1413,7 +1419,7 @@ get_program_build_info(Program, Device) ->
 %%  program. A kernel object encapsulates the specific __kernel
 %%  function declared in a program and the argument values to be used
 %%  when executing this __kernel function.
-create_kernel(Program, Name) ->
+create_kernel({object,?PROGRAM_TYPE,Program}, Name) ->
     NameBin = list_to_binary([Name]),
     NameLen = byte_size(NameBin),
     cl_drv:create(?ECL_CREATE_KERNEL,
@@ -1444,7 +1450,7 @@ create_kernel(Program, Name) ->
 %% kernel. Devices associated with a program object for which a valid
 %% program executable has been built can be used to execute kernels
 %% declared in the program object.
-create_kernels_in_program(Program) ->
+create_kernels_in_program({object,?PROGRAM_TYPE,Program}) ->
     cl_drv:create(?ECL_CREATE_KERNELS_IN_PROGRAM, 
 		   ?ECL_RELEASE_KERNEL,
 		   <<?pointer_t(Program)>>).
@@ -1474,25 +1480,25 @@ create_kernels_in_program(Program) ->
 %% release user allocated resources associated with OpenCL objects
 %% such as the cl_mem backing store used with CL_MEM_USE_HOST_PTR.
 
-set_kernel_arg(Kernel,Index,{'pointer',Ptr}) ->
+set_kernel_arg({object,?KERNEL_TYPE,Kernel},Index,{object,_Type,Ptr}) ->
     cl_drv:call(?ECL_SET_KERNEL_ARG_POINTER_T,
 		<<?pointer_t(Kernel),
 		  ?u_int32_t(Index),
-		  ?u_int32_t(8),
+		  ?size_t(8),
 		  ?pointer_t(Ptr)>>);
-set_kernel_arg(Kernel,Index,{'size',Sz}) ->
+set_kernel_arg({object,?KERNEL_TYPE,Kernel},Index,{'size',Sz}) ->
     cl_drv:call(?ECL_SET_KERNEL_ARG_SIZE_T,
 		<<?pointer_t(Kernel),
 		  ?u_int32_t(Index),
-		  ?u_int32_t(8),
+		  ?size_t(8),
 		  ?size_t(Sz)>>);
-set_kernel_arg(Kernel,Index,Argument) ->
+set_kernel_arg({object,?KERNEL_TYPE,Kernel},Index,Argument) ->
     Arg = encode_argument(Argument),
     Size  = byte_size(Arg),
     cl_drv:call(?ECL_SET_KERNEL_ARG,
 		<<?pointer_t(Kernel),
-		 ?u_int32_t(Index),
-		 ?u_int32_t(Size),
+		  ?u_int32_t(Index),
+		  ?size_t(Size),
 		 Arg/binary>>).
 
 %%
@@ -1502,11 +1508,11 @@ set_kernel_arg(Kernel,Index,Argument) ->
 %%
 %% @doc clErlang special to set kernel arg with size only (local mem etc)
 %%
-set_kernel_arg_size(Kernel,Index,Size) ->
+set_kernel_arg_size({object,?KERNEL_TYPE,Kernel},Index,Size) ->
     cl_drv:call(?ECL_SET_KERNEL_ARG,
 		<<?pointer_t(Kernel),
 		 ?u_int32_t(Index),
-		 ?u_int32_t(Size)>>).
+		 ?size_t(Size)>>).
 
 %%
 %% @spec retain_kernel(Context::cl_kernel()) ->
@@ -1539,13 +1545,13 @@ kernel_workgroup_info() ->
 
 %% @doc Returns specific information about the kernel object that may
 %% be specific to a device.
-get_kernel_workgroup_info(Kernel, Device, Info) ->
+get_kernel_workgroup_info(Kernel, {object,?DEVICE_TYPE,Device}, Info) ->
     get_info(?ECL_GET_KERNEL_WORKGROUP_INFO, Kernel,
 	     <<?pointer_t(Device)>>,  Info, fun workgroup_info_map/1).
 
 %% @doc Returns all information about the kernel object that may be
 %% specific to a device.
-get_kernel_workgroup_info(Kernel, Device) ->
+get_kernel_workgroup_info(Kernel, {object,?DEVICE_TYPE,Device}) ->
     get_info_list(?ECL_GET_KERNEL_WORKGROUP_INFO, Kernel, 
 		  <<?pointer_t(Device)>>, 
 		  workgroup_info_keys(), fun workgroup_info_map/1).
@@ -1566,8 +1572,8 @@ get_kernel_workgroup_info(Kernel, Device) ->
 		   WaitList::[cl_event()]) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
-enqueue_task(Queue, Kernel, WaitList) ->
-    EventData = encode_pointer_array(WaitList),
+enqueue_task({object,?QUEUE_TYPE,Queue}, {object,?KERNEL_TYPE,Kernel}, WaitList) ->
+    EventData = encode_pointer_array(WaitList,?EVENT_TYPE),
     cl_drv:create(?ECL_ENQUEUE_TASK,
 		   ?ECL_RELEASE_EVENT,
 		   <<?pointer_t(Queue), ?pointer_t(Kernel),
@@ -1600,10 +1606,11 @@ enqueue_task(Queue, Kernel, WaitList) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
 
-enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList) ->
+enqueue_nd_range_kernel({object,?QUEUE_TYPE,Queue}, {object,?KERNEL_TYPE,Kernel}, 
+			Global, Local, WaitList) ->
     WorkDim = length(Global),
     WorkDim = length(Local),
-    EventData = encode_pointer_array(WaitList),
+    EventData = encode_pointer_array(WaitList,?EVENT_TYPE),
     cl_drv:create(?ECL_ENQUEUE_ND_RANGE_KERNEL,
 		  ?ECL_RELEASE_EVENT,
 		  <<?pointer_t(Queue), ?pointer_t(Kernel),
@@ -1624,7 +1631,7 @@ enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList) ->
 -spec enqueue_marker(Queue::cl_queue()) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
-enqueue_marker(Queue) ->
+enqueue_marker({object,?QUEUE_TYPE,Queue}) ->
     cl_drv:create(?ECL_ENQUEUE_MARKER,
 		  ?ECL_RELEASE_EVENT,
 		  <<?pointer_t(Queue)>>).
@@ -1641,8 +1648,8 @@ enqueue_marker(Queue) ->
 -spec enqueue_wait_for_event(Queue::cl_queue(),  WaitList::[cl_event()]) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
-enqueue_wait_for_event(Queue, WaitList) ->
-    EventData = encode_pointer_array(WaitList),
+enqueue_wait_for_event({object,?QUEUE_TYPE,Queue}, WaitList) ->
+    EventData = encode_pointer_array(WaitList,?EVENT_TYPE),
     cl_drv:call(?ECL_ENQUEUE_WAIT_FOR_EVENT,
 		 <<?pointer_t(Queue), EventData/binary>>).
 
@@ -1676,8 +1683,9 @@ enqueue_wait_for_event(Queue, WaitList) ->
 			  WaitList::[cl_event()]) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
-enqueue_read_buffer(Queue, Buffer, Offset, Size, WaitList) ->
-    EventData = encode_pointer_array(WaitList),
+enqueue_read_buffer({object,?QUEUE_TYPE,Queue}, {object,?MEM_TYPE,Buffer}, 
+		    Offset, Size, WaitList) ->
+    EventData = encode_pointer_array(WaitList,?EVENT_TYPE),
     cl_drv:create(?ECL_ENQUEUE_READ_BUFFER,
 		  ?ECL_RELEASE_EVENT,
 		  <<?pointer_t(Queue), ?pointer_t(Buffer),
@@ -1715,8 +1723,9 @@ enqueue_read_buffer(Queue, Buffer, Offset, Size, WaitList) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
 
-enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList) ->
-    EventData = encode_pointer_array(WaitList),
+enqueue_write_buffer({object,?QUEUE_TYPE,Queue}, {object,?MEM_TYPE,Buffer}, 
+		     Offset, Size, Data, WaitList) ->
+    EventData = encode_pointer_array(WaitList,?EVENT_TYPE),
     %% also: async_create
     cl_drv:create(?ECL_ENQUEUE_WRITE_BUFFER,
 		  ?ECL_RELEASE_EVENT,
@@ -1736,7 +1745,7 @@ enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList) ->
 -spec enqueue_barrier(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
 
-enqueue_barrier(Queue) ->
+enqueue_barrier({object,?QUEUE_TYPE,Queue}) ->
     cl_drv:call(?ECL_ENQUEUE_BARRIER,
 		 <<?pointer_t(Queue)>>).
 
@@ -1753,7 +1762,7 @@ enqueue_barrier(Queue) ->
 -spec flush(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
 
-flush(Queue) ->
+flush({object,?QUEUE_TYPE,Queue}) ->
     cl_drv:call(?ECL_FLUSH, <<?pointer_t(Queue)>>).
 
 %%
@@ -1770,7 +1779,7 @@ flush(Queue) ->
 -spec finish(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
 
-finish(Queue) ->
+finish({object,?QUEUE_TYPE,Queue}) ->
     cl_drv:call(?ECL_FINISH, <<?pointer_t(Queue)>>).
 
 %%
@@ -1828,6 +1837,7 @@ wait(Event) ->
 %%  in event_list to complete. A command is considered complete if its
 %%  execution status is CL_COMPLETE or a negative value.
 wait(Event, Timeout) ->
+    %% io:format("Wait for event: ~p\n", [Event]),
     receive
 	{cl_event, Event, Binary} when is_binary(Binary) ->
 	    release_event(Event),
@@ -1849,16 +1859,16 @@ wait(Event, Timeout) ->
 get_info(Command, ID, Info, Map) ->
     get_info(Command, ID, <<>>, Info, Map).
 
-get_info(Command, ID, Arg, Info, Map) ->
+get_info(Command, {object,_Type,Ptr}, Arg, Info, Map) ->
     InfoID = Map(Info),
-    cl_drv:call(Command, <<?pointer_t(ID),Arg/binary,?u_int32_t(InfoID)>>).
+    cl_drv:call(Command, <<?pointer_t(Ptr),Arg/binary,?u_int32_t(InfoID)>>).
 
 %% @hidden
 get_info_list(InfoCommand, ID, Keys, Map) ->
     get_info_list(InfoCommand, ID, <<>>, Keys, Map).
 
-get_info_list(InfoCommand, ID, Arg, Keys, Map) ->
-    get_info_list(InfoCommand, <<?pointer_t(ID),Arg/binary>>, Keys, Map,
+get_info_list(InfoCommand, {object,_Type,Ptr}, Arg, Keys, Map) ->
+    get_info_list(InfoCommand, <<?pointer_t(Ptr),Arg/binary>>, Keys, Map,
 		  [], ok).
 
 get_info_list(Command, Arg, [K|Ks], Map, Acc, _Err) ->
@@ -1901,14 +1911,13 @@ encode_queue_properties([]) ->
 
 %%
 %% Encode kernel argument
-%% FIXME: check pointers etc since OpenCL will crash if we 
-%%        send bad pointers!
 %%
 %% @hidden
 encode_argument(X) when is_integer(X) -> <<?cl_int(X)>>;
 encode_argument(X) when is_float(X)   -> <<?cl_float(X)>>;
 encode_argument(X) when is_list(X)    -> list_to_binary(X);
 encode_argument(X) when is_binary(X)  -> X;
+
 encode_argument({'char',X}) -> <<?cl_char(X)>>;
 encode_argument({'uchar',X}) -> <<?cl_uchar(X)>>;
 encode_argument({'short',X}) -> <<?cl_short(X)>>;
@@ -1963,7 +1972,6 @@ encode_argument({'ushort16',{X1,X2,X3,X4,X5,X6,X7,X8,
     <<?cl_ushort16(X1,X2,X3,X4,X5,X6,X7,X8,
 		 X9,X10,X11,X12,X13,X14,X15,X16)>>;
 
-
 encode_argument({'int2',{X1,X2}}) ->
     <<?cl_int2(X1,X2)>>;    
 encode_argument({'int4',{X1,X2,X3,X4}}) ->
@@ -2016,15 +2024,15 @@ encode_argument({'float16',{X1,X2,X3,X4,X5,X6,X7,X8,
 			   X9,X10,X11,X12,X13,X14,X15,X16}}) ->
     <<?cl_float16(X1,X2,X3,X4,X5,X6,X7,X8,
 		 X9,X10,X11,X12,X13,X14,X15,X16)>>.
-
-
 %%
 %% Encode pointer array <<N:32, Ptr1:Ptr, ... PtrN:Ptr>>
 %%
 %% @hidden
-encode_pointer_array(Pointers) when is_list(Pointers) ->
+encode_pointer_array(Pointers,Type) when is_list(Pointers) ->
     N = length(Pointers),
-    <<?size_t(N), (<< <<?pointer_t(Ptr) >> || Ptr <- Pointers >>)/binary>>.
+    <<?size_t(N), (<< <<?pointer_t(Ptr) >> || 
+		       {object,Type1,Ptr} <- Pointers, 
+		       Type1 =:= Type >>)/binary>>.
 
 %%
 %% Encode binary array <<N:32, Size1:Size, Binary1:Size1/binary ... >>
