@@ -175,17 +175,21 @@ apply_kernel_args(Kernel, Args) ->
 	    {ok,Name} = cl:get_kernel_info(Kernel, function_name),
 	    erlang:error({bad_arity,Name,N});
        true ->
-	    apply_args(Kernel, 0, Args)
+	    try 
+		apply_args(Kernel, 0, Args)
+	    catch 
+		error:{badmatch,Error} -> 
+		    erlang:error(Error)
+	    end
     end.
-
 
 apply_args(Kernel, I, [{local,Size}|As]) ->
     %%io:format("kernel set arg ~w size to ~p\n", [I,Size]),
-    cl:set_kernel_arg_size(Kernel,I,Size),
+    ok = cl:set_kernel_arg_size(Kernel,I,Size),
     apply_args(Kernel,I+1,As);
 apply_args(Kernel,I,[A|As]) ->
     %%io:format("kernel set arg ~w to ~p\n", [I,A]),
-    cl:set_kernel_arg(Kernel,I,A),
+    ok = cl:set_kernel_arg(Kernel,I,A),
     apply_args(Kernel,I+1,As);
 apply_args(_Kernel, _I, []) -> 
     ok.
