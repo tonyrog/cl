@@ -16,6 +16,7 @@ SSE       = No
 SSE2      = No
 SSE3      = No
 SSE4      = No
+EXT       = so
 
 ifeq ($(WORDSIZE), 64)
 include config.64.build
@@ -27,22 +28,22 @@ endif
 ifeq ($(TYPE), debug)
 OBJDIR=../obj/debug
 LIBDIR=../lib/debug
-CFLAGS += -fPIC -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common 
+CFLAGS += -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common 
 endif
 
 ifeq ($(TYPE), release)
 OBJDIR=../obj/release
 LIBDIR=../lib/release
-CFLAGS += -fPIC -O3 -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common
+CFLAGS += -O3 -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common
 endif
 
 ifeq ($(OSNAME), Linux)
 LINUX = Yes
 ifeq ($(WORDSIZE), 32)
-CFLAGS += -m32 -DWORDSIZE=32
+CFLAGS += -fPIC -m32 -DWORDSIZE=32
 endif
 ifeq ($(WORDSIZE), 64)
-CFLAGS += -m64 -DWORDSIZE=64
+CFLAGS += -fPIC -m64 -DWORDSIZE=64
 endif
 LD_SHARED	:= $(CC) -shared -lOpenCL
 endif
@@ -50,13 +51,33 @@ endif
 ifeq ($(OSNAME), Darwin)
 MAC_OS_X = Yes
 ifeq ($(WORDSIZE), 32)
-CFLAGS += -m32 -DWORDSIZE=32 -DDARWIN -no-cpp-precomp
+CFLAGS += -fPIC -m32 -DWORDSIZE=32 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m32 -bundle -flat_namespace -undefined suppress
 endif
 ifeq ($(WORDSIZE), 64)
-CFLAGS += -m64 -DWORDSIZE=64 -DDARWIN -no-cpp-precomp
+CFLAGS += -fPIC -m64 -DWORDSIZE=64 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m64 -bundle -flat_namespace -undefined suppress
 endif
+endif
+
+ifeq ($(OSNAME), MINGW32_NT-6.0)
+MINGW = Yes
+endif
+ifeq ($(OSNAME), MINGW32_NT-6.1)
+MINGW = Yes
+endif
+
+ifeq ($(MINGW), Yes)
+WIN32 = Yes
+EXT   = dll
+CFLAGS += -D__WIN32__
+ifeq ($(WORDSIZE), 32)
+CFLAGS += -shared -I/opt/local/include -m32 -DWIN32 -DWORDSIZE=32
+endif
+ifeq ($(WORDSIZE), 64)
+CFLAGS += -shared -I/opt/local/include -m64 -DWIN32 -DWORDSIZE=64
+endif
+LD_SHARED	:= $(CC) -shared 
 endif
 
 ifeq ($(MACHINE), "Power Macintosh")
@@ -83,6 +104,7 @@ endif
 
 ifeq ($(WIN32),Yes)
 	CFLAGS += -DWIN32
+	LDFLAGS += -Wl--enable-stdcall-fixup -L/opt/local/lib -lOpenCL
 endif
 
 ifeq ($(ALTIVEC),Yes)
@@ -107,9 +129,9 @@ ifeq ($(MMX),Yes)
 	SIMD_OBJS += ocl_simd_mmx.$(BIT).o
 endif
 
-CL_DRV = $(LIBDIR)/$(WORDSIZE)/cl_drv.so
+CL_DRV = $(LIBDIR)/$(WORDSIZE)/cl_drv.$(EXT)
 
-CL_NIF = $(LIBDIR)/$(WORDSIZE)/cl_nif.so
+CL_NIF = $(LIBDIR)/$(WORDSIZE)/cl_nif.$(EXT)
 
 CL_DRV_OBJS = \
 	$(OBJDIR)/$(WORDSIZE)/cl_drv.o \
@@ -195,7 +217,7 @@ $(OBJDIR)/$(WORDSIZE)/cl_drv.o: cbufv2.h cl_hash.h
 $(OBJDIR)/$(WORDSIZE)/%.o: %.c
 	$(CC) -c -o $@ $(CFLAGS) -I$(ERL_C_INCLUDE_DIR) $<
 
- $(OBJDIR)/$(WORDSIZE)/%.s: %.c
+$(OBJDIR)/$(WORDSIZE)/%.s: %.c
 	$(CC) -S -o $@ $(CFLAGS) -I$(ERL_C_INCLUDE_DIR) $<
 
 cbuf_test.o: cbuf_test.c

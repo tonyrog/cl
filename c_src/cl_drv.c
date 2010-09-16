@@ -1,14 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <stdint.h>
+
+#ifdef __MINGW32__
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <sys/socket.h>
+#endif
+
 #ifdef DARWIN
 #include <OpenCL/opencl.h>
 #else
 #include <CL/cl.h>
 #endif
+
 
 #if WORDSIZE==32
 #include "config.32.h"
@@ -2594,40 +2602,6 @@ static int ecl_drv_ctl(ErlDrvData d,
 	break;
     }
 
-    case ECL_SET_QUEUE_PROPERTY: {
-	// <<Queue:Ptr, Properties:32, Enable:Bool>>
-	pointer_t        handle;
-	u_int32_t        prop;
-	u_int32_t        enable;
-	ecl_object_t* obj;
-
-	if (get_pointer(&arg, &handle) && 
-	    get_uint32(&arg, &prop) &&
-	    get_uint32(&arg, &enable) &&
-	    cbuf_eob(&arg) &&
-	    ((obj = queue_object(env, handle)) != 0)) {
-	    cl_command_queue_properties properties = 0;
-	    cl_command_queue_properties old_properties;
-
-	    if (prop & ECL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE)
-		properties |= CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
-	    if (prop & ECL_QUEUE_PROFILING_ENABLE)
-		properties |= CL_QUEUE_PROFILING_ENABLE;
-	    err = clSetCommandQueueProperty(obj->queue, properties,
-					    (enable != 0),
-					    &old_properties);
-	    if (err == CL_SUCCESS) {
-		cbuf_put_tuple_begin(&reply, 2);
-		cbuf_put_tag_ok(&reply);
-		put_element(&reply, BITFIELD, &old_properties,
-			    kv_command_queue_properties);
-		cbuf_put_tuple_end(&reply, 2);
-		goto done;
-	    }
-	}
-	break;
-    }
-
     case ECL_FLUSH: {	
 	// <<Queue:Ptr>>
 	pointer_t        handle;
@@ -3245,8 +3219,8 @@ static int ecl_drv_ctl(ErlDrvData d,
 	    {
 		int i;
 		for (i = 0; i < (int)work_dim; i++) {
-		    printf("global[%d] = %ld\r\n", i, global_work_size[i]);
-		    printf("local[%d] = %ld\r\n", i,  local_work_size[i]);
+		    printf("global[%d] = %ld\r\n", i, (long int) global_work_size[i]);
+		    printf("local[%d] = %ld\r\n", i,  (long int) local_work_size[i]);
 		}
 	    }
 #endif

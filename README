@@ -1,8 +1,7 @@
 Welcome to the Erlang OpenCL binding
 
-To get started you need erlang, preferably R13. You also need
-GCC and a machine with OpenCL installed. Currently only Mac Os X 10.6.x
-is known to work. Then linux support is on it's way.
+To get started you need erlang, preferably R14. You also need
+GCC and a machine with OpenCL installed. 
 
 To build: just run make
 
@@ -10,5 +9,21 @@ To build examples: Goto the examples directory and run make.
 
 Make sure erlang finds the cl/ebin directory.
 
+Windows Users: 
+I'm assuming you got an mingw environment, otherwise you are on your own.
 
+mkdir -p /opt/local/include/CL
+mkdir -p /opt/local/lib
 
+Download all headers from http://www.khronos.org/registry/cl/
+and put them in /opt/local/include/CL
+
+Find a OpenCL.lib available in Nvidia or ATI developments kits
+cp /c/CUDA/lib/OpenCL.dll /opt/local/lib
+
+Also you might need autoconf package available at:
+http://sourceforge.net/projects/mingw/files_beta/MSYS/
+
+OpenCL with ATI drivers for CPU usage don't work when erlang
+is started within a mingw shell but does if you start it from
+a Windows CMD.exe shell.

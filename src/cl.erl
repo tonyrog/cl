@@ -870,8 +870,9 @@ create_queue({object,?CONTEXT_TYPE,Context},
 %%    'ok' | {'error', cl_error()}
 %% @doc Function is deprecated and have been removed.
 
-set_queue_property({object,?QUEUE_TYPE,Queue}, Properties, Enable) ->
+set_queue_property(_Queue, _Properties, _Enable) ->
     erlang:error(deprecated).
+
 %%
 %% @spec release_queue(Queue::cl_queue()) ->
 %%    'ok' | {'error', cl_error()}

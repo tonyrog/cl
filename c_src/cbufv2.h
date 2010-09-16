@@ -14,6 +14,19 @@
 #endif
 
 #define UNUSED __attribute__((unused))
+#ifdef __MINGW32__
+#undef ERROR
+#define LITTLE_ENDIAN 1234
+#define BIG_ENDIAN 4321
+#define BYTE_ORDER LITTLE_ENDIAN
+#include <windows.h>
+#ifndef u_int8_t 
+typedef unsigned char u_int8_t;
+typedef unsigned short int u_int16_t;
+typedef unsigned int u_int32_t;
+typedef unsigned long long u_int64_t;
+#endif
+#endif
 
 #define CBUF_USE_PUT_ETF   // pack ETF 
 #define CBUF_USE_PUT_CTI   // pack CTI 
@@ -135,20 +148,20 @@ void cbuf_print(cbuf_t* cp,char* name)
     if (cp->flags & CBUF_FLAG_BINARY)	fprintf(f," binary");
     if (cp->flags & CBUF_FLAG_HEAP)	fprintf(f," heap");
     fprintf(f,"\r\n");
-    fprintf(f,"     iv: %lu\r\n", cp->iv);
-    fprintf(f,"     ip: %lu\r\n", cp->ip);
-    fprintf(f,"  vsize: %lu\r\n", cp->vsize);
-    fprintf(f,"   vlen: %lu\r\n", cp->vlen);
+    fprintf(f,"     iv: %lu\r\n", (long unsigned int) cp->iv);
+    fprintf(f,"     ip: %lu\r\n", (long unsigned int) cp->ip);
+    fprintf(f,"  vsize: %lu\r\n", (long unsigned int) cp->vsize);
+    fprintf(f,"   vlen: %lu\r\n", (long unsigned int) cp->vlen);
     fprintf(f,"     dv: %s\r\n", (cp->v == cp->dv) ? "true" : "false");
     for (i = 0; i < cp->vlen; i++) {
-	fprintf(f,"    v[%lu].flags:", i);
+	fprintf(f,"    v[%lu].flags:", (long unsigned int) i);
 	if (cp->v[i].flags & CBUF_FLAG_BINARY)	fprintf(f," binary");
 	if (cp->v[i].flags & CBUF_FLAG_HEAP)	fprintf(f," heap");
 	fprintf(f,"\r\n");
-	fprintf(f,"    v[%lu].base = %p\r\n",  i, cp->v[i].base);
-	fprintf(f,"    v[%lu].size = %lu\r\n", i, cp->v[i].size);
-	fprintf(f,"    v[%lu].len  = %lu\r\n", i, cp->v[i].len);
-	fprintf(f,"    v[%lu].bp   = %p\r\n", i,  cp->v[i].bp);
+	fprintf(f,"    v[%lu].base = %p\r\n",  (long unsigned int) i, cp->v[i].base);
+	fprintf(f,"    v[%lu].size = %lu\r\n", (long unsigned int) i, (long unsigned int)cp->v[i].size);
+	fprintf(f,"    v[%lu].len  = %lu\r\n", (long unsigned int) i, (long unsigned int) cp->v[i].len);
+	fprintf(f,"    v[%lu].bp   = %p\r\n", (long unsigned int) i,  cp->v[i].bp);
     }
     fprintf(f,"};\r\n");
 }
@@ -176,7 +189,7 @@ static inline void* memcpy_n2b(void* dst, void* src, size_t len)
 //
 static inline void* memcpy_n2l(void* dst, void* src, size_t len)
 {
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if BYTE_ORDER == LITTLE_ENDIAN    
     return memcpy(dst, src, len);
 #else
     u_int8_t* sp = ((u_int8_t*) src) + len;

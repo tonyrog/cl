@@ -93,7 +93,12 @@ __kernel void program1(int n, int m) {
 	      end, DeviceList),
 	    ok;
 	Error ->
-	    io:format("Build Error: ~p\n", [Error])
+	    io:format("\n\nBuild Error: ~p\n\n", [Error]),
+	    foreach(
+	      fun(Device) ->
+		      {ok,BuildInfo} = cl:get_program_build_info(Program,Device),
+		      io:format("BuildInfo @ ~w: ~p\n", [Device,BuildInfo])
+	      end, DeviceList)
     end,
     cl:release_program(Program),
     ok.
