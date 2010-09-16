@@ -868,38 +868,10 @@ create_queue({object,?CONTEXT_TYPE,Context},
 %%                          Properties::[cl_queue_property()],
 %%                          Enable::bool()) ->
 %%    'ok' | {'error', cl_error()}
-%% @doc Enable or disable the properties of a command-queue.
-%%
-%% As specified for create_queue/3, the
-%% 'out_of_order_exec_mode_enable' command-queue property
-%% determines whether the commands in a command-queue are executed
-%% in-order or out-of-order. Changing this command-queue property will
-%% cause the OpenCL implementation to block until all previously
-%% queued commands in command_queue have completed. This can be an
-%% expensive operation and therefore changes to the
-%% 'out_of_order_exec_mode_enable' property should be only done
-%% when absolutely necessary.
-%%
-%% It is possible that a device(s) becomes unavailable after a context
-%% and command-queues that use this device(s) have been created and
-%% commands have been queued to command-queues. In this case the
-%% behavior of OpenCL API calls that use this context (and
-%% command-queues) are considered to be implementation-defined. The
-%% user callback function, if specified when the context is created,
-%% can be used to record appropriate information in the errinfo,
-%% private_info arguments passed to the callback function when the
-%% device becomes unavailable.
--spec set_queue_property(Queue::cl_queue(),
-                         Properties::[cl_queue_property()],
-                         Enable::boolean()) ->
-    'ok' | {'error', cl_error()}.
+%% @doc Function is deprecated and have been removed.
 
 set_queue_property({object,?QUEUE_TYPE,Queue}, Properties, Enable) ->
-    Prop = encode_queue_properties(Properties),
-    Ena  = encode_bool(Enable),
-    cl_drv:call(?ECL_SET_QUEUE_PROPERTY,
-		<< ?pointer_t(Queue), ?u_int32_t(Prop), ?u_int32_t(Ena)>>).
-
+    erlang:error(deprecated).
 %%
 %% @spec release_queue(Queue::cl_queue()) ->
 %%    'ok' | {'error', cl_error()}
