@@ -34,16 +34,16 @@ endif
 ifeq ($(TYPE), release)
 OBJDIR=../obj/release
 LIBDIR=../lib/release
-CFLAGS += -O3 -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common
+CFLAGS += -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common
 endif
 
 ifeq ($(OSNAME), Linux)
 LINUX = Yes
 ifeq ($(WORDSIZE), 32)
-CFLAGS += -fPIC -m32 -DWORDSIZE=32
+CFLAGS += -O3 -fPIC -m32 -DWORDSIZE=32
 endif
 ifeq ($(WORDSIZE), 64)
-CFLAGS += -fPIC -m64 -DWORDSIZE=64
+CFLAGS += -O3 -fPIC -m64 -DWORDSIZE=64
 endif
 LD_SHARED	:= $(CC) -shared -lOpenCL
 endif
@@ -51,11 +51,11 @@ endif
 ifeq ($(OSNAME), Darwin)
 MAC_OS_X = Yes
 ifeq ($(WORDSIZE), 32)
-CFLAGS += -fPIC -m32 -DWORDSIZE=32 -DDARWIN -no-cpp-precomp
+CFLAGS += -O3 -fPIC -m32 -DWORDSIZE=32 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m32 -bundle -flat_namespace -undefined suppress
 endif
 ifeq ($(WORDSIZE), 64)
-CFLAGS += -fPIC -m64 -DWORDSIZE=64 -DDARWIN -no-cpp-precomp
+CFLAGS += -O3 -fPIC -m64 -DWORDSIZE=64 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m64 -bundle -flat_namespace -undefined suppress
 endif
 endif
@@ -77,6 +77,13 @@ endif
 ifeq ($(WORDSIZE), 64)
 CFLAGS += -shared -I/opt/local/include -m64 -DWIN32 -DWORDSIZE=64
 endif
+
+## Optimizations is broken on mingw 4.4.0 (it crashes with it on)
+GCC_VERSION = $(shell gcc -dumpversion)
+ifneq ($(GCC_VERSION), 4.4.0)
+CFLAGS += -O3
+endif
+
 LD_SHARED	:= $(CC) -shared 
 endif
 
