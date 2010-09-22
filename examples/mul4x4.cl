@@ -15,8 +15,8 @@ __kernel void mul4x4(__global float* input,
     if (ix < count) {
         int i,j,k;
 
-	b = input  + ix;
-	c = output + ix;
+	b = input  + ix*16;
+	c = output + ix*16;
 
 	for (i=0; i<4; i++) {
 	    for (j=0; j<4; j++) {

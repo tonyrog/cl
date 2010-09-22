@@ -116,7 +116,7 @@ run(Data, DevType) ->
     erlang:display_string("enqueu write\n"),
 
     %% Set kernel arguments
-    clu:apply_kernel_args(Kernel, [Input,Output,zero_matrix(),{uint,Count}]),
+    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
     io:format("kernel args set\n"),
 
     Device = hd(E#cl.devices),
