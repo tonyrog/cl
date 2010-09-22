@@ -1240,7 +1240,10 @@ static inline void put_object(cbuf_t* out, ecl_object_t* obj)
     pointer_t handle = ecl_handle(obj);
     cbuf_put_tuple_begin(out, 3);
     cbuf_put_atom(out, "object");
-    cbuf_put_uint8(out, obj->cl->type);
+    if (obj)
+	cbuf_put_uint8(out, obj->cl->type);
+    else
+	cbuf_put_uint8(out, 0);
     cbuf_put_pointer(out, handle);
     cbuf_put_tuple_end(out, 3);
 }

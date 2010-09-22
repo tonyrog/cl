@@ -60,7 +60,7 @@ random_matrices(N) ->
 	end, lists:seq(1, N))).
 
 test_data() ->
-    random_matrices(64).
+    random_matrices(4).
 
 dump_data(Bin) ->
     io:format("data=~p\n", [decode_matrix(Bin)]).
@@ -108,13 +108,16 @@ run(Data, DevType) ->
     {ok,Kernel} = cl:create_kernel(Program, "mul4x4"),
     io:format("kernel created: ~p\n", [Kernel]),
 
-    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
-    io:format("kernel args set\n"),
+    dump_data(Data),
 
     %% Write data into input array 
     {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, Data, []),
     io:format("write data enqueued\n"),
     erlang:display_string("enqueu write\n"),
+
+    %% Set kernel arguments
+    clu:apply_kernel_args(Kernel, [Input,Output,zero_matrix(),{uint,Count}]),
+    io:format("kernel args set\n"),
 
     Device = hd(E#cl.devices),
     {ok,Local} = cl:get_kernel_workgroup_info(Kernel, Device, work_group_size),
@@ -153,4 +156,10 @@ run(Data, DevType) ->
     cl:release_program(Program),
 
     clu:teardown(E),
+    case Event3Res of
+	{ok,ResData} ->
+	    dump_data(ResData);
+	_ ->
+	    ok
+    end,
     Event3Res.

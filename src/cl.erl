@@ -131,6 +131,17 @@
 -include("../include/cl.hrl").
 -include("cl_int.hrl").
 
+-define(is_platform(X), element(2,X) =:= ?PLATFORM_TYPE).
+-define(is_device(X), element(2,X) =:= ?DEVICE_TYPE).
+-define(is_context(X), element(2,X) =:= ?CONTEXT_TYPE).
+-define(is_queue(X), element(2,X) =:= ?QUEUE_TYPE).
+-define(is_mem(X), element(2,X) =:= ?MEM_TYPE).
+-define(is_sampler(X), element(2,X) =:= ?SAMPLER_TYPE).
+-define(is_program(X), element(2,X) =:= ?PROGRAM_TYPE).
+-define(is_kernel(X), element(2,X) =:= ?KERNEL_TYPE).
+-define(is_event(X), element(2,X) =:= ?EVENT_TYPE).
+
+
 %%
 %% @type start_arg() = { {'debug',boolean()} }
 %%
@@ -705,7 +716,7 @@ create_context_from_type(Type) ->
 -spec release_context(Context::cl_context()) ->
     'ok' | {'error', cl_error()}.
 
-release_context(Context) ->
+release_context(Context) when ?is_context(Context) ->
     cl_drv:release(?ECL_RELEASE_CONTEXT, Context).
 
 %%
@@ -716,7 +727,7 @@ release_context(Context) ->
 -spec retain_context(Context::cl_context()) ->
     'ok' | {'error', cl_error()}.
 
-retain_context(Context) ->
+retain_context(Context) when ?is_context(Context) ->
     cl_drv:retain(?ECL_RETAIN_CONTEXT, Context).
 
 %%
@@ -745,7 +756,7 @@ context_info() ->
 -spec get_context_info(Context::cl_context(), Info::cl_context_info_key()) ->
     {'ok', term()} | {'error', cl_error()}.
 
-get_context_info(Context, Info) ->
+get_context_info(Context, Info) when ?is_context(Context) ->
     get_info(?ECL_GET_CONTEXT_INFO, Context, Info, fun context_info_map/1).
 
 %% @spec get_context_info(Context::cl_context()) ->
@@ -755,7 +766,7 @@ get_context_info(Context, Info) ->
 -spec get_context_info(Context::cl_context()) ->
     {'ok', [cl_context_info()]} | {'error', cl_error()}.
 
-get_context_info(Context) ->
+get_context_info(Context) when ?is_context(Context) ->
     get_info_list(?ECL_GET_CONTEXT_INFO, Context, 
 		  context_info_keys(), fun context_info_map/1).
 
@@ -900,7 +911,7 @@ set_queue_property({object,?QUEUE_TYPE,Queue}, Properties, Enable) ->
 %% deleted.
 -spec release_queue(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
-release_queue(Queue) ->
+release_queue(Queue) when ?is_queue(Queue) ->
     cl_drv:release(?ECL_RELEASE_QUEUE, Queue).
 
 %%
@@ -919,7 +930,7 @@ release_queue(Queue) ->
 -spec retain_queue(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
 
-retain_queue(Queue) ->
+retain_queue(Queue) when ?is_queue(Queue) ->
     cl_drv:retain(?ECL_RETAIN_QUEUE, Queue).
 
 %% @spec queue_info() -> [queue_info_keys()]
@@ -929,13 +940,13 @@ queue_info() ->
 
 %% @spec get_queue_info(Queue, Info) -> {ok, term()}
 %% @doc Return the specified queue info
-get_queue_info(Queue, Info) ->
+get_queue_info(Queue, Info) when ?is_queue(Queue) ->
     get_info(?ECL_GET_QUEUE_INFO, Queue, Info, 
 	     fun queue_info_map/1).
 
 %% @spec get_queue_info(Queue) -> [queue_info_keys()]
 %% @doc Returns all queue info.
-get_queue_info(Queue) ->
+get_queue_info(Queue) when ?is_queue(Queue) ->
     get_info_list(?ECL_GET_QUEUE_INFO, Queue, 
 		  queue_info_keys(), fun queue_info_map/1).
 
@@ -1002,7 +1013,7 @@ create_buffer({object,?CONTEXT_TYPE,Context},Flags,Size,Data) ->
 -spec release_mem_object(Mem::cl_mem()) ->
     'ok' | {'error', cl_error()}.
 
-release_mem_object(Mem) ->
+release_mem_object(Mem) when ?is_mem(Mem) ->
     cl_drv:release(?ECL_RELEASE_MEM_OBJECT, Mem).
 
 %%
@@ -1012,7 +1023,7 @@ release_mem_object(Mem) ->
 -spec retain_mem_object(Mem::cl_mem()) ->
     'ok' | {'error', cl_error()}.
 
-retain_mem_object(Mem) ->
+retain_mem_object(Mem) when ?is_mem(Mem) ->
     cl_drv:release(?ECL_RETAIN_MEM_OBJECT, Mem).
 
 
@@ -1027,7 +1038,7 @@ retain_mem_object(Mem) ->
 -spec get_mem_object_info(Mem::cl_mem(), Info::cl_mem_info_key()) ->
     {'ok', term()} | {'error', cl_error()}.
 
-get_mem_object_info(Mem, InfoType) ->
+get_mem_object_info(Mem, InfoType) when ?is_mem(Mem) ->
     get_info(?ECL_GET_MEM_OBJECT_INFO, Mem, InfoType, fun mem_info_map/1).
 %%
 %% @spec get_mem_object_info(Mem::cl_mem()) ->
@@ -1035,7 +1046,7 @@ get_mem_object_info(Mem, InfoType) ->
 %%
 %% @doc Used to get all information that is common to all memory objects
 %% (buffer and image objects).
-get_mem_object_info(Mem) ->
+get_mem_object_info(Mem) when ?is_mem(Mem) ->
     get_info_list(?ECL_GET_MEM_OBJECT_INFO, Mem, 
 		  mem_info_keys(), fun mem_info_map/1).
 
@@ -1092,8 +1103,8 @@ create_sampler({object,?CONTEXT_TYPE,Context}, Normalized, AddressingMode, Filte
 -spec release_sampler(Sampler::cl_sampler()) ->
     'ok' | {'error', cl_error()}.
 
-release_sampler(Mem) ->
-    cl_drv:release(?ECL_RELEASE_SAMPLER, Mem).
+release_sampler(Sampler) when ?is_sampler(Sampler) ->
+    cl_drv:release(?ECL_RELEASE_SAMPLER, Sampler).
 
 %%
 %% @spec retain_sampler(Sampler::cl_sampler()) ->
@@ -1102,7 +1113,7 @@ release_sampler(Mem) ->
 -spec retain_sampler(Sampler::cl_sampler()) ->
     'ok' | {'error', cl_error()}.
 
-retain_sampler(Sampler) ->
+retain_sampler(Sampler) when ?is_sampler(Sampler) ->
     cl_drv:release(?ECL_RETAIN_SAMPLER, Sampler).
 
 sampler_info() ->
@@ -1111,14 +1122,14 @@ sampler_info() ->
 %% @spec get_sampler_info(Sampler::cl_sampler(), InfoType::cl_sampler_info_type()) -> 
 %%    {'ok', term()} | {'error', cl_error()}
 %% @doc Returns <c>InfoType</c> information about the sampler object. 
-get_sampler_info(Sampler, Info) ->
+get_sampler_info(Sampler, Info) when ?is_sampler(Sampler) ->
     get_info(?ECL_GET_SAMPLER_INFO, Sampler, Info, 
 	     fun sampler_info_map/1).
 
 %% @spec get_sampler_info(Sampler::cl_sampler()) -> {'ok', term()} | {'error', cl_error()}
 %% @doc Returns all information about the sampler object. 
 %% @see get_sampler_info/2
-get_sampler_info(Sampler) ->
+get_sampler_info(Sampler) when ?is_sampler(Sampler) ->
     get_info_list(?ECL_GET_SAMPLER_INFO, Sampler, 
 		  sampler_info_keys(), fun sampler_info_map/1).
 
@@ -1222,7 +1233,7 @@ create_program_with_binary({object,?CONTEXT_TYPE,Context}, DeviceList, BinaryLis
 %% @spec retain_program(Program::cl_program()) ->
 %%    'ok' | {'error', cl_error()}
 %% @doc  Increments the program reference count. 
-retain_program(Program) ->
+retain_program(Program) when ?is_program(Program) ->
     cl_drv:retain(?ECL_RETAIN_PROGRAM, Program).
 
 %%
@@ -1233,7 +1244,7 @@ retain_program(Program) ->
 %% The program object is deleted after all kernel objects associated
 %% with program have been deleted and the program reference count
 %% becomes zero.
-release_program(Program) ->
+release_program(Program) when ?is_program(Program) ->
     cl_drv:release(?ECL_RELEASE_PROGRAM, Program).
 
 %%
@@ -1383,11 +1394,11 @@ program_info() ->
     program_info_keys().
 
 %% @doc  Returns specific information about the program object. 
-get_program_info(Program, Info) ->
+get_program_info(Program, Info) when ?is_program(Program) ->
     get_info(?ECL_GET_PROGRAM_INFO, Program, Info, fun program_info_map/1).
 
 %% @doc  Returns all information about the program object. 
-get_program_info(Program) ->
+get_program_info(Program) when ?is_program(Program) ->
     get_info_list(?ECL_GET_PROGRAM_INFO, Program, 
 		  program_info_keys(), fun program_info_map/1).
 
@@ -1395,11 +1406,13 @@ program_build_info() ->
     build_info_keys().
 
 %% @doc Returns specific build information for each device in the program object. 
-get_program_build_info(Program, {object,?DEVICE_TYPE,Device}, Info) ->
+get_program_build_info(Program, {object,?DEVICE_TYPE,Device}, Info) 
+  when ?is_program(Program) ->
     get_info(?ECL_GET_PROGRAM_BUILD_INFO, Program, 
 	     <<?pointer_t(Device)>>, Info, fun build_info_map/1).
 %% @doc Returns all build information for each device in the program object. 
-get_program_build_info(Program, {object,?DEVICE_TYPE,Device}) ->
+get_program_build_info(Program, {object,?DEVICE_TYPE,Device}) 
+  when ?is_program(Program) ->
     get_info_list(?ECL_GET_PROGRAM_BUILD_INFO, Program,
 		  <<?pointer_t(Device)>>, 
 		  build_info_keys(), fun build_info_map/1).
@@ -1518,25 +1531,25 @@ set_kernel_arg_size({object,?KERNEL_TYPE,Kernel},Index,Size) ->
 %% @spec retain_kernel(Context::cl_kernel()) ->
 %%    'ok' | {'error', cl_error()}
 %% @doc  Increments the program kernel reference count. 
-retain_kernel(Kernel) ->
+retain_kernel(Kernel) when ?is_kernel(Kernel) ->
     cl_drv:retain(?ECL_RETAIN_KERNEL, Kernel).
 
 %%
 %% @spec release_kernel(Context::cl_kernel()) ->
 %%    'ok' | {'error', cl_error()}
 %% @doc  Decrements the kernel reference count. 
-release_kernel(Kernel) ->
+release_kernel(Kernel) when ?is_kernel(Kernel) ->
     cl_drv:release(?ECL_RELEASE_KERNEL, Kernel).
 
 kernel_info() ->
     kernel_info_keys().
 
 %% @doc Returns specific information about the kernel object. 
-get_kernel_info(Kernel, Info) ->
+get_kernel_info(Kernel, Info) when ?is_kernel(Kernel) ->
     get_info(?ECL_GET_KERNEL_INFO, Kernel, Info, fun kernel_info_map/1).
 
 %% @doc Returns all information about the kernel object. 
-get_kernel_info(Kernel) ->
+get_kernel_info(Kernel) when ?is_kernel(Kernel) ->
     get_info_list(?ECL_GET_KERNEL_INFO, Kernel, 
 		  kernel_info_keys(), fun kernel_info_map/1).
 
@@ -1545,13 +1558,15 @@ kernel_workgroup_info() ->
 
 %% @doc Returns specific information about the kernel object that may
 %% be specific to a device.
-get_kernel_workgroup_info(Kernel, {object,?DEVICE_TYPE,Device}, Info) ->
+get_kernel_workgroup_info(Kernel, {object,?DEVICE_TYPE,Device}, Info) 
+  when ?is_kernel(Kernel) ->
     get_info(?ECL_GET_KERNEL_WORKGROUP_INFO, Kernel,
 	     <<?pointer_t(Device)>>,  Info, fun workgroup_info_map/1).
 
 %% @doc Returns all information about the kernel object that may be
 %% specific to a device.
-get_kernel_workgroup_info(Kernel, {object,?DEVICE_TYPE,Device}) ->
+get_kernel_workgroup_info(Kernel, {object,?DEVICE_TYPE,Device}) 
+  when ?is_kernel(Kernel) ->
     get_info_list(?ECL_GET_KERNEL_WORKGROUP_INFO, Kernel, 
 		  <<?pointer_t(Device)>>, 
 		  workgroup_info_keys(), fun workgroup_info_map/1).
@@ -1787,7 +1802,7 @@ finish({object,?QUEUE_TYPE,Queue}) ->
 %%    'ok' | {'error', cl_error()}
 %% @doc  Increments the event reference count. 
 %% NOTE: The OpenCL commands that return an event perform an implicit retain. 
-retain_event(Event) ->
+retain_event(Event) when ?is_event(Event) ->
     cl_drv:retain(?ECL_RETAIN_EVENT, Event).
 
 %%
@@ -1800,7 +1815,7 @@ retain_event(Event) ->
 %%  identified by this event has completed (or terminated) and there
 %%  are no commands in the command-queues of a context that require a
 %%  wait for this event to complete.
-release_event(Event) ->
+release_event(Event) when ?is_event(Event) ->
     cl_drv:release(?ECL_RELEASE_EVENT, Event).
 
 %% @doc Returns all possible event_info items.
@@ -1808,11 +1823,11 @@ event_info() ->
     event_info_keys().
 
 %% @doc Returns specific information about the event object. 
-get_event_info(Event, Info) ->
+get_event_info(Event, Info) when ?is_event(Event) ->
     get_info(?ECL_GET_EVENT_INFO, Event, Info, fun event_info_map/1).
 
 %% @doc Returns all specific information about the event object. 
-get_event_info(Event) ->
+get_event_info(Event) when ?is_event(Event) ->
     get_info_list(?ECL_GET_EVENT_INFO, Event, 
 		  event_info_keys(), fun event_info_map/1).
 
@@ -1836,7 +1851,7 @@ wait(Event) ->
 %%  Waits on the host thread for commands identified by event objects
 %%  in event_list to complete. A command is considered complete if its
 %%  execution status is CL_COMPLETE or a negative value.
-wait(Event, Timeout) ->
+wait(Event, Timeout) when ?is_event(Event) ->
     %% io:format("Wait for event: ~p\n", [Event]),
     receive
 	{cl_event, Event, Binary} when is_binary(Binary) ->
