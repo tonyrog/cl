@@ -108,4 +108,5 @@ run(Data, DevType) ->
     cl:release_program(Program),
 
     clu:teardown(E),
-    Event3Res.
+    {ok,EventResData} = Event3Res,
+    dump_data(EventResData).
