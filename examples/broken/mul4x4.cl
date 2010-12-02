@@ -22,7 +22,7 @@ __kernel void mul4x4(__global float* input,
 	    for (j=0; j<4; j++) {
 	        float s1 = 0.0;
 		for (k=0; k<4; k++) {
-		    float t1 = a[4*i+k];
+		    float t1 = a.s(4*i+k);
 		    float t2 = b[4*k+j];
 		    s1 += (t1*t2);
 		}
