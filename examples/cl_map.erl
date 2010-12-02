@@ -37,7 +37,7 @@ run(Function, Data) ->
     {_NArgs,ItemSize,Source} = p_program(Function),
     io:format("Program:\n~s\n", [Source]),
     {ok,Program} = clu:build_source(E, Source),
-    {ok,Kernel} = cl:create_kernel(Program, "main"),
+    {ok,Kernel} = cl:create_kernel(Program, "example"),
 
     Kws =
 	map(
@@ -205,7 +205,7 @@ p_header(Params) ->
     map(fun p_arg/1, Params).
 
 g_header([{V,T}|Ps]) ->
-    ["__kernel void main(",
+    ["__kernel void example(",
      "__global ", g_type(T), "*", "in", ",",
      "__global ", g_type(T), "*", "out",",",
      "const uint n",
