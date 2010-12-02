@@ -1,7 +1,7 @@
 %%
-%% Hello program adpoted from "Hello World" OpenCL examples by apple
+%% SquareFloat program adpoted from "Hello World" OpenCL examples by apple
 %%
--module(cl_hello).
+-module(cl_square_float).
 
 -compile(export_all).
 
