@@ -1,10 +1,9 @@
 
 MODULES = \
 	cl_basic \
-	cl_hello \
+	cl_square_float \
 	cl_map \
-	cl_binary_test \
-	cl_mul
+	cl_binary_test 
 
 
 
