@@ -3,7 +3,8 @@ MODULES = \
 	cl_basic \
 	cl_square_float \
 	cl_map \
-	cl_binary_test 
+	cl_binary_test \
+	cl_bandwidth
 
 
 
