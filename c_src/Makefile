@@ -156,16 +156,13 @@ OCL_SIMD_OBJS = $(SIMD_OBJS:%=$(OBJDIR)/%)
 
 all:	all32 all64
 
-nif32:	config.32.h
-	$(MAKE) nif TYPE=release WORDSIZE=32
-
 all32:	config.32.build
-	$(MAKE) driver TYPE=release WORDSIZE=32
-	$(MAKE) driver TYPE=debug   WORDSIZE=32
+	$(MAKE) nif TYPE=release WORDSIZE=32
+	$(MAKE) nif TYPE=debug   WORDSIZE=32
 
 all64:	config.64.build
-	$(MAKE) driver TYPE=release WORDSIZE=64
-	$(MAKE) driver TYPE=debug   WORDSIZE=64
+	$(MAKE) nif TYPE=release WORDSIZE=64
+	$(MAKE) nif TYPE=debug   WORDSIZE=64
 
 config.32.build:	configure
 	./configure --with-wordsize=32
@@ -184,49 +181,36 @@ clean:
 
 # Make cl library
 debug:
-	$(MAKE) driver TYPE=debug
+	$(MAKE) nif TYPE=debug
 
 clean_debug:
 	$(MAKE) clean_internal TYPE=debug
 
 release:
-	$(MAKE) driver TYPE=release
+	$(MAKE) nif TYPE=release
 
 ifeq ($(CL_BUILD), false)
-driver: 
+nif: 
 	@echo 
-	@echo Skipping driver for wordsize=$(WORDSIZE), not supported on this system
+	@echo Skipping nif for wordsize=$(WORDSIZE), not supported on this system
 	@echo 
 else
-driver: $(CL_DRV)
-endif
-
 nif: $(CL_NIF)
-
-cbuf_test: cbuf_test.o
-	$(CC) -o $@ cbuf_test.o
-
-cbuf_test.o:  cbufv2.h
+endif
 
 depend:
 
 clean_internal:
 	-rm -f $(OBJDIR)/$(WORDSIZE)/*.o
 
-$(CL_DRV): $(OCL_LIB) $(CL_DRV_OBJS) # $(CL_ASM)
-	$(LD_SHARED) -o $@ $(CL_DRV_OBJS) $(LDFLAGS)
-
 $(CL_NIF): $(OCL_LIB) $(CL_NIF_OBJS) # $(CL_ASM)
 	$(LD_SHARED) -o $@ $(CL_NIF_OBJS) $(LDFLAGS)
 
-$(OBJDIR)/$(WORDSIZE)/cl_drv.o: cbufv2.h cl_hash.h
+$(OBJDIR)/$(WORDSIZE)/cl_nif.o: cl_hash.h
 
 $(OBJDIR)/$(WORDSIZE)/%.o: %.c
 	$(CC) -c -o $@ $(CFLAGS) -I$(ERL_C_INCLUDE_DIR) $<
 
 $(OBJDIR)/$(WORDSIZE)/%.s: %.c
 	$(CC) -S -o $@ $(CFLAGS) -I$(ERL_C_INCLUDE_DIR) $<
-
-cbuf_test.o: cbuf_test.c
-	$(CC) -c -o $@ -g -I$(ERL_C_INCLUDE_DIR) $<
 

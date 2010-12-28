@@ -1,9 +1,7 @@
 {application, cl,
  [{description, "OpenCL binding for Erlang"},
   {vsn, "%VSN%"},
-  {modules, [cl_drv, cl_app, cl_sup, cl, clu]},
-  {registered, [cl_serv]},
-  {mod,{cl_app,[]}},
+  {modules, [cl, clu]},
   {env, []},
   {applications,[kernel,stdlib]}
   ]}.

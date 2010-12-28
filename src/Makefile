@@ -1,8 +1,5 @@
 
 MODULES = \
-	cl_app \
-	cl_sup \
-	cl_drv \
 	cl  \
 	clu
 

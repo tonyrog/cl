@@ -4,7 +4,8 @@ MODULES = \
 	cl_square_float \
 	cl_map \
 	cl_binary_test \
-	cl_bandwidth
+	cl_bandwidth \
+	cl_test
 
 
 
