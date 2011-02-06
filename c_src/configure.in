@@ -1,4 +1,4 @@
-AC_INIT(cl_drv.c)
+AC_INIT(cl_nif.c)
 AC_PREREQ(2.59)
 
 AC_CHECK_FUNC(socketpair,AC_DEFINE(HAVE_SOCKETPAIR,[1],[socketpair present]),[])

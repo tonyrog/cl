@@ -1,13 +1,17 @@
 OSNAME := $(shell uname -s)
 MACHINE := $(shell uname -m)
 CC = gcc
+OUT_C = -o
+OUT_L = -o
+OBJ = o
 
 ERLDIR	:= $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir()])" -s erlang halt)
 ERL_C_INCLUDE_DIR := $(ERLDIR)/usr/include
 OCL_DIR := $(shell cd ..; pwd)
 
 MAC_OS_X  = No
-WIN32     = No
+WIN32_GCC = No
+WIN32_CL  = No
 LINUX     = No
 
 ALTIVEC   = No
@@ -28,13 +32,16 @@ endif
 ifeq ($(TYPE), debug)
 OBJDIR=../obj/debug
 LIBDIR=../lib/debug
-CFLAGS += -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common 
+CFLAGS += -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE 
+CFLAGS += -D_REENTRANT -fno-common -I$(ERL_C_INCLUDE_DIR)
+WIN_DEBUG = -Ddebug -DDEBUG
 endif
 
 ifeq ($(TYPE), release)
 OBJDIR=../obj/release
 LIBDIR=../lib/release
 CFLAGS += -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE -D_REENTRANT -fno-common
+CFLAGS += -I$(ERL_C_INCLUDE_DIR)
 endif
 
 ifeq ($(OSNAME), Linux)
@@ -60,6 +67,7 @@ LD_SHARED	:= $(CC) -m64 -bundle -flat_namespace -undefined suppress
 endif
 endif
 
+## Windows start
 ifeq ($(OSNAME), MINGW32_NT-6.0)
 MINGW = Yes
 endif
@@ -68,8 +76,21 @@ MINGW = Yes
 endif
 
 ifeq ($(MINGW), Yes)
-WIN32 = Yes
-EXT   = dll
+EXT = dll
+MCL = $(shell which cl.exe)
+
+#ifneq ($(MCL), )
+ifeq ($(MCL), buggy)
+## Use Microsoft CL
+WIN32_CL = Yes
+CC = cl.exe 
+OUT_C = -Fo
+OUT_L = -out:
+LD_SHARED := link.exe -DLL 
+OPENCL_DIR = c:/msysgit/opt/local/
+else
+## Use mingw-gcc
+WIN32_GCC = Yes
 CFLAGS += -D__WIN32__
 ifeq ($(WORDSIZE), 32)
 CFLAGS += -shared -I/opt/local/include -m32 -DWIN32 -DWORDSIZE=32
@@ -78,14 +99,17 @@ ifeq ($(WORDSIZE), 64)
 CFLAGS += -shared -I/opt/local/include -m64 -DWIN32 -DWORDSIZE=64
 endif
 
+LD_SHARED	:= $(CC) -shared 
+
 ## Optimizations is broken on mingw 4.4.0 (it crashes with it on)
 GCC_VERSION = $(shell gcc -dumpversion)
 ifneq ($(GCC_VERSION), 4.4.0)
 CFLAGS += -O3
 endif
 
-LD_SHARED	:= $(CC) -shared 
 endif
+endif
+## Windows end
 
 ifeq ($(MACHINE), "Power Macintosh")
 ALTIVEC   = Yes
@@ -105,15 +129,6 @@ SSE2      = Yes
 SSE3      = No
 endif
 
-ifeq ($(MAC_OS_X),Yes)
-	LDFLAGS += -framework OpenCL
-endif
-
-ifeq ($(WIN32),Yes)
-	CFLAGS += -DWIN32
-	LDFLAGS += -Wl--enable-stdcall-fixup -L/opt/local/lib -lOpenCL
-endif
-
 ifeq ($(ALTIVEC),Yes)
 	CFLAGS += -maltivec -DUSE_ALTIVEC
 endif
@@ -124,7 +139,7 @@ endif
 
 ifeq ($(SSE2),Yes)
 	CFLAGS += -msse2 -DUSE_SSE2
-	SIMD_OBJS += ocl_simd_sse2.$(BIT).o
+	SIMD_OBJS += ocl_simd_sse2.$(BIT).$(OBJ)
 endif
 
 ifeq ($(SSE3),Yes)
@@ -133,7 +148,22 @@ endif
 
 ifeq ($(MMX),Yes)
 	MCFLAGS += -mmmx -DUSE_MMX
-	SIMD_OBJS += ocl_simd_mmx.$(BIT).o
+	SIMD_OBJS += ocl_simd_mmx.$(BIT).$(OBJ)
+endif
+
+
+ifeq ($(MAC_OS_X),Yes)
+	LDFLAGS += -framework OpenCL
+endif
+
+ifeq ($(WIN32_GCC),Yes)
+	CFLAGS += -DWIN32
+	LDFLAGS += -Wl--enable-stdcall-fixup -L/opt/local/lib -lOpenCL
+endif
+
+ifeq ($(WIN32_CL),Yes)
+	CFLAGS = -I$(OPENCL_DIR)/include -I$(ERL_C_INCLUDE_DIR) -MD -D_THREAD_SAFE -DWIN32 -D__WIN32__ $(WIN_DEBUG)
+	LDFLAGS = $(OPENCL_DIR)/lib/OpenCL.lib
 endif
 
 CL_DRV = $(LIBDIR)/$(WORDSIZE)/cl_drv.$(EXT)
@@ -141,12 +171,12 @@ CL_DRV = $(LIBDIR)/$(WORDSIZE)/cl_drv.$(EXT)
 CL_NIF = $(LIBDIR)/$(WORDSIZE)/cl_nif.$(EXT)
 
 CL_DRV_OBJS = \
-	$(OBJDIR)/$(WORDSIZE)/cl_drv.o \
-	$(OBJDIR)/$(WORDSIZE)/cl_hash.o
+	$(OBJDIR)/$(WORDSIZE)/cl_drv.$(OBJ) \
+	$(OBJDIR)/$(WORDSIZE)/cl_hash.$(OBJ)
 
 CL_NIF_OBJS = \
-	$(OBJDIR)/$(WORDSIZE)/cl_nif.o \
-	$(OBJDIR)/$(WORDSIZE)/cl_hash.o
+	$(OBJDIR)/$(WORDSIZE)/cl_nif.$(OBJ) \
+	$(OBJDIR)/$(WORDSIZE)/cl_hash.$(OBJ)
 
 CL_ASM = \
 	$(OBJDIR)/$(WORDSIZE)/cl_drv.s \
@@ -201,16 +231,16 @@ endif
 depend:
 
 clean_internal:
-	-rm -f $(OBJDIR)/$(WORDSIZE)/*.o
+	-rm -f $(OBJDIR)/$(WORDSIZE)/*.$(OBJ)
 
 $(CL_NIF): $(OCL_LIB) $(CL_NIF_OBJS) # $(CL_ASM)
-	$(LD_SHARED) -o $@ $(CL_NIF_OBJS) $(LDFLAGS)
+	$(LD_SHARED) $(OUT_L)$@ $(CL_NIF_OBJS) $(LDFLAGS)
 
-$(OBJDIR)/$(WORDSIZE)/cl_nif.o: cl_hash.h
+$(OBJDIR)/$(WORDSIZE)/cl_nif.$(OBJ): cl_hash.h
 
-$(OBJDIR)/$(WORDSIZE)/%.o: %.c
-	$(CC) -c -o $@ $(CFLAGS) -I$(ERL_C_INCLUDE_DIR) $<
+$(OBJDIR)/$(WORDSIZE)/%.$(OBJ): %.c
+	$(CC) -c $(OUT_C)$@ $(CFLAGS) $<
 
 $(OBJDIR)/$(WORDSIZE)/%.s: %.c
-	$(CC) -S -o $@ $(CFLAGS) -I$(ERL_C_INCLUDE_DIR) $<
+	$(CC) -S $(OUT_C)$@ $(CFLAGS) $<
 

@@ -4,15 +4,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
+
+#ifndef WIN32
+#include <stdbool.h>
+#else
+#include <windows.h>
+#endif
 
 #ifdef DARWIN
 #include <OpenCL/opencl.h>
 #else
 #include <CL/cl.h>
 #endif
+
+// Old cl_platform doesn't have the CL_CALLBACK
+#ifndef CL_CALLBACK
+#define CL_CALLBACK
+#endif
+
+#ifdef WIN32
+typedef cl_bool bool;
+#define true 1
+#define false 0
+#endif
+
+#define UNUSED(a) ((void) a)
 
 #include "erl_nif.h"
 #include "cl_hash.h"
@@ -135,7 +153,7 @@ typedef enum {
 
 typedef struct {
     ERL_NIF_TERM*  key;
-    u_int64_t      value;
+    ErlNifUInt64   value;
 } ecl_kv_t;
 
 typedef struct {
@@ -341,7 +359,6 @@ static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc,
 
 static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[]);
-
 
 
 ErlNifFunc ecl_funcs[] =
@@ -1350,13 +1367,14 @@ static void ecl_emit_error(char* file, int line, ...)
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\r\n");
     va_end(ap);
+    fflush(stderr);
 }
 #endif
 
 // Parse bool
 static int get_bool(ErlNifEnv* env, const ERL_NIF_TERM key, cl_bool* val)
 {
-    (void) env;
+    UNUSED(env);
     if (key == ATOM(true)) {
 	*val = true;
 	return 1;
@@ -1373,7 +1391,7 @@ static int get_bool(ErlNifEnv* env, const ERL_NIF_TERM key, cl_bool* val)
 static int get_enum(ErlNifEnv* env, const ERL_NIF_TERM key,
 		    cl_uint* num, ecl_kv_t* kv)
 {
-    (void) env;
+    UNUSED(env);
 
     if (!enif_is_atom(env, key))
 	return 0;
@@ -1391,7 +1409,7 @@ static int get_enum(ErlNifEnv* env, const ERL_NIF_TERM key,
 static int get_bitfield(ErlNifEnv* env, const ERL_NIF_TERM key,
 			cl_bitfield* field, ecl_kv_t* kv)
 {
-    (void) env;
+    UNUSED(env);
 
     if (!enif_is_atom(env, key))
 	return 0;
@@ -1493,7 +1511,7 @@ static int ref_cmp(void* key, void* data)
 
 static void ref_release(void *data)
 {
-    (void) data;
+    UNUSED(data);
     // object's are free'd by garbage collection
 }
 
@@ -1723,8 +1741,8 @@ static int ecl_resource_init(ErlNifEnv* env,
 
 static void ecl_platform_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
-    (void) obj;
+    UNUSED(env);
+    UNUSED(obj);
     DBG("ecl_platform_dtor: %p", obj);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
@@ -1732,8 +1750,8 @@ static void ecl_platform_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_device_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
-    (void) obj;
+    UNUSED(env);
+    UNUSED(obj);
     DBG("ecl_device_dtor: %p", obj);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
@@ -1741,7 +1759,7 @@ static void ecl_device_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_queue_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
+    UNUSED(env);
     DBG("ecl_queue_dtor: %p", obj);
     clReleaseCommandQueue(obj->queue);
     object_erase(obj);
@@ -1750,7 +1768,7 @@ static void ecl_queue_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_mem_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
+    UNUSED(env);
     DBG("ecl_mem_dtor: %p", obj);
     clReleaseMemObject(obj->mem);
     object_erase(obj);
@@ -1759,7 +1777,7 @@ static void ecl_mem_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_sampler_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
+    UNUSED(env);
     DBG("ecl_sampler_dtor: %p", obj);
     clReleaseSampler(obj->sampler);
     object_erase(obj);
@@ -1768,7 +1786,7 @@ static void ecl_sampler_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_program_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
+    UNUSED(env);
     DBG("ecl_program_dtor: %p", obj);
     clReleaseProgram(obj->program);
     object_erase(obj);
@@ -1777,7 +1795,7 @@ static void ecl_program_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_kernel_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
+    UNUSED(env);
     DBG("ecl_kernel_dtor: %p", obj);
     clReleaseKernel(obj->kernel);
     object_erase(obj);
@@ -1786,8 +1804,8 @@ static void ecl_kernel_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_event_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
     ecl_event_t* evt = (ecl_event_t*) obj;
+    UNUSED(env);
     DBG("ecl_event_dtor: %p", evt);
     clReleaseEvent(evt->obj.event);
     object_erase(obj);
@@ -1802,9 +1820,9 @@ static void ecl_event_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_context_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
-    (void) env;
     void* exit_value;
     ecl_context_t* ctx = (ecl_context_t*) obj;
+    UNUSED(env);
 
     DBG("ecl_context_dtor: %p", ctx);
     clReleaseContext(ctx->obj.context);
@@ -2223,7 +2241,7 @@ static ERL_NIF_TERM make_info_element(ErlNifEnv* env, ocl_type_t type, void* ptr
 
 static ERL_NIF_TERM make_info_value(ErlNifEnv* env, ecl_info_t* iptr, void* buf, size_t buflen)
 {
-    u_int8_t* dptr = (u_int8_t*) buf;
+    char* dptr = (char*) buf;
     ERL_NIF_TERM value;
 
     if (iptr->is_array) {  // arrays are return as lists of items
@@ -2449,23 +2467,23 @@ static void* ecl_context_main(void* arg)
 static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc,
 			     const ERL_NIF_TERM argv[])
 {
-    (void) env;
-    (void) argc;
-    (void) argv;
+    UNUSED(env);
+    UNUSED(argc);
+    UNUSED(argv);
     return ATOM(ok);
 }
 
 static ERL_NIF_TERM ecl_get_platform_ids(ErlNifEnv* env, int argc,
 					 const ERL_NIF_TERM argv[])
 {
-    (void) argc;
-    (void) argv;
     cl_uint          num_platforms;
     cl_platform_id   platform_id[MAX_PLATFORMS];
     ERL_NIF_TERM     idv[MAX_PLATFORMS];
     ERL_NIF_TERM     platform_list;
     cl_uint i;
     cl_int err;
+    UNUSED(argc);
+    UNUSED(argv);
 
     if ((err = clGetPlatformIDs(MAX_PLATFORMS, platform_id, &num_platforms)))
 	return ecl_make_error(env, err);
@@ -2480,8 +2498,8 @@ static ERL_NIF_TERM ecl_get_platform_ids(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_platform_info(ErlNifEnv* env, int argc,
 					  const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_platform;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &platform_r, false, &o_platform))
 	return enif_make_badarg(env);
@@ -2495,7 +2513,6 @@ static ERL_NIF_TERM ecl_get_platform_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_device_type   device_type = 0;
     cl_device_id     device_id[MAX_DEVICES];
     ERL_NIF_TERM     idv[MAX_DEVICES];
@@ -2504,6 +2521,7 @@ static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc,
     cl_uint          i;
     cl_platform_id   platform;
     cl_int err;
+    UNUSED(argc);
     
     if (!get_object(env, argv[0], &platform_r, true,(void**)&platform))
 	return enif_make_badarg(env);
@@ -2522,8 +2540,8 @@ static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_device;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &device_r, false, &o_device))
 	return enif_make_badarg(env);	
@@ -2540,11 +2558,11 @@ static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_context(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_device_id     device_list[MAX_DEVICES];
     size_t           num_devices = MAX_DEVICES;
     cl_context       context;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_object_list(env, argv[0], &device_r, false, 
 			 (void**) device_list, &num_devices))
@@ -2565,8 +2583,8 @@ static ERL_NIF_TERM ecl_create_context(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_context_info(ErlNifEnv* env, int argc, 
 					 const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -2579,12 +2597,12 @@ static ERL_NIF_TERM ecl_get_context_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_queue(ErlNifEnv* env, int argc, 
 				     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
     cl_device_id  device;
     cl_command_queue_properties properties;
     cl_command_queue queue;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -2606,8 +2624,8 @@ static ERL_NIF_TERM ecl_create_queue(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_queue_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_queue;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -2621,7 +2639,6 @@ static ERL_NIF_TERM ecl_get_queue_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_buffer(ErlNifEnv* env, int argc, 
 				      const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
     size_t size;
     cl_mem_flags mem_flags;
@@ -2667,7 +2684,6 @@ static ERL_NIF_TERM ecl_create_buffer(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
     size_t width;
     size_t height;
@@ -2680,6 +2696,7 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
     const ERL_NIF_TERM* array;
     int arity;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -2727,7 +2744,6 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
     size_t width;
     size_t height;
@@ -2742,6 +2758,7 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
     const ERL_NIF_TERM* array;
     int arity;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -2793,13 +2810,13 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_supported_image_formats(ErlNifEnv* env, int argc, 
 						    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_context context;
     cl_mem_flags flags;
     cl_mem_object_type image_type;
     cl_image_format image_format[MAX_IMAGE_FORMATS];
     cl_uint num_image_formats;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_object(env, argv[0], &context_r, false, (void**) &context))
 	return enif_make_badarg(env);
@@ -2837,8 +2854,8 @@ static ERL_NIF_TERM ecl_get_supported_image_formats(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_mem_object_info(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_mem;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &mem_r, false, &o_mem))
 	return enif_make_badarg(env);
@@ -2851,8 +2868,8 @@ static ERL_NIF_TERM ecl_get_mem_object_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_image_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_mem;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &mem_r, false, &o_mem))
 	return enif_make_badarg(env);
@@ -2872,13 +2889,13 @@ static ERL_NIF_TERM ecl_get_image_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_sampler(ErlNifEnv* env, int argc,
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
     cl_bool normalized_coords;
     cl_addressing_mode addressing_mode;
     cl_filter_mode filter_mode;
     cl_sampler sampler;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -2904,8 +2921,8 @@ static ERL_NIF_TERM ecl_create_sampler(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_sampler_info(ErlNifEnv* env, int argc, 
 					 const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_sampler;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &sampler_r, false, &o_sampler))
 	return enif_make_badarg(env);
@@ -2922,14 +2939,13 @@ static ERL_NIF_TERM ecl_get_sampler_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_program_with_source(ErlNifEnv* env, int argc, 
 						   const ERL_NIF_TERM argv[])
 {
-
-    (void) argc;
     ecl_object_t* o_context;
     cl_program program;
     ErlNifBinary source;
     char* strings[1];
     size_t lengths[1];
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -2959,7 +2975,6 @@ static ERL_NIF_TERM ecl_create_program_with_source(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc, 
 						   const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_context;
     cl_program     program;
     cl_device_id   device_list[MAX_DEVICES];
@@ -2971,6 +2986,7 @@ static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc,
     cl_uint        i;
     cl_int         status[MAX_DEVICES];
     cl_int         err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
@@ -3021,12 +3037,12 @@ typedef struct {
     ecl_object_t*  program;
 } ecl_build_data_t;
 
-void ecl_build_notify(cl_program program, void* user_data)
+void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
 {
-    (void) program;
     ecl_build_data_t* bp = user_data;
     ERL_NIF_TERM reply;
     int res;
+    UNUSED(program);
 
     DBG("ecl_build_notify: done user_data=%p", user_data);
 
@@ -3050,7 +3066,6 @@ void ecl_build_notify(cl_program program, void* user_data)
 static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_program;
     cl_device_id     device_list[MAX_DEVICES];
     size_t           num_devices = MAX_DEVICES;
@@ -3058,6 +3073,7 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
     ERL_NIF_TERM     ref;
     ecl_build_data_t* bp;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
 	return enif_make_badarg(env);
@@ -3102,9 +3118,9 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
-    (void) argc;
-    (void) argv;
     cl_int err;
+    UNUSED(argc);
+    UNUSED(argv);
 
     err = clUnloadCompiler();
     if (err)
@@ -3176,8 +3192,8 @@ cleanup:
 static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc, 
 					 const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_program;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
 	return enif_make_badarg(env);
@@ -3194,9 +3210,9 @@ static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_program_build_info(ErlNifEnv* env, int argc, 
 					       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_program;
     ecl_object_t* o_device;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
 	return enif_make_badarg(env);
@@ -3212,11 +3228,11 @@ static ERL_NIF_TERM ecl_get_program_build_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_kernel(ErlNifEnv* env, int argc, 
 				      const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_program;
     cl_kernel kernel;
     char kernel_name[MAX_KERNEL_NAME];
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
 	return enif_make_badarg(env);
@@ -3241,7 +3257,6 @@ static ERL_NIF_TERM ecl_create_kernel(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_kernels_in_program(ErlNifEnv* env, int argc, 
 						  const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_program;
     ERL_NIF_TERM kernv[MAX_KERNELS];
     ERL_NIF_TERM kernel_list;
@@ -3249,6 +3264,7 @@ static ERL_NIF_TERM ecl_create_kernels_in_program(ErlNifEnv* env, int argc,
     cl_uint num_kernels_ret;
     cl_uint i;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
 	return enif_make_badarg(env);
@@ -3280,7 +3296,6 @@ static ERL_NIF_TERM ecl_create_kernels_in_program(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_kernel kernel;
     unsigned char arg_buf[16*sizeof(double)]; // vector type buffer
     cl_uint arg_index;
@@ -3299,6 +3314,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
     void*    ptr_arg;
     int      arity;
     cl_int   err;
+    UNUSED(argc);
 
     if (!get_object(env, argv[0], &kernel_r, false,(void**)&kernel))
 	return enif_make_badarg(env);
@@ -3469,12 +3485,12 @@ do_kernel_arg:
 static ERL_NIF_TERM ecl_set_kernel_arg_size(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_kernel kernel;
     cl_uint arg_index;
     size_t  arg_size;
     unsigned char* arg_value = 0;
     cl_int  err;
+    UNUSED(argc);
 
     if (!get_object(env, argv[0], &kernel_r, false,(void**)&kernel))
 	return enif_make_badarg(env);
@@ -3489,15 +3505,15 @@ static ERL_NIF_TERM ecl_set_kernel_arg_size(ErlNifEnv* env, int argc,
 			 arg_value);
     if (!err)
 	return ATOM(ok);
-    return ecl_make_error(env, err);    
+    return ecl_make_error(env, err);
 
 }
 
 static ERL_NIF_TERM ecl_get_kernel_info(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_kernel;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &kernel_r, false, &o_kernel))
 	return enif_make_badarg(env);
@@ -3510,9 +3526,9 @@ static ERL_NIF_TERM ecl_get_kernel_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc, 
 						  const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_kernel;
     ecl_object_t* o_device;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &kernel_r, false, &o_kernel))
 	return enif_make_badarg(env);
@@ -3532,13 +3548,13 @@ static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc, 
 				     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_kernel        kernel;
     cl_event         wait_list[MAX_WAIT_LIST];
     size_t           num_events = MAX_WAIT_LIST;
     cl_event         event;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3569,7 +3585,6 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc, 
 						const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_kernel     kernel;
     cl_event      wait_list[MAX_WAIT_LIST];
@@ -3580,6 +3595,7 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
     size_t        temp_dim = MAX_WORK_SIZE;
     cl_event      event;
     cl_int        err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3614,10 +3630,10 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_event event;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3636,11 +3652,11 @@ static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc, 
 						const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_command_queue queue;
     cl_event      wait_list[MAX_WAIT_LIST];
     size_t        num_events = MAX_WAIT_LIST;
     cl_int        err;
+    UNUSED(argc);
 
     if (!get_object(env, argv[0], &command_queue_r, false, (void**)&queue))
 	return enif_make_badarg(env);
@@ -3665,7 +3681,6 @@ static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
 					    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           buffer;
     size_t           offset;
@@ -3675,6 +3690,7 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
     cl_event         event;
     ErlNifBinary*    bin;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3722,7 +3738,6 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc, 
 					     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           buffer;
     size_t           offset;
@@ -3733,6 +3748,7 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
     ErlNifBinary*    bin;
     ErlNifEnv*       bin_env;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3792,7 +3808,6 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc, 
 					   const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           buffer;
     size_t           origin[3];
@@ -3808,6 +3823,7 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
     cl_event         event;
     ErlNifBinary*    bin;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3864,7 +3880,6 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           buffer;
     size_t           origin[3];
@@ -3881,6 +3896,7 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     ErlNifBinary*    bin;
     ErlNifEnv*       bin_env;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3944,7 +3960,6 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc, 
 					   const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           src_image;
     cl_mem           dst_image;
@@ -3958,6 +3973,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
     size_t           num_region = 3;
     cl_event         event;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -3998,7 +4014,6 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc, 
 						     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           src_image;
     cl_mem           dst_buffer;
@@ -4011,6 +4026,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc,
     size_t           num_region = 3;
     cl_event         event;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4053,7 +4069,6 @@ static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc, 
 						     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           src_buffer;
     cl_mem           dst_image;
@@ -4066,6 +4081,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc,
     size_t           num_region = 3;
     cl_event         event;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4104,7 +4120,6 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc, 
 					   const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           buffer;
     cl_map_flags     map_flags;
@@ -4115,6 +4130,7 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
     cl_event         event;
     cl_int           err;
     void*            ptr;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4155,7 +4171,6 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc, 
 					  const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           image;
     cl_map_flags     map_flags;
@@ -4170,6 +4185,7 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
     cl_event         event;
     cl_int           err;
     void*            ptr;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4215,7 +4231,6 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc, 
 						 const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t*    o_queue;
     cl_mem           memobj;
     cl_event         wait_list[MAX_WAIT_LIST];
@@ -4223,6 +4238,7 @@ static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc,
     cl_event         event;
     void* mapped_ptr;
     cl_int err;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4249,9 +4265,9 @@ static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     cl_command_queue queue;
     cl_int           err;
+    UNUSED(argc);
 
     if (!get_object(env, argv[0], &command_queue_r, false,(void**)&queue))
 	return enif_make_badarg(env);
@@ -4267,11 +4283,11 @@ static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_async_flush(ErlNifEnv* env, int argc, 
 				    const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_queue;
     ecl_context_t* o_context;
     ecl_message_t m;
     ERL_NIF_TERM ref;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4296,11 +4312,11 @@ static ERL_NIF_TERM ecl_async_flush(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_async_finish(ErlNifEnv* env, int argc, 
 				     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_queue;
     ecl_context_t* o_context;
     ecl_message_t m;
     ERL_NIF_TERM ref;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4325,12 +4341,12 @@ static ERL_NIF_TERM ecl_async_finish(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc, 
 					     const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_event_t* o_event;
     ecl_object_t* o_queue;
     ecl_context_t* o_context;
     ecl_message_t m;
     ERL_NIF_TERM ref;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0],&event_r,false,(ecl_object_t**)&o_event))
 	return enif_make_badarg(env);
@@ -4355,8 +4371,8 @@ static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    (void) argc;
     ecl_object_t* o_event;
+    UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &event_r, false, &o_event))
 	return enif_make_badarg(env);
@@ -4372,8 +4388,8 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     ErlNifResourceFlags tried;
     ecl_env_t* ecl;
     lhash_func_t func = { ref_hash, ref_cmp, ref_release, 0 };
-    (void) env;
-    (void) load_info;
+    UNUSED(env);
+    UNUSED(load_info);
 
     if (!(ecl = enif_alloc(sizeof(ecl_env_t))))
 	return -1;
@@ -4809,9 +4825,9 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 
 static int  ecl_reload(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 {
-    (void) env;
-    (void) load_info;
-    (void) priv_data;
+    UNUSED(env);
+    UNUSED(load_info);
+    UNUSED(priv_data);
     // FIXME
     return 0;
 }
@@ -4819,8 +4835,8 @@ static int  ecl_reload(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, 
 			ERL_NIF_TERM load_info)
 {
-    (void) env;
-    (void) load_info;
+    UNUSED(env);
+    UNUSED(load_info);
     // FIXME
     *priv_data = *old_priv_data;
     return 0;
@@ -4828,8 +4844,8 @@ static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 
 static void ecl_unload(ErlNifEnv* env, void* priv_data)
 {
-    (void) env;
     ecl_env_t* ecl = priv_data;
+    UNUSED(env);
 
     enif_rwlock_rwlock(ecl->ref_lock);
     lhash_delete(&ecl->ref);

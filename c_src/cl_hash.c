@@ -23,7 +23,12 @@
     (((((hval) & (lh)->szm)) < (lh)->p) ? \
        ((hval) & (((lh)->szm << 1) | 1)) : \
        (((hval) & (lh)->szm)))
-      
+
+#ifndef WIN32
+#define INLINE inline
+#else
+#define INLINE
+#endif
 
 static lhash_bucket_t** lhash_alloc_seg(int seg_sz)
 {
@@ -35,7 +40,7 @@ static lhash_bucket_t** lhash_alloc_seg(int seg_sz)
     return bp;
 }
 
-inline static lhash_bucket_t** lhash_HLOOKUP(lhash_t* lh,
+INLINE static lhash_bucket_t** lhash_HLOOKUP(lhash_t* lh,
 					     lhash_value_t hval,
 					     void* key)
 {
@@ -53,7 +58,7 @@ inline static lhash_bucket_t** lhash_HLOOKUP(lhash_t* lh,
 }
 
 /* scan bucket for key return bucket */
-inline static lhash_bucket_t** lhash_LOOKUP(lhash_t* lh, void* key)
+INLINE static lhash_bucket_t** lhash_LOOKUP(lhash_t* lh, void* key)
 {
     return lhash_HLOOKUP(lh, lh->func.hash(key), key);
 }
