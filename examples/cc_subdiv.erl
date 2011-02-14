@@ -88,8 +88,10 @@ draw(R, #state{gl=Canvas, orig=OrigMesh, sd=SDMesh}) ->
     gl:loadIdentity(),  
     glu:lookAt(15,15,15, 0,0,0, 0,1,0),    
     drawBox(R),
+    gl:disable(?GL_BLEND),
     gl:color4f(1.0,1.0,0.0,1.0),
     draw_buff(SDMesh),
+    gl:enable(?GL_BLEND),
     gl:color4f(0.5,0.5,0.5,0.5),
     draw_buff(OrigMesh),
     wxGLCanvas:swapBuffers(Canvas).

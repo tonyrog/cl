@@ -3039,7 +3039,9 @@ static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc,
 //
 typedef struct {
     ErlNifPid        sender;  // sender pid
-    ErlNifEnv*          env;  // message environment (ref, bin's etc)
+    ErlNifEnv*        s_env;  // senders message environment (ref, bin's etc)
+    ErlNifEnv*        r_env;  // receiver message environment (ref, bin's etc)
+    ErlNifTid*          tid;  // Calling thread
     ERL_NIF_TERM        ref;  // ref (in env!)
     ecl_object_t*  program;
 } ecl_build_data_t;
@@ -3048,6 +3050,7 @@ void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
 {
     ecl_build_data_t* bp = user_data;
     ERL_NIF_TERM reply;
+    ErlNifEnv*        s_env;
     int res;
     UNUSED(program);
 
@@ -3057,14 +3060,20 @@ void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
     // clGetProgramBuildInfo(bp->program->program, CL_PROGRAM_BUILD_STATUS,
 
     // reply = !err ? ATOM(ok) : ecl_make_error(bp->env, err);
+        
+    if(enif_equal_tids(bp->tid, enif_thread_self()))
+       s_env = bp->s_env;
+    else
+       s_env = 0;
+
     reply = ATOM(ok);
-    res = enif_send(0, &bp->sender, bp->env, 
-		    enif_make_tuple3(bp->env, 
+    res = enif_send(s_env, &bp->sender, bp->r_env, 
+		    enif_make_tuple3(bp->r_env, 
 				     ATOM(cl_async),
 				     bp->ref,
 				     reply));
     DBG("ecl_build_notify: send r=%d", res);
-    enif_free_env(bp->env);
+    enif_free_env(bp->r_env);
     enif_release_resource(bp->program);
     enif_free(bp);
 }
@@ -3092,14 +3101,16 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
     if (!(bp = enif_alloc(sizeof(ecl_build_data_t))))
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
 
-    if (!(bp->env = enif_alloc_env())) {
+    if (!(bp->r_env = enif_alloc_env())) {
 	enif_free(bp);
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
     }
     ref = enif_make_ref(env);
     (void) enif_self(env, &bp->sender);
-    bp->ref    = enif_make_copy(bp->env, ref);
+    bp->ref    = enif_make_copy(bp->r_env, ref);
     bp->program = o_program;
+    bp->s_env = env;
+    bp->tid = enif_thread_self();
     enif_keep_resource(o_program);    // keep while operation is running
 
     err = clBuildProgram(o_program->program,
@@ -3115,7 +3126,7 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
 	(err==CL_BUILD_PROGRAM_FAILURE))
 	return enif_make_tuple2(env, ATOM(ok), ref);
     else { 
-	enif_free_env(bp->env);
+        enif_free_env(bp->r_env);
 	enif_release_resource(bp->program);
 	enif_free(bp);
 	return ecl_make_error(env, err);

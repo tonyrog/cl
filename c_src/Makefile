@@ -234,13 +234,13 @@ clean_internal:
 	-rm -f $(OBJDIR)/$(WORDSIZE)/*.$(OBJ)
 
 $(CL_NIF): $(OCL_LIB) $(CL_NIF_OBJS) # $(CL_ASM)
-	$(LD_SHARED) $(OUT_L)$@ $(CL_NIF_OBJS) $(LDFLAGS)
+	$(LD_SHARED) $(OUT_L) $@ $(CL_NIF_OBJS) $(LDFLAGS)
 
 $(OBJDIR)/$(WORDSIZE)/cl_nif.$(OBJ): cl_hash.h
 
 $(OBJDIR)/$(WORDSIZE)/%.$(OBJ): %.c
-	$(CC) -c $(OUT_C)$@ $(CFLAGS) $<
+	$(CC) -c $(OUT_C) $@ $(CFLAGS) $<
 
 $(OBJDIR)/$(WORDSIZE)/%.s: %.c
-	$(CC) -S $(OUT_C)$@ $(CFLAGS) $<
+	$(CC) -S $(OUT_C) $@ $(CFLAGS) $<
 

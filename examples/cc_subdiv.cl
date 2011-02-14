@@ -40,7 +40,7 @@ __kernel void gen_faces(
       center.xyz += VsIn[FsIn[fi.start+i]].xyz;
   }
 
-  center /= i;
+  center /= (float) i;
   // Create new center vertex
   const uint ov_id = noVs + face_id;
   center.w = fi.len*4.0;  // Valance = faceVs and hard_edge count = 0 (Valance << 2)
@@ -276,7 +276,7 @@ __kernel void move_verts(
     VsIn[v_id] = v_out;
   } else if(hc == 2) {
     v_out += v_in * 6.0;
-    v_out *= 1.0/8.0;
+    v_out *= 1.0f/8.0f;
     v_out.w = v_in.w;
     VsOut[v_id] = v_out;
     VsIn[v_id] = v_out;

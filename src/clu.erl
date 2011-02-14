@@ -91,9 +91,18 @@ build_source(E, Source) ->
     {ok,Program} = cl:create_program_with_source(E#cl.context,Source),
     case cl:build_program(Program, E#cl.devices, "") of
 	ok ->
-	    %%Logs = get_program_logs(Program),
-	    %%io:format("Logs: ~s\n", [Logs]),
-	    {ok,Program};
+	    Status = [cl:get_program_build_info(Program, Dev, status)
+		      || Dev <- E#cl.devices],
+	    case lists:any(fun({ok, success}) -> true; 
+			      (_) -> false end, Status) 
+	    of
+		true -> 
+		    {ok,Program};
+		false ->
+		    Logs = get_program_logs(Program),
+		    io:format("Logs: ~s\n", [Logs]),
+		    {error,{Status,Logs}}
+	    end;
 	Error ->
 	    Logs = get_program_logs(Program),
 	    io:format("Logs: ~s\n", [Logs]),
@@ -111,14 +120,15 @@ build_source_file(E, File) ->
     end.
 
 compile_file(File) ->
-    E = setup(cpu),
+    E = setup(all),
     Result = build_source_file(E, File),
     Res =
 	case Result of
-	    {error,{_,Logs}} ->
-		lists:foreach(
-		  fun(Log) -> io:format("~s\n", [Log]) end, 
-		  Logs),
+	    {error,{_,_Logs}} ->
+		%% Listed in build_source, should it be?
+		%% lists:foreach(
+		%%   fun(Log) -> io:format("~s\n", [Log]) end, 
+		%%   Logs),
 		Result;
 	    {ok,Program} ->
 		BRes = get_program_binaries(Program),
