@@ -2312,9 +2312,10 @@ ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* 
 			       info2_fn_t func, ecl_info_t* info, size_t num_info)
 {
     size_t returned_size = 0;
-    cl_ulong buf[MAX_INFO_SIZE];
+    cl_long *buf;
     cl_int err;
     unsigned int i;
+    ERL_NIF_TERM result;
 
     if (!enif_is_atom(env, key))
 	return enif_make_badarg(env);
@@ -2323,10 +2324,16 @@ ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* 
 	i++;
     if (i == num_info)
 	return enif_make_badarg(env);  // or error ?
-    if (!(err = (*func)(obj1->opaque, obj2->opaque, info[i].info_id, sizeof(buf), buf, &returned_size)))
-	return enif_make_tuple2(env, ATOM(ok), make_info_value(env, &info[i], buf, returned_size));
-    else
-	return ecl_make_error(env, err);
+    if (!(buf = enif_alloc(sizeof(cl_long) * MAX_INFO_SIZE))) 
+	ecl_make_error(env, CL_OUT_OF_RESOURCES);
+    if (!(err = (*func)(obj1->opaque, obj2->opaque, info[i].info_id, 
+			sizeof(cl_long) * MAX_INFO_SIZE, buf, &returned_size))) {
+	result = enif_make_tuple2(env, ATOM(ok), make_info_value(env, &info[i], buf, returned_size));
+	enif_free(buf);
+	return result;
+    }
+    enif_free(buf);
+    return ecl_make_error(env, err);
 }
 
 /******************************************************************************
