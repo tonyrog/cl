@@ -16,3 +16,7 @@ TAGS
 /c_src/autom4te.cache
 /c_src/config.*
 /c_src/configure
+
+# Derivates
+/obj/*
+/lib/*

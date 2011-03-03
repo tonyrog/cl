@@ -17,6 +17,8 @@ mkdir -p /opt/local/lib
 
 Download all headers from http://www.khronos.org/registry/cl/
 and put them in /opt/local/include/CL
+You can also use the environment variable OPENCL_DIR to point
+out other locations.
 
 Find a OpenCL.lib available in Nvidia or ATI developments kits
 cp /c/CUDA/lib/OpenCL.dll /opt/local/lib
@@ -27,3 +29,10 @@ http://sourceforge.net/projects/mingw/files_beta/MSYS/
 OpenCL with ATI drivers for CPU usage don't work when erlang
 is started within a mingw shell but does if you start it from
 a Windows CMD.exe shell.
+
+If you don't like mingws compiler you can use Microsoft compiler by running 
+$ make MCL=true
+This assumes that you have all the environment variables set.
+They can be set by adding first in your 'msys.bat':
+call "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+

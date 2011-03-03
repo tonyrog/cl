@@ -5,6 +5,8 @@ OUT_C = -o
 OUT_L = -o
 OBJ = o
 
+## make MCL=1  to build with microsoft compiler using msbuild (MSVC-10)
+
 ERLDIR	:= $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir()])" -s erlang halt)
 ERL_C_INCLUDE_DIR := $(ERLDIR)/usr/include
 OCL_DIR := $(shell cd ..; pwd)
@@ -68,35 +70,32 @@ endif
 endif
 
 ## Windows start
-ifeq ($(OSNAME), MINGW32_NT-6.0)
-MINGW = Yes
-endif
-ifeq ($(OSNAME), MINGW32_NT-6.1)
+ifneq (, $(findstring MINGW32,$(OSNAME)))
 MINGW = Yes
 endif
 
 ifeq ($(MINGW), Yes)
 EXT = dll
-MCL = $(shell which cl.exe)
 
-#ifneq ($(MCL), )
-ifeq ($(MCL), buggy)
+ifneq ($(MCL), )
 ## Use Microsoft CL
 WIN32_CL = Yes
-CC = cl.exe 
-OUT_C = -Fo
-OUT_L = -out:
-LD_SHARED := link.exe -DLL 
-OPENCL_DIR = c:/msysgit/opt/local/
+ifeq ($(OPENCL_DIR), )
+   OPENCL_DIR = c:/msysgit/opt/local/
+endif
 else
 ## Use mingw-gcc
 WIN32_GCC = Yes
 CFLAGS += -D__WIN32__
+ifeq ($(OPENCL_DIR), )
+   OPENCL_DIR = /opt/local/
+endif
+
 ifeq ($(WORDSIZE), 32)
-CFLAGS += -shared -I/opt/local/include -m32 -DWIN32 -DWORDSIZE=32
+CFLAGS += -shared -I$(OPENCL_DIR)/include -m32 -DWIN32 -DWORDSIZE=32
 endif
 ifeq ($(WORDSIZE), 64)
-CFLAGS += -shared -I/opt/local/include -m64 -DWIN32 -DWORDSIZE=64
+CFLAGS += -shared -I$(OPENCL_DIR)/include -m64 -DWIN32 -DWORDSIZE=64
 endif
 
 LD_SHARED	:= $(CC) -shared 
@@ -158,12 +157,7 @@ endif
 
 ifeq ($(WIN32_GCC),Yes)
 	CFLAGS += -DWIN32
-	LDFLAGS += -Wl--enable-stdcall-fixup -L/opt/local/lib -lOpenCL
-endif
-
-ifeq ($(WIN32_CL),Yes)
-	CFLAGS = -I$(OPENCL_DIR)/include -I$(ERL_C_INCLUDE_DIR) -MD -D_THREAD_SAFE -DWIN32 -D__WIN32__ $(WIN_DEBUG)
-	LDFLAGS = $(OPENCL_DIR)/lib/OpenCL.lib
+	LDFLAGS += -Wl--enable-stdcall-fixup -L$(OPENCL_DIR)/lib -lOpenCL
 endif
 
 CL_DRV = $(LIBDIR)/$(WORDSIZE)/cl_drv.$(EXT)
@@ -177,6 +171,10 @@ CL_DRV_OBJS = \
 CL_NIF_OBJS = \
 	$(OBJDIR)/$(WORDSIZE)/cl_nif.$(OBJ) \
 	$(OBJDIR)/$(WORDSIZE)/cl_hash.$(OBJ)
+
+CL_NIF_SRC = \
+	cl_nif.c \
+	cl_hash.c
 
 CL_ASM = \
 	$(OBJDIR)/$(WORDSIZE)/cl_drv.s \
@@ -230,11 +228,21 @@ endif
 
 depend:
 
+ifeq ($(WIN32_CL),No) 
 clean_internal:
 	-rm -f $(OBJDIR)/$(WORDSIZE)/*.$(OBJ)
+	-rm -f $(LIBDIR)/$(WORDSIZE)/*.$(EXT)
 
 $(CL_NIF): $(OCL_LIB) $(CL_NIF_OBJS) # $(CL_ASM)
 	$(LD_SHARED) $(OUT_L) $@ $(CL_NIF_OBJS) $(LDFLAGS)
+else
+clean_internal:
+	msbuild.exe CL.sln -t:clean
+
+$(CL_NIF): $(CL_NIF_SRC) cl_hash.h
+	msbuild.exe CL.sln -p:Configuration=$(TYPE) -p:ERL_C_INCLUDE_DIR=$(ERL_C_INCLUDE_DIR) \
+	-p:OPENCL_DIR=$(OPENCL_DIR)
+endif
 
 $(OBJDIR)/$(WORDSIZE)/cl_nif.$(OBJ): cl_hash.h
 

@@ -2135,12 +2135,12 @@ static ERL_NIF_TERM ecl_lookup_object(ErlNifEnv* env, ecl_resource_t* rtype,
 }
 
 
-typedef cl_int (*info_fn_t)(void* ptr, cl_uint param_name, 
-			    size_t param_value_size,
-			    void* param_value, size_t* param_value_size_ret);
-typedef cl_int (*info2_fn_t)(void* ptr1, void* ptr2, cl_uint param_name, 
-			     size_t param_value_size,
-			     void* param_value, size_t* param_value_size_ret);
+typedef cl_int CL_API_CALL info_fn_t(void* ptr, cl_uint param_name, 
+				     size_t param_value_size,
+				     void* param_value, size_t* param_value_size_ret);
+typedef cl_int CL_API_CALL info2_fn_t(void* ptr1, void* ptr2, cl_uint param_name, 
+				      size_t param_value_size,
+				      void* param_value, size_t* param_value_size_ret);
 
 // return size of type
 static size_t ecl_sizeof(ocl_type_t type)
@@ -2266,7 +2266,7 @@ static ERL_NIF_TERM make_info_value(ErlNifEnv* env, ecl_info_t* iptr, void* buf,
 // Find object value
 // return {ok,Value} | {error,Reason} | exception badarg
 //
-ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* obj, info_fn_t func, 
+ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* obj, info_fn_t* func, 
 			      ecl_info_t* info, size_t num_info)
 {
     size_t returned_size = 0;
@@ -2309,7 +2309,7 @@ ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* o
 
 
 ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* obj1, ecl_object_t* obj2,
-			       info2_fn_t func, ecl_info_t* info, size_t num_info)
+				   info2_fn_t* func, ecl_info_t* info, size_t num_info)
 {
     size_t returned_size = 0;
     cl_long *buf;
@@ -2511,7 +2511,7 @@ static ERL_NIF_TERM ecl_get_platform_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &platform_r, false, &o_platform))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_platform, 
-			    (info_fn_t) clGetPlatformInfo, 
+			    (info_fn_t*) clGetPlatformInfo, 
 			    platform_info, 
 			    sizeof_array(platform_info));
 }
@@ -2553,7 +2553,7 @@ static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &device_r, false, &o_device))
 	return enif_make_badarg(env);	
     return make_object_info(env, argv[1], o_device, 
-			    (info_fn_t) clGetDeviceInfo, 
+			    (info_fn_t*) clGetDeviceInfo, 
 			    device_info, 
 			    sizeof_array(device_info));
 }
@@ -2596,7 +2596,7 @@ static ERL_NIF_TERM ecl_get_context_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_context,
-			    (info_fn_t) clGetContextInfo,
+			    (info_fn_t*) clGetContextInfo,
 			    context_info,
 			    sizeof_array(context_info));
 }
@@ -2637,7 +2637,7 @@ static ERL_NIF_TERM ecl_get_queue_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_queue, 
-			    (info_fn_t) clGetCommandQueueInfo, 
+			    (info_fn_t*) clGetCommandQueueInfo, 
 			    queue_info,
 			    sizeof_array(queue_info));
 }
@@ -2867,7 +2867,7 @@ static ERL_NIF_TERM ecl_get_mem_object_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &mem_r, false, &o_mem))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_mem, 
-			    (info_fn_t) clGetMemObjectInfo,
+			    (info_fn_t*) clGetMemObjectInfo,
 			    mem_info,
 			    sizeof_array(mem_info));
 }
@@ -2881,7 +2881,7 @@ static ERL_NIF_TERM ecl_get_image_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &mem_r, false, &o_mem))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_mem,
-			    (info_fn_t) clGetImageInfo,
+			    (info_fn_t*) clGetImageInfo,
 			    image_info, 
 			    sizeof_array(image_info));
 }
@@ -2934,7 +2934,7 @@ static ERL_NIF_TERM ecl_get_sampler_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &sampler_r, false, &o_sampler))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_sampler,
-			    (info_fn_t) clGetSamplerInfo,
+			    (info_fn_t*) clGetSamplerInfo,
 			    sampler_info,
 			    sizeof_array(sampler_info));
 }
@@ -3041,7 +3041,7 @@ typedef struct {
     ErlNifPid        sender;  // sender pid
     ErlNifEnv*        s_env;  // senders message environment (ref, bin's etc)
     ErlNifEnv*        r_env;  // receiver message environment (ref, bin's etc)
-    ErlNifTid*          tid;  // Calling thread
+    ErlNifTid           tid;  // Calling thread
     ERL_NIF_TERM        ref;  // ref (in env!)
     ecl_object_t*  program;
 } ecl_build_data_t;
@@ -3220,7 +3220,7 @@ static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc,
 	return make_program_binaries(env, o_program->program);
     else
 	return make_object_info(env, argv[1], o_program,
-				(info_fn_t) clGetProgramInfo,
+				(info_fn_t*) clGetProgramInfo,
 				program_info,
 				sizeof_array(program_info));
 }
@@ -3237,7 +3237,7 @@ static ERL_NIF_TERM ecl_get_program_build_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[1], &device_r, false, &o_device))
 	return enif_make_badarg(env);
     return make_object_info2(env, argv[2], o_program, o_device, 
-			     (info2_fn_t) clGetProgramBuildInfo,
+			     (info2_fn_t*) clGetProgramBuildInfo,
 			     build_info,
 			     sizeof_array(build_info));
 }
@@ -3536,7 +3536,7 @@ static ERL_NIF_TERM ecl_get_kernel_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &kernel_r, false, &o_kernel))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_kernel,
-			    (info_fn_t) clGetKernelInfo, 
+			    (info_fn_t*) clGetKernelInfo, 
 			    kernel_info,
 			    sizeof_array(kernel_info));
 }
@@ -3553,7 +3553,7 @@ static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[1], &device_r, false, &o_device))
 	return enif_make_badarg(env);
     return make_object_info2(env, argv[2], o_kernel, o_device, 
-			     (info2_fn_t) clGetKernelWorkGroupInfo,
+			     (info2_fn_t*) clGetKernelWorkGroupInfo,
 			     workgroup_info,
 			     sizeof_array(workgroup_info));
 }
@@ -4395,7 +4395,7 @@ static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &event_r, false, &o_event))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_event,
-			    (info_fn_t) clGetEventInfo,
+			    (info_fn_t*) clGetEventInfo,
 			    event_info,
 			    sizeof_array(event_info));
 }
