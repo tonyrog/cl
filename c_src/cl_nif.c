@@ -2324,15 +2324,17 @@ ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* 
 	i++;
     if (i == num_info)
 	return enif_make_badarg(env);  // or error ?
-    if (!(buf = enif_alloc(sizeof(cl_long) * MAX_INFO_SIZE))) 
-	ecl_make_error(env, CL_OUT_OF_RESOURCES);
     if (!(err = (*func)(obj1->opaque, obj2->opaque, info[i].info_id, 
-			sizeof(cl_long) * MAX_INFO_SIZE, buf, &returned_size))) {
-	result = enif_make_tuple2(env, ATOM(ok), make_info_value(env, &info[i], buf, returned_size));
-	enif_free(buf);
-	return result;
+			0, NULL, &returned_size))) {
+	if (!(buf = enif_alloc(returned_size)))
+	    return ecl_make_error(env, CL_OUT_OF_RESOURCES);
+	if (!(err = (*func)(obj1->opaque, obj2->opaque, info[i].info_id, 
+			    returned_size, buf, &returned_size))) {
+	    result = enif_make_tuple2(env, ATOM(ok), make_info_value(env, &info[i], buf, returned_size));
+	    enif_free(buf);
+	    return result;
+	}
     }
-    enif_free(buf);
     return ecl_make_error(env, err);
 }
 
@@ -2653,6 +2655,8 @@ static ERL_NIF_TERM ecl_create_buffer(ErlNifEnv* env, int argc,
     ErlNifBinary bin;
     void* host_ptr = 0;
     cl_int err;
+    UNUSED(argc);
+
 
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
