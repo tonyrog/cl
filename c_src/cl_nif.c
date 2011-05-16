@@ -105,6 +105,7 @@ typedef struct _ecl_object_t {
 typedef struct _ecl_event_t {
     ecl_object_t obj;       // FIXED place for inhertiance
     bool          rd;       // Read binary operation
+    bool          rl;       // Do not release if true
     ErlNifEnv*    bin_env;  // environment to hold binary term data
     ErlNifBinary* bin;      // read/write data
 } ecl_event_t;
@@ -370,7 +371,6 @@ ErlNifFunc ecl_funcs[] =
     { "get_platform_info",          2, ecl_get_platform_info },
 
     // Devices
-    { "get_device_ids",             0, ecl_get_device_ids },
     { "get_device_ids",             2, ecl_get_device_ids },
     { "get_device_info",            2, ecl_get_device_info },
 
@@ -1810,7 +1810,8 @@ static void ecl_event_dtor(ErlNifEnv* env, ecl_object_t* obj)
     clReleaseEvent(evt->obj.event);
     object_erase(obj);
     if (evt->bin) {
-	enif_release_binary(evt->bin);
+	if (!evt->rl)
+	    enif_release_binary(evt->bin);
 	enif_free(evt->bin);
     }
     if (evt->bin_env)
@@ -2009,17 +2010,15 @@ static int get_binary_list(ErlNifEnv* env, const ERL_NIF_TERM term,
 // Copy a "local" binary to a new process independent environment
 // fill the binary structure with the new data and return it.
 //
-static ErlNifBinary* ecl_copy_binary(ErlNifEnv* src_env, ErlNifEnv* dst_env,
-				     ErlNifBinary* bin)
+static ERL_NIF_TERM ecl_copy_binary(ErlNifEnv* src_env, ErlNifEnv* dst_env,
+				    ErlNifBinary* bin)
 {
-    ERL_NIF_TERM b0, b1;
+    ERL_NIF_TERM b;
 
     // make it a complete binary, may be a io_list !
-    b0 = enif_make_binary(src_env, bin);
+    b = enif_make_binary(src_env, bin);
     // copy to destination environment
-    b1 = enif_make_copy(dst_env, b0); 
-    enif_inspect_binary(dst_env, b1, bin); // bin in the new environment
-    return bin;
+    return enif_make_copy(dst_env, b); 
 }
 
 
@@ -2090,7 +2089,7 @@ static ERL_NIF_TERM ecl_make_object(ErlNifEnv* env, ecl_resource_t* rtype,
 }
 
 static ERL_NIF_TERM ecl_make_event(ErlNifEnv* env, cl_event event,
-				   bool rd,
+				   bool rd, bool rl,
 				   ErlNifEnv* bin_env,
 				   ErlNifBinary* bin, 
 				   ecl_object_t* parent)
@@ -2101,6 +2100,7 @@ static ERL_NIF_TERM ecl_make_event(ErlNifEnv* env, cl_event event,
     evt->bin_env = bin_env;
     evt->bin = bin;
     evt->rd  = rd;
+    evt->rl  = rl;
     res = make_object(env, event_r.type, (ecl_object_t*) evt);
     if (evt)
 	enif_release_resource(evt);
@@ -2436,8 +2436,10 @@ static void* ecl_context_main(void* arg)
 		    switch(status) {
 		    case CL_COMPLETE:
 			DBG("ecl_context_main: wait_for_event complete");
-			if (m.event->bin && m.event->rd)
+			if (m.event->bin && m.event->rd) {
+			    m.event->rl = true;
 			    reply = enif_make_binary(m.env, m.event->bin);
+			}
 			else
 			    reply = ATOM(complete);
 			break;
@@ -3592,7 +3594,7 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
 			&event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
@@ -3643,7 +3645,7 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 				 &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
@@ -3661,7 +3663,7 @@ static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!(err = clEnqueueMarker(o_queue->queue, &event))) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);
@@ -3741,7 +3743,7 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
 			      &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, true, 0, bin, o_queue);
+	t = ecl_make_event(env, event, true, false, 0, bin, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     else {
@@ -3767,7 +3769,7 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
     cl_event         wait_list[MAX_WAIT_LIST];
     size_t           num_events = MAX_WAIT_LIST;
     cl_event         event;
-    ErlNifBinary*    bin;
+    ErlNifBinary     bin;
     ErlNifEnv*       bin_env;
     cl_int           err;
     UNUSED(argc);
@@ -3777,47 +3779,41 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
     if (!get_object(env, argv[1], &mem_r, false, (void**)&buffer))
 	return enif_make_badarg(env);
     if (!enif_get_ulong(env, argv[2], &offset))
-	return enif_make_badarg(env);	
+	return enif_make_badarg(env);
     if (!enif_get_ulong(env, argv[3], &size))
+	return enif_make_badarg(env);
+    if (!enif_inspect_binary(env, argv[4], &bin))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[5], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
 
     // handle binary and iolist as binary
-    if (!(bin = enif_alloc(sizeof(ErlNifBinary))))
-	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
-    if (!enif_inspect_iolist_as_binary(env, argv[4], bin)) {
-	enif_free(bin);
-	return enif_make_badarg(env);
-    }
-    if (bin->size < size) {
-	enif_free(bin);
+    if (bin.size < size) {   // FIXME: handle offset! 
 	return enif_make_badarg(env);
     }
 
     // copy the binary new environment 
     if (!(bin_env = enif_alloc_env())) {  // create binary environment
-	enif_free(bin);	
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
     }
-    bin = ecl_copy_binary(env, bin_env, bin);
+
+    (void) ecl_copy_binary(env, bin_env, &bin);
 
     err = clEnqueueWriteBuffer(o_queue->queue, buffer,
 			       CL_FALSE,
 			       offset,
 			       size,
-			       bin->data,
+			       bin.data,
 			       num_events,
 			       num_events ? wait_list : 0,
 			       &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, bin_env, bin, o_queue);
+	t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     else {
-	enif_free(bin);
 	enif_free_env(bin_env);	
 	return ecl_make_error(env, err);
     }
@@ -3886,7 +3882,7 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
 			     &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, true, 0, bin, o_queue);
+	t = ecl_make_event(env, event, true, false, 0, bin, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     else {
@@ -3915,7 +3911,7 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     size_t           psize;
     size_t           size;
     cl_event         event;
-    ErlNifBinary*    bin;
+    ErlNifBinary     bin;
     ErlNifEnv*       bin_env;
     cl_int           err;
     UNUSED(argc);
@@ -3934,28 +3930,23 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!enif_get_ulong(env, argv[5], &slice_pitch))
 	return enif_make_badarg(env);
-    if (!get_object_list(env, argv[6], &event_r, false,
+    if (!enif_inspect_binary(env, argv[6], &bin))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[7], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    if (!(bin = enif_alloc(sizeof(ErlNifBinary))))
-	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
-    if (!enif_inspect_iolist_as_binary(env, argv[7], bin)) {
-	enif_free(bin);
-	return enif_make_badarg(env);
-    }
+
 
     // calculate the read size of the image FIXME: check error return
     clGetImageInfo(buffer, CL_IMAGE_ELEMENT_SIZE, sizeof(psize), &psize, 0);
     size = region[0]*region[1]*region[2]*psize;
-    if (bin->size < size) {
-	enif_free(bin);
+    if (bin.size < size) {
 	return enif_make_badarg(env);
     }
     if (!(bin_env = enif_alloc_env())) {  // create binary environment
-	enif_free(bin);	
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
     }
-    bin = ecl_copy_binary(env, bin_env, bin);
+    (void) ecl_copy_binary(env, bin_env, &bin);
 
     err = clEnqueueWriteImage(o_queue->queue, buffer,
 			      CL_FALSE,
@@ -3963,17 +3954,16 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 			      region,
 			      row_pitch,
 			      slice_pitch,
-			      bin->data,
+			      bin.data,
 			      num_events,
 			      num_events ? wait_list : 0,
 			      &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, bin_env, bin, o_queue);
+	t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     else {
-	enif_free(bin);
 	enif_free_env(bin_env);	
 	return ecl_make_error(env, err);
     }
@@ -4024,7 +4014,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
 			     &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
@@ -4078,7 +4068,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc,
 				     &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
@@ -4133,7 +4123,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc,
 				     &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
@@ -4181,7 +4171,7 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
     if (!err) {
 	ERL_NIF_TERM t;
 	// FIXME: how should we handle ptr????
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);
@@ -4240,7 +4230,7 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
     if (!err) {
 	ERL_NIF_TERM t;
 	// FIXME: send binary+event to event thread
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
@@ -4278,7 +4268,7 @@ static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc,
 				  &event);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, 0, 0, o_queue);
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);    
