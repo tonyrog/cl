@@ -1069,14 +1069,14 @@ retain_mem_object(Mem) when ?is_mem(Mem) ->
 
 -type cl_mem_info_key() :: {'object_type' | 'flags' | 'size' | 'host_ptr' | 'map_count' |
 			    'reference_count' | 'context'}.
+
+
 %%
-%% @spec get_mem_object_info(Mem::cl_mem(), InfoType::cl_mem_info_key()) ->
-%%    {'ok', term()} | {'error', cl_error()}
-%%
-%% @doc Used to get <c>InfoType</c> information that is common to all memory objects
-%% (buffer and image objects).
--spec get_mem_object_info(Mem::cl_mem(), Info::cl_mem_info_key()) ->
-    {'ok', term()} | {'error', cl_error()}.
+%% @spec mem_object_info() ->
+%%    [cl_mem_info_keys()]
+%% @doc Returns a list of the possible mem info keys.
+-spec mem_object_info() ->
+    [cl_mem_info_key()].
 
 mem_object_info() ->
     [
@@ -1088,6 +1088,15 @@ mem_object_info() ->
      reference_count,
      context
     ].
+
+%%
+%% @spec get_mem_object_info(Mem::cl_mem(), InfoType::cl_mem_info_key()) ->
+%%    {'ok', term()} | {'error', cl_error()}
+%%
+%% @doc Used to get <c>InfoType</c> information that is common to all memory objects
+%% (buffer and image objects).
+-spec get_mem_object_info(Mem::cl_mem(), Info::cl_mem_info_key()) ->
+    {'ok', term()} | {'error', cl_error()}.
 
 get_mem_object_info(_Mem, _Info) ->
     erlang:error(nif_not_loaded).
@@ -1424,9 +1433,6 @@ release_program(Program) when ?is_program(Program) ->
 %% </p></dd>
 %%</dl>
 
-async_build_program(_Program, _DeviceList, _Options) ->
-    erlang:error(nif_not_loaded).
-
 build_program(Program, DeviceList, Options) ->
     case async_build_program(Program, DeviceList, Options) of
 	{ok,Ref} ->
@@ -1437,6 +1443,10 @@ build_program(Program, DeviceList, Options) ->
 	Error ->
 	    Error
     end.
+
+async_build_program(_Program, _DeviceList, _Options) ->
+    erlang:error(nif_not_loaded).
+
 
 %%
 %% @spec unload_compiler() -> 'ok' | {'error', cl_error()}
@@ -1826,9 +1836,6 @@ enqueue_unmap_mem_object(_Queue, _Mem, _WaitList) ->
 -spec flush(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
 
-async_flush(_Queue) ->
-    erlang:error(nif_not_loaded).
-
 flush(Queue) ->
     case async_flush(Queue) of
 	{ok,Ref} ->
@@ -1838,6 +1845,9 @@ flush(Queue) ->
 	    end;
 	Error -> Error
     end.
+
+async_flush(_Queue) ->
+    erlang:error(nif_not_loaded).
 
 %%
 %% @spec finish(Queue::cl_queue()) ->
@@ -1853,9 +1863,6 @@ flush(Queue) ->
 -spec finish(Queue::cl_queue()) ->
     'ok' | {'error', cl_error()}.
 
-async_finish(_Queue) ->
-    erlang:error(nif_not_loaded).
-
 finish(Queue) ->
     case async_finish(Queue) of
 	{ok,Ref} ->
@@ -1865,6 +1872,9 @@ finish(Queue) ->
 	    end;
 	Error -> Error
     end.
+
+async_finish(_Queue) ->
+    erlang:error(nif_not_loaded).
 
 %%
 %% @spec retain_event(Event::cl_event()) ->
@@ -1919,16 +1929,19 @@ create_image3d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Depth,
 	       _RowPicth, _SlicePitch, _Data) ->
     erlang:error(nif_not_loaded).
     
-    
-    
-
-%% @type timeout() = non_neg_integer() | 'infinity'
 %%
 %% @spec wait(Event::cl_event) -> 
 %%    {'ok','completed'} | {'ok',Binary} | {'error',cl_error()}
-%% @equiv wait(Event, infinity)
 %%
 wait(Event) ->
+    wait(Event, infinity).
+
+%% @spec wait_for_event(Event::cl_event) -> 
+%%    {'ok','completed'} | {'ok',Binary} | {'error',cl_error()}
+%% @equiv wait(Event, infinity)
+%%
+
+wait_for_event(Event) ->
     wait(Event, infinity).
 
 %%  
@@ -1943,8 +1956,6 @@ wait(Event) ->
 %%  in event_list to complete. A command is considered complete if its
 %%  execution status is CL_COMPLETE or a negative value.
 
-wait_for_event(Event) ->
-    wait(Event, infinity).
 
 wait(Event, Timeout) when ?is_event(Event) ->
     case async_wait_for_event(Event) of
@@ -1964,7 +1975,7 @@ wait1(Ref, Event, Timeout) when ?is_event(Event) ->
 	    {ok,completed};
 	{cl_event, Ref, Err} ->
 	    release_event(Event),
-	    {error, Err}
+	    Err
     after Timeout ->
 	    {error, timeout}
     end.
