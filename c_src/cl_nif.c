@@ -110,6 +110,28 @@ typedef struct _ecl_event_t {
     ErlNifBinary* bin;      // read/write data
 } ecl_event_t;
 
+#define KERNEL_ARG_OTHER   0
+#define KERNEL_ARG_MEM     1
+#define KERNEL_ARG_SAMPLER 2
+
+// This is a special construct inorder to kee
+typedef struct {
+    int type;    // 0=other, 1=mem, 2=samper
+    union {
+	cl_mem      mem;
+	cl_sampler  sampler;
+	void*       other;
+	void*       value;
+    };
+} ecl_kernel_arg_t;
+
+// "inherits" ecl_object_t and reference count kernel args
+typedef struct _ecl_kernel_t {
+    ecl_object_t      obj;       // FIXED place for inhertiance
+    cl_uint           num_args;  // number of arguments used by the kernel
+    ecl_kernel_arg_t* arg;       // array of current args 
+} ecl_kernel_t;
+
 
 typedef enum {
     OCL_CHAR,          // cl_char
@@ -1733,6 +1755,58 @@ static int ecl_resource_init(ErlNifEnv* env,
     return 0;
 }
 
+//
+// Reference new kernel argument and Dereference old value
+//
+
+static void unref_kernel_arg(int type, void* val)
+{
+    switch(type) {
+    case KERNEL_ARG_MEM:
+	if (val)
+	    clReleaseMemObject((cl_mem) val);
+	break;
+    case KERNEL_ARG_SAMPLER:
+	if (val)
+	    clReleaseSampler((cl_sampler) val);
+	break;
+    case KERNEL_ARG_OTHER:
+    default:
+	break;
+    }
+}
+
+static void ref_kernel_arg(int type, void* val)
+{
+    switch(type) {
+    case KERNEL_ARG_MEM:
+	if (val)
+	    clRetainMemObject((cl_mem) val);
+	break;
+    case KERNEL_ARG_SAMPLER:
+	if (val)
+	    clRetainSampler((cl_sampler) val);
+	break;
+    case KERNEL_ARG_OTHER:
+    default:
+	break;
+    }
+}
+
+static int set_kernel_arg(ecl_kernel_t* kern, cl_uint i, int type, void* value)
+{
+    if (i < kern->num_args) {
+	int   old_type  = kern->arg[i].type;
+	void* old_value = kern->arg[i].value;
+	ref_kernel_arg(type, value);
+	kern->arg[i].type  = type;
+	kern->arg[i].value = value;
+	unref_kernel_arg(old_type, old_value);
+	return 0;
+    }
+    return -1;
+}
+
 /******************************************************************************
  *
  *   Resource destructors
@@ -1795,9 +1869,14 @@ static void ecl_program_dtor(ErlNifEnv* env, ecl_object_t* obj)
 
 static void ecl_kernel_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
+    ecl_kernel_t* kern = (ecl_kernel_t*) obj;
+    cl_uint i;
     UNUSED(env);
-    DBG("ecl_kernel_dtor: %p", obj);
-    clReleaseKernel(obj->kernel);
+    DBG("ecl_kernel_dtor: %p", kern);
+    for (i = 0; i < kern->num_args; i++)
+	unref_kernel_arg(kern->arg[i].type, kern->arg[i].value);
+    enif_free(kern->arg);
+    clReleaseKernel(kern->obj.kernel);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
 }
@@ -2085,6 +2164,30 @@ static ERL_NIF_TERM ecl_make_object(ErlNifEnv* env, ecl_resource_t* rtype,
     res = make_object(env, rtype->type, obj);
     if (obj)
 	enif_release_resource(obj);
+    return res;
+}
+
+
+static ERL_NIF_TERM ecl_make_kernel(ErlNifEnv* env, cl_kernel kernel,
+				    ecl_object_t* parent)
+{
+    ecl_kernel_t* kern = (ecl_kernel_t*) ecl_new(env,&kernel_r,
+						 (void*)kernel,parent);
+    ERL_NIF_TERM  res;
+    cl_uint num_args;
+    size_t sz;
+
+    // Get number of arguments, FIXME: check error return
+    clGetKernelInfo(kernel,CL_KERNEL_NUM_ARGS,sizeof(num_args),&num_args,0);
+    sz = num_args*sizeof(ecl_kernel_arg_t);
+
+    kern->arg = (ecl_kernel_arg_t*) enif_alloc(sz);
+    memset(kern->arg, 0, sz);
+    kern->num_args = num_args;
+    
+    res = make_object(env, kernel_r.type, kern);
+    if (kern)
+	enif_release_resource(kern);
     return res;
 }
 
@@ -3267,7 +3370,7 @@ static ERL_NIF_TERM ecl_create_kernel(ErlNifEnv* env, int argc,
     kernel = clCreateKernel(o_program->program,kernel_name, &err);
     if (!err) {
 	ERL_NIF_TERM t;
-	t = ecl_make_object(env, &kernel_r,(void*) kernel, o_program);
+	t = ecl_make_kernel(env, kernel, o_program);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);
@@ -3301,11 +3404,13 @@ static ERL_NIF_TERM ecl_create_kernels_in_program(ErlNifEnv* env, int argc,
 	return ecl_make_error(env, err);
     for (i = 0; i < num_kernels_ret; i++) {
 	// FIXME: handle out of memory
-	kernv[i] = ecl_make_object(env, &kernel_r, kernel[i], o_program);
+	kernv[i] = ecl_make_kernel(env, kernel[i], o_program);
     }
     kernel_list = enif_make_list_from_array(env, kernv, num_kernels_ret);
     return enif_make_tuple2(env, ATOM(ok), kernel_list);
 }
+
+
 //
 // cl:set_kernel_arg(Kernel::cl_kernel(), Index::non_neg_integer(),
 //                   Argument::cl_kernel_arg()) -> 
@@ -3320,7 +3425,7 @@ static ERL_NIF_TERM ecl_create_kernels_in_program(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
-    cl_kernel kernel;
+    ecl_kernel_t* o_kernel;
     unsigned char arg_buf[16*sizeof(double)]; // vector type buffer
     cl_uint arg_index;
     size_t  arg_size;
@@ -3335,12 +3440,13 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
     ErlNifBinary bval;
     cl_int   int_arg;
     cl_float float_arg;
-    void*    ptr_arg;
+    void*    ptr_arg = 0;
     int      arity;
     cl_int   err;
+    int      arg_type = KERNEL_ARG_OTHER;
     UNUSED(argc);
 
-    if (!get_object(env, argv[0], &kernel_r, false,(void**)&kernel))
+    if (!get_ecl_object(env,argv[0],&kernel_r,false,(ecl_object_t**)&o_kernel))
 	return enif_make_badarg(env);
     if (!enif_get_uint(env, argv[1], &arg_index))
 	return enif_make_badarg(env);
@@ -3349,6 +3455,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 	    if (array[0] == ATOM(mem_t)) {
 		if (!get_object(env,argv[2],&mem_r,true,&ptr_arg))
 		    return enif_make_badarg(env);
+		arg_type = KERNEL_ARG_MEM;
 		arg_value = &ptr_arg;
 		arg_size = sizeof(cl_mem);
 		goto do_kernel_arg;
@@ -3356,6 +3463,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 	    else if (array[0] == ATOM(sampler_t)) {
 		if (!get_object(env,argv[2],&sampler_r,false,&ptr_arg))
 		    return enif_make_badarg(env);
+		arg_type = KERNEL_ARG_SAMPLER;
 		arg_value = &ptr_arg;
 		arg_size = sizeof(cl_sampler);
 		goto do_kernel_arg;
@@ -3491,12 +3599,14 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
     return enif_make_badarg(env);
 
 do_kernel_arg:
-    err = clSetKernelArg(kernel,
+    err = clSetKernelArg(o_kernel->obj.kernel,
 			 arg_index,
 			 arg_size,
 			 arg_value);
-    if (!err)
+    if (!err) {
+	set_kernel_arg(o_kernel, arg_index, arg_type, ptr_arg);
 	return ATOM(ok);
+    }
     return ecl_make_error(env, err);    
 }
 
@@ -3509,26 +3619,28 @@ do_kernel_arg:
 static ERL_NIF_TERM ecl_set_kernel_arg_size(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[])
 {
-    cl_kernel kernel;
+    ecl_kernel_t* o_kernel;
     cl_uint arg_index;
     size_t  arg_size;
     unsigned char* arg_value = 0;
     cl_int  err;
     UNUSED(argc);
 
-    if (!get_object(env, argv[0], &kernel_r, false,(void**)&kernel))
+    if (!get_ecl_object(env,argv[0],&kernel_r,false,(ecl_object_t**)&o_kernel))
 	return enif_make_badarg(env);
     if (!enif_get_uint(env, argv[1], &arg_index))
 	return enif_make_badarg(env);
     if (!enif_get_ulong(env, argv[1], &arg_size))
 	return enif_make_badarg(env);
 
-    err = clSetKernelArg(kernel,
+    err = clSetKernelArg(o_kernel->obj.kernel,
 			 arg_index,
 			 arg_size,
 			 arg_value);
-    if (!err)
+    if (!err) {
+	set_kernel_arg(o_kernel, arg_index, KERNEL_ARG_OTHER, (void*) 0);
 	return ATOM(ok);
+    }
     return ecl_make_error(env, err);
 
 }
@@ -4824,7 +4936,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 		      ecl_program_dtor,
 		      ERL_NIF_RT_CREATE, &tried);
     ecl_resource_init(env, &kernel_r, "kernel_t",
-		      sizeof(ecl_object_t),
+		      sizeof(ecl_kernel_t),   // NOTE! specialized!
 		      ecl_kernel_dtor,
 		      ERL_NIF_RT_CREATE, &tried);
     ecl_resource_init(env, &event_r, "event_t",
