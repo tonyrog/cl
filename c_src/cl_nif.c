@@ -45,6 +45,8 @@ static void ecl_emit_error(char* file, int line, ...);
 #define DBG(...)
 #endif
 
+#define CL_ERROR(...) ecl_emit_error(__FILE__,__LINE__,__VA_ARGS__)
+
 // soft limits
 #define MAX_INFO_SIZE   1024
 #define MAX_DEVICES     128   
@@ -1375,8 +1377,6 @@ ERL_NIF_TERM ecl_make_error(ErlNifEnv* env, cl_int err)
     return enif_make_tuple2(env, ATOM(error), ecl_error(err));
 }
 
-#ifdef DEBUG
-
 static void ecl_emit_error(char* file, int line, ...)
 {
     va_list ap;
@@ -1391,7 +1391,6 @@ static void ecl_emit_error(char* file, int line, ...)
     va_end(ap);
     fflush(stderr);
 }
-#endif
 
 // Parse bool
 static int get_bool(ErlNifEnv* env, const ERL_NIF_TERM key, cl_bool* val)
@@ -2665,6 +2664,27 @@ static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc,
 			    sizeof_array(device_info));
 }
 
+typedef struct {
+    ErlNifPid        sender;  // sender pid
+    ErlNifEnv*        s_env;  // senders message environment (ref, bin's etc)
+    ErlNifEnv*        r_env;  // receiver message environment (ref, bin's etc)
+    ErlNifTid           tid;  // Calling thread
+} ecl_notify_data_t;
+
+void CL_CALLBACK ecl_context_notify(const char *errinfo, 
+				    const void* private_info, size_t cb,
+				    void * user_data)
+{
+    /* ecl_notify_data_t* bp = user_data; */
+    /* ERL_NIF_TERM reply; */
+    /* ErlNifEnv*   s_env; */
+    /* int res; */
+
+    DBG("ecl_context_notify:  user_data=%p", user_data);        
+    DBG("ecl_context_notify:  priv_info=%p cb=%d", private_info, cb);
+    CL_ERROR("CL ERROR ASYNC: %s", errinfo);
+}
+
 //
 // cl:create_context([cl_device_id()]) -> 
 //   {ok, cl_context()} | {error, cl_error()}
@@ -2676,15 +2696,29 @@ static ERL_NIF_TERM ecl_create_context(ErlNifEnv* env, int argc,
     size_t           num_devices = MAX_DEVICES;
     cl_context       context;
     cl_int err;
+    ecl_notify_data_t* bp;
+
     UNUSED(argc);
 
     if (!get_object_list(env, argv[0], &device_r, false, 
 			 (void**) device_list, &num_devices))
 	return enif_make_badarg(env);
 
+    if (!(bp = enif_alloc(sizeof(ecl_notify_data_t))))
+	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
+    
+    if (!(bp->r_env = enif_alloc_env())) {
+	enif_free(bp);
+	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
+    }
+    (void) enif_self(env, &bp->sender);
+    bp->s_env = env;
+    bp->tid = enif_thread_self();
+    DBG("ecl_create_context: self %p", bp->tid);
+
     context = clCreateContext(0, num_devices, device_list, 
-			      0, // ecl_context_notify,
-			      0, // env,
+			      ecl_context_notify,
+			      bp,
 			      &err);
     if (context) {
 	ERL_NIF_TERM t;
