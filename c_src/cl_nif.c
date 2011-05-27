@@ -2680,6 +2680,10 @@ void CL_CALLBACK ecl_context_notify(const char *errinfo,
     /* ERL_NIF_TERM reply; */
     /* ErlNifEnv*   s_env; */
     /* int res; */
+    UNUSED(errinfo);
+    UNUSED(private_info);
+    UNUSED(cb);
+    UNUSED(user_data);
 
     DBG("ecl_context_notify:  user_data=%p", user_data);        
     DBG("ecl_context_notify:  priv_info=%p cb=%d", private_info, cb);
