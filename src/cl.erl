@@ -119,15 +119,22 @@
 -export([kernel_workgroup_info/0]).
 -export([get_kernel_workgroup_info/2,get_kernel_workgroup_info/3]).
 %% Events
--export([enqueue_task/3]).
+-export([enqueue_task/3, enqueue_task/4]).
+-export([nowait_enqueue_task/3]).
 -export([enqueue_nd_range_kernel/5]).
+-export([enqueue_nd_range_kernel/6]).
+-export([nowait_enqueue_nd_range_kernel/5]).
 -export([enqueue_marker/1]).
 -export([enqueue_barrier/1]).
 -export([enqueue_wait_for_events/2]).
 -export([enqueue_read_buffer/5]).
 -export([enqueue_write_buffer/6]).
+-export([enqueue_write_buffer/7]).
+-export([nowait_enqueue_write_buffer/6]).
 -export([enqueue_read_image/7]).
 -export([enqueue_write_image/8]).
+-export([enqueue_write_image/9]).
+-export([nowait_enqueue_write_image/8]).
 -export([enqueue_copy_image/6]).
 -export([enqueue_copy_image_to_buffer/7]).
 -export([enqueue_copy_buffer_to_image/7]).
@@ -1648,7 +1655,17 @@ get_kernel_workgroup_info(Kernel, Device) ->
 		   WaitList::[cl_event()]) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
-enqueue_task(_Queue, _Kernel, _WaitList) ->
+enqueue_task(Queue, Kernel, WaitList) ->
+    enqueue_task(Queue, Kernel, WaitList, true).
+
+-spec nowait_enqueue_task(Queue::cl_queue(), Kernel::cl_kernel(),
+		   WaitList::[cl_event()]) ->
+    'ok' | {'error', cl_error()}.
+
+nowait_enqueue_task(Queue, Kernel, WaitList) ->
+    enqueue_task(Queue, Kernel, WaitList, false).
+
+enqueue_task(_Queue, _Kernel, _WaitList, _WantEvent) ->
     erlang:error(nif_not_loaded).
 
 %%
@@ -1678,7 +1695,21 @@ enqueue_task(_Queue, _Kernel, _WaitList) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
 
-enqueue_nd_range_kernel(_Queue, _Kernel, _Global, _Local, _WaitList) ->
+enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList) ->
+    enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList, true).
+
+
+-spec nowait_enqueue_nd_range_kernel(Queue::cl_queue(), Kernel::cl_kernel(),
+				     Global::[non_neg_integer()],
+				     Local::[non_neg_integer()],
+				     WaitList::[cl_event()]) ->
+    'ok' | {'error', cl_error()}.
+
+nowait_enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList) ->
+    enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList, false).
+
+enqueue_nd_range_kernel(_Queue, _Kernel, _Global, _Local, _WaitList, 
+			_WantEvent) ->
     erlang:error(nif_not_loaded).
 
 %% @spec enqueue_marker(Queue::cl_queue()) ->
@@ -1776,7 +1807,21 @@ enqueue_read_buffer(_Queue, _Buffer, _Offset, _Size, _WaitList) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
 
-enqueue_write_buffer(_Queue, _Buffer, _Offset, _Size, _Data, _WaitList) ->
+enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList) ->
+    enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList, true).
+
+-spec nowait_enqueue_write_buffer(Queue::cl_queue(), Buffer::cl_mem(),
+			   Offset::non_neg_integer(), 
+			   Size::non_neg_integer(), 
+			   Data::binary(),
+			   WaitList::[cl_event()]) ->
+    'ok' | {'error', cl_error()}.
+
+nowait_enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList) ->
+    enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList, false).
+
+enqueue_write_buffer(_Queue, _Buffer, _Offset, _Size, _Data, _WaitList,
+		     _WantEvent) ->
     erlang:error(nif_not_loaded).
 
 %% 
@@ -1799,9 +1844,21 @@ enqueue_read_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
 		   _WaitList) ->
     erlang:error(nif_not_loaded).
 
+enqueue_write_image(Queue, Image, Origin, Region, RowPitch, SlicePitch,
+		    Data, WaitList) ->
+    enqueue_write_image(Queue, Image, Origin, Region, RowPitch, SlicePitch,
+			Data, WaitList, true).
+
+
+nowait_enqueue_write_image(Queue, Image, Origin, Region, RowPitch, SlicePitch,
+			   Data, WaitList) ->
+    enqueue_write_image(Queue, Image, Origin, Region, RowPitch, SlicePitch,
+			Data, WaitList, false).
+
 enqueue_write_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
-		    _Data, _WaitList) ->
+		    _Data, _WaitList, _WantEvent) ->
     erlang:error(nif_not_loaded).
+
 
 enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _Origin, _Region, _WaitList) ->
     erlang:error(nif_not_loaded).

@@ -437,15 +437,15 @@ ErlNifFunc ecl_funcs[] =
     { "get_kernel_workgroup_info",  3, ecl_get_kernel_workgroup_info },
 
     // Events
-    { "enqueue_task",               3, ecl_enqueue_task },
-    { "enqueue_nd_range_kernel",    5, ecl_enqueue_nd_range_kernel },
+    { "enqueue_task",               4, ecl_enqueue_task },
+    { "enqueue_nd_range_kernel",    6, ecl_enqueue_nd_range_kernel },
     { "enqueue_marker",             1, ecl_enqueue_marker },
     { "enqueue_barrier",            1, ecl_enqueue_barrier },
     { "enqueue_wait_for_events",    2, ecl_enqueue_wait_for_events },
     { "enqueue_read_buffer",        5, ecl_enqueue_read_buffer },
-    { "enqueue_write_buffer",       6, ecl_enqueue_write_buffer },
+    { "enqueue_write_buffer",       7, ecl_enqueue_write_buffer },
     { "enqueue_read_image",         7, ecl_enqueue_read_image },
-    { "enqueue_write_image",        8, ecl_enqueue_write_image },
+    { "enqueue_write_image",        9, ecl_enqueue_write_image },
     { "enqueue_copy_image",         6, ecl_enqueue_copy_image },
     { "enqueue_copy_image_to_buffer", 7, ecl_enqueue_copy_image_to_buffer },
     { "enqueue_copy_buffer_to_image", 7, ecl_enqueue_copy_buffer_to_image },
@@ -3717,8 +3717,8 @@ static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc,
 
 //
 // cl:enqueue_task(Queue::cl_queue(), Kernel::cl_kernel(),
-//                   WaitList::[cl_event()]) ->
-//    {'ok', cl_event()} | {'error', cl_error()}
+//                   WaitList::[cl_event()], WantEvent::boolean()) ->
+//    'ok' | {'ok', cl_event()} | {'error', cl_error()}
 //
 static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc, 
 				     const ERL_NIF_TERM argv[])
@@ -3729,6 +3729,7 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
     size_t           num_events = MAX_WAIT_LIST;
     cl_event         event;
     cl_int           err;
+    cl_bool          want_event;
     UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
@@ -3738,15 +3739,21 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[2], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
+    if (!get_bool(env, argv[3], &want_event))
+	return enif_make_badarg(env);
+
     err = clEnqueueTask(o_queue->queue, 
 			kernel,
 			num_events,
-			num_events ? wait_list : 0,
-			&event);
+			num_events ? wait_list : NULL,
+			want_event ? &event : NULL);
     if (!err) {
-	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
-	return enif_make_tuple2(env, ATOM(ok), t);
+	if (want_event) {
+	    ERL_NIF_TERM t;
+	    t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	    return enif_make_tuple2(env, ATOM(ok), t);
+	}
+	return ATOM(ok);
     }
     return ecl_make_error(env, err);    
 }
@@ -3754,8 +3761,8 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
 // cl:enqueue_nd_range_kernel(Queue::cl_queue(), Kernel::cl_kernel(),
 //                            Global::[non_neg_integer()],
 //                            Local::[non_neg_integer()],
-//                            WaitList::[cl_event()]) ->
-//    {'ok', cl_event()} | {'error', cl_error()}
+//                            WaitList::[cl_event()], WantEvent::boolean()) ->
+//    'ok' | {'ok', cl_event()} | {'error', cl_error()}
 //
 static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc, 
 						const ERL_NIF_TERM argv[])
@@ -3770,6 +3777,7 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
     size_t        temp_dim = MAX_WORK_SIZE;
     cl_event      event;
     cl_int        err;
+    cl_bool       want_event;
     UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
@@ -3783,6 +3791,9 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[4], &event_r, false, 
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
+    if (!get_bool(env, argv[5], &want_event))
+	return enif_make_badarg(env);
+
     if ((work_dim != temp_dim) || (work_dim == 0))
 	return enif_make_badarg(env);
 
@@ -3792,12 +3803,15 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 				 global_work_size,
 				 local_work_size,
 				 num_events, 
-				 num_events ? wait_list : 0,
-				 &event);
+				 num_events ? wait_list : NULL,
+				 want_event ? &event : NULL);
     if (!err) {
-	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
-	return enif_make_tuple2(env, ATOM(ok), t);
+	if (want_event) {
+	    ERL_NIF_TERM t;
+	    t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	    return enif_make_tuple2(env, ATOM(ok), t);
+	}
+	return ATOM(ok);
     }
     return ecl_make_error(env, err);    
 }
@@ -3907,7 +3921,9 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
 //                         Offset::non_neg_integer(), 
 //                         Size::non_neg_integer(), 
 //                         Data::binary(),
-//                         WaitList::[cl_event()]) ->
+//                         WaitList::[cl_event()],
+//                         WantEvent::boolean()
+//                       ) ->
 //    {'ok', cl_event()} | {'error', cl_error()}
 //
 static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc, 
@@ -3923,6 +3939,7 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
     ErlNifBinary     bin;
     ErlNifEnv*       bin_env;
     cl_int           err;
+    cl_bool          want_event;
     UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
@@ -3937,6 +3954,8 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[5], &event_r, false,
 			 (void**) wait_list, &num_events))
+	return enif_make_badarg(env);
+    if (!get_bool(env, argv[6], &want_event))
 	return enif_make_badarg(env);
 
     // handle binary and iolist as binary
@@ -3957,12 +3976,15 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 			       size,
 			       bin.data,
 			       num_events,
-			       num_events ? wait_list : 0,
-			       &event);
+			       num_events ? wait_list : NULL,
+			       want_event ? &event : NULL);
     if (!err) {
-	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
-	return enif_make_tuple2(env, ATOM(ok), t);
+	if (want_event) {
+	    ERL_NIF_TERM t;
+	    t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
+	    return enif_make_tuple2(env, ATOM(ok), t);
+	}
+	return ATOM(ok);
     }
     else {
 	enif_free_env(bin_env);	
@@ -4044,7 +4066,7 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
 
 //
 // enqueue_write_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
-//		    _Data, _WaitList) ->
+//		    _Data, _WaitList, _WantEvent, WantEvent) ->
 //
 static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[])
@@ -4065,6 +4087,7 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     ErlNifBinary     bin;
     ErlNifEnv*       bin_env;
     cl_int           err;
+    cl_bool          want_event;
     UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
@@ -4086,7 +4109,9 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[7], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-
+    if (!get_bool(env, argv[8], &want_event))
+	return enif_make_badarg(env);
+    
 
     // calculate the read size of the image FIXME: check error return
     clGetImageInfo(buffer, CL_IMAGE_ELEMENT_SIZE, sizeof(psize), &psize, 0);
@@ -4107,12 +4132,15 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 			      slice_pitch,
 			      bin.data,
 			      num_events,
-			      num_events ? wait_list : 0,
-			      &event);
+			      num_events ? wait_list : NULL,
+			      want_event ? &event : NULL );
     if (!err) {
-	ERL_NIF_TERM t;
-	t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
-	return enif_make_tuple2(env, ATOM(ok), t);
+	if (want_event) {
+	    ERL_NIF_TERM t;
+	    t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
+	    return enif_make_tuple2(env, ATOM(ok), t);
+	}
+	return ATOM(ok);
     }
     else {
 	enif_free_env(bin_env);	
