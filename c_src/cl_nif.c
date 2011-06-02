@@ -81,9 +81,19 @@ typedef struct {
     size_t              size;  // "real" object size
 } ecl_resource_t;
 
+struct _ecl_object_t;
+
+typedef struct _ecl_platform_t {
+    struct _ecl_object_t* o_platform;
+    cl_uint ndevices;
+    struct _ecl_object_t** o_device;
+} ecl_platform_t;
+
 typedef struct _ecl_env_t {
     lhash_t     ref;        // cl -> ecl
     ErlNifRWLock* ref_lock; // lhash operation lock
+    cl_uint nplatforms;
+    ecl_platform_t* platform;
 } ecl_env_t;
 
 typedef struct _ecl_object_t {
@@ -2141,6 +2151,18 @@ static ecl_object_t* ecl_new(ErlNifEnv* env, ecl_resource_t* rtype,
     }
 }
 
+static ERL_NIF_TERM ecl_make_object(ErlNifEnv* env, ecl_resource_t* rtype, 
+				    void* ptr, ecl_object_t* parent)
+{
+    ecl_object_t* obj = ecl_new(env,rtype,ptr,parent);
+    ERL_NIF_TERM  res;
+    res = make_object(env, rtype->type, obj);
+    if (obj)
+	enif_release_resource(obj);
+    return res;
+}
+
+
 // lookup or create a new ecl_object_t resource
 static ecl_object_t* ecl_maybe_new(ErlNifEnv* env, ecl_resource_t* rtype, 
 				   void* ptr, ecl_object_t* parent, 
@@ -2156,17 +2178,20 @@ static ecl_object_t* ecl_maybe_new(ErlNifEnv* env, ecl_resource_t* rtype,
     return obj;
 }
 
-static ERL_NIF_TERM ecl_make_object(ErlNifEnv* env, ecl_resource_t* rtype, 
-				    void* ptr, ecl_object_t* parent)
+
+// lookup or create resource object, return as erlang term
+static ERL_NIF_TERM ecl_lookup_object(ErlNifEnv* env, ecl_resource_t* rtype, 
+				      void* ptr, ecl_object_t* parent)
 {
-    ecl_object_t* obj = ecl_new(env,rtype,ptr,parent);
+    bool is_new;
     ERL_NIF_TERM  res;
+    ecl_object_t* obj = ecl_maybe_new(env,rtype,ptr,parent,&is_new);
+    
     res = make_object(env, rtype->type, obj);
-    if (obj)
+    if (obj && is_new)
 	enif_release_resource(obj);
     return res;
 }
-
 
 static ERL_NIF_TERM ecl_make_kernel(ErlNifEnv* env, cl_kernel kernel,
 				    ecl_object_t* parent)
@@ -2220,20 +2245,6 @@ static ERL_NIF_TERM ecl_make_context(ErlNifEnv* env, cl_context context)
     res = make_object(env, context_r.type, (ecl_object_t*) ctx);
     if (ctx)
 	enif_release_resource(ctx);
-    return res;
-}
-
-// lookup or create resource object, return as erlang term
-static ERL_NIF_TERM ecl_lookup_object(ErlNifEnv* env, ecl_resource_t* rtype, 
-				      void* ptr, ecl_object_t* parent)
-{
-    bool is_new;
-    ERL_NIF_TERM  res;
-    ecl_object_t* obj = ecl_maybe_new(env,rtype,ptr,parent,&is_new);
-    
-    res = make_object(env, rtype->type, obj);
-    if (obj && is_new)
-	enif_release_resource(obj);
     return res;
 }
 
@@ -2603,7 +2614,7 @@ static ERL_NIF_TERM ecl_get_platform_ids(ErlNifEnv* env, int argc,
 	return ecl_make_error(env, err);
 
     for (i = 0; i < num_platforms; i++)
-	idv[i] = ecl_make_object(env,&platform_r,platform_id[i],0);
+	idv[i] = ecl_lookup_object(env,&platform_r,platform_id[i],0);
 
     platform_list = enif_make_list_from_array(env, idv,num_platforms);
     return enif_make_tuple2(env, ATOM(ok), platform_list);
@@ -2646,7 +2657,7 @@ static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc,
 	return ecl_make_error(env, err);
     
     for (i = 0; i < num_devices; i++)
-	idv[i] = ecl_make_object(env, &device_r, device_id[i], 0);
+	idv[i] = ecl_lookup_object(env, &device_r, device_id[i], 0);
     device_list = enif_make_list_from_array(env, idv, num_devices);
     return enif_make_tuple2(env, ATOM(ok), device_list);
 }
@@ -4573,11 +4584,54 @@ static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc,
 			    sizeof_array(event_info));
 }
 
+// pre-Load Platform Ids and Device Ids, this will make the 
+// internal IDs kind of static for the application code. The IDs
+// can then be used in matching etc.
+
+static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
+{
+    cl_platform_id   platform_id[MAX_PLATFORMS];
+    cl_uint          num_platforms;
+    cl_uint          i;
+    cl_int           err;
+    
+    if ((err = clGetPlatformIDs(MAX_PLATFORMS, platform_id, &num_platforms))) {
+	*rerr = err;
+	return -1;
+    }
+
+    ecl->platform = enif_alloc(num_platforms*sizeof(ecl_platform_t*));
+    ecl->nplatforms = num_platforms;
+
+    for (i = 0; i < num_platforms; i++) {
+	ecl_object_t* obj;
+	cl_device_id     device_id[MAX_DEVICES];
+	cl_uint          num_devices;
+	cl_uint          j;
+	
+	obj = ecl_new(env, &platform_r,platform_id[i],0);
+	ecl->platform[i].o_platform = obj;
+
+	if ((err = clGetDeviceIDs(platform_id[i], CL_DEVICE_TYPE_ALL,
+				  MAX_DEVICES, device_id, &num_devices))) {
+	    *rerr = err;
+	    return -1;
+	}
+	ecl->platform[i].o_device=enif_alloc(num_devices*sizeof(ecl_object_t));
+	ecl->platform[i].ndevices = num_devices;
+	for (j = 0; j < num_devices; j++) {
+	    obj = ecl_new(env, &device_r, device_id[j],0);
+	    ecl->platform[i].o_device[j] = obj;
+	}
+    }
+    return 0;
+}
 
 static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 {
     ErlNifResourceFlags tried;
     ecl_env_t* ecl;
+    cl_int err;
     lhash_func_t func = { ref_hash, ref_cmp, ref_release, 0 };
     UNUSED(env);
     UNUSED(load_info);
@@ -5011,6 +5065,10 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 		      ecl_event_dtor,
 		      ERL_NIF_RT_CREATE, &tried);
     *priv_data = ecl;
+
+    if (ecl_pre_load(env, ecl, &err) < 0) {
+	CL_ERROR("ecl_pre_load: error code = %d", err);
+    }	
     return 0;
 }
 
@@ -5037,6 +5095,22 @@ static void ecl_unload(ErlNifEnv* env, void* priv_data)
 {
     ecl_env_t* ecl = priv_data;
     UNUSED(env);
+    cl_uint i;
+    cl_uint j;
+
+    for (i = 0; i < ecl->nplatforms; i++) {
+	ecl_object_t* obj;
+
+	for (j = 0; j < ecl->platform[i].ndevices; j++) {
+	    obj = ecl->platform[i].o_device[j];
+	    enif_release_resource(obj);
+	}
+	enif_free(ecl->platform[i].o_device);
+
+	obj = ecl->platform[i].o_platform;
+	enif_release_resource(obj);
+    }
+    enif_free(ecl->platform);
 
     enif_rwlock_rwlock(ecl->ref_lock);
     lhash_delete(&ecl->ref);
