@@ -75,7 +75,8 @@ endif
 ifeq ($(WORDSIZE), 64)
 CFLAGS += -O3 -fPIC -m64 -DWORDSIZE=64
 endif
-LD_SHARED	:= $(CC) -shared -lOpenCL
+LD_SHARED	:= $(CC) -shared
+LDFLAGS	        += -lOpenCL
 endif
 
 ifeq ($(OSNAME), Darwin)
