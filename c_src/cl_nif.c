@@ -1429,7 +1429,7 @@ static int get_enum(ErlNifEnv* env, const ERL_NIF_TERM key,
 	return 0;
     while(kv->key) {
 	if (*kv->key == key) {
-	    *num = kv->value;
+	    *num = (cl_uint) kv->value;
 	    return 1;
 	}
 	kv++;
@@ -3555,32 +3555,32 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 		case OCL_CHAR:
 		    if (!enif_get_long(env, values[i], &lval))
 			return enif_make_badarg(env);
-		    *((cl_char*)ptr) = lval;
+		    *((cl_char*)ptr) = (cl_char) lval;
 		    break;
 		case OCL_UCHAR:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_uchar*)ptr) = luval;
+		    *((cl_uchar*)ptr) = (cl_uchar) luval;
 		    break;
 		case OCL_SHORT:
 		    if (!enif_get_long(env, values[i], &lval))
 			return enif_make_badarg(env);
-		    *((cl_short*)ptr) = lval;
+		    *((cl_short*)ptr) = (cl_short) lval;
 		    break;
 		case OCL_USHORT:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_ushort*)ptr) = luval;
+		    *((cl_ushort*)ptr) = (cl_ushort) luval;
 		    break;
 		case OCL_INT:
 		    if (!enif_get_long(env, values[i], &lval))
 			return enif_make_badarg(env);
-		    *((cl_int*)ptr) = lval;
+		    *((cl_int*)ptr) = (cl_int) lval;
 		    break;
 		case OCL_UINT:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_uint*)ptr) = luval;
+		    *((cl_uint*)ptr) = (cl_uint) luval;
 		    break;
 		case OCL_LONG:
 		    if (!enif_get_int64(env, values[i], &i64val))
@@ -3595,12 +3595,12 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 		case OCL_HALF:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_half*)ptr) = luval;
+		    *((cl_half*)ptr) = (cl_half) luval;
 		    break;
 		case OCL_FLOAT:
 		    if (!enif_get_double(env, values[i], &fval))
 			return enif_make_badarg(env);
-		    *((cl_float*)ptr) = fval;
+		    *((cl_float*)ptr) = (cl_float) fval;
 		    break;
 
 		case OCL_DOUBLE:
@@ -3642,7 +3642,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 	goto do_kernel_arg;
     }
     else if (enif_get_double(env, argv[2], &fval)) {
-	float_arg = fval;
+	float_arg = (float) fval;
 	arg_value = &float_arg;
 	arg_size = sizeof(float_arg);
 	goto do_kernel_arg;
