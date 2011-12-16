@@ -1726,12 +1726,11 @@ error:
 static int ecl_thread_stop(ecl_thread_t* thr, void** exit_value)
 {
     ecl_message_t m;
-    int r;
 
     m.type   = ECL_MESSAGE_STOP;
     m.env    = 0;
     ecl_message_send(thr, &m);
-    r=enif_thread_join(thr->tid, exit_value);
+    enif_thread_join(thr->tid, exit_value);
     ecl_queue_destroy(&thr->q);
     enif_free(thr);
     return 0;
@@ -3983,14 +3982,14 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	enif_free_env(bin_env);
 	return enif_make_badarg(env);
     }
-    
+
     // handle binary and iolist as binary
-    if (bin.size < size) {   // FIXME: handle offset! 
+    if (bin.size < size) {   // FIXME: handle offset!
 	return enif_make_badarg(env);
     }
 
     err = clEnqueueWriteBuffer(o_queue->queue, buffer,
-			       CL_FALSE,
+			       !want_event, // FALSE for async
 			       offset,
 			       size,
 			       bin.data,
@@ -4002,11 +4001,13 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	    ERL_NIF_TERM t;
 	    t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
 	    return enif_make_tuple2(env, ATOM(ok), t);
+	} else {
+	    enif_free_env(bin_env);
 	}
 	return ATOM(ok);
     }
     else {
-	enif_free_env(bin_env);	
+	enif_free_env(bin_env);
 	return ecl_make_error(env, err);
     }
 }
@@ -4145,7 +4146,7 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     }
 
     err = clEnqueueWriteImage(o_queue->queue, buffer,
-			      CL_FALSE,
+			      !want_event, // FALSE for ASYNC
 			      origin,
 			      region,
 			      row_pitch,
@@ -4159,6 +4160,8 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 	    ERL_NIF_TERM t;
 	    t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
 	    return enif_make_tuple2(env, ATOM(ok), t);
+	} else {
+	    enif_free_env(bin_env);
 	}
 	return ATOM(ok);
     }
@@ -5103,9 +5106,9 @@ static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 static void ecl_unload(ErlNifEnv* env, void* priv_data)
 {
     ecl_env_t* ecl = priv_data;
-    UNUSED(env);
     cl_uint i;
     cl_uint j;
+    UNUSED(env);
 
     for (i = 0; i < ecl->nplatforms; i++) {
 	ecl_object_t* obj;
