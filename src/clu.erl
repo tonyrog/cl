@@ -34,19 +34,29 @@ setup(DevType) ->
 
 setup(DevType, [Platform|Ps]) ->
     case cl:get_device_ids(Platform,DevType) of
+	{ok, []} ->
+	    setup(DevType, Ps);
 	{ok,DeviceList} ->
-	    {ok,Context}      = cl:create_context(DeviceList),
-	    #cl { platform = Platform,
-		  devices  = DeviceList,
-		  context  = Context };
+	    case cl:create_context(DeviceList) of
+		{ok,Context} ->
+		    #cl { platform = Platform,
+			  devices  = DeviceList,
+			  context  = Context };
+		{error, _} when Ps /= [] ->
+		    setup(DevType, Ps);
+		Other ->
+		    Other
+	    end;
 	{error, device_not_found} ->
+	    setup(DevType, Ps);
+	{error, _} when Ps /= [] ->
 	    setup(DevType, Ps);
 	Other ->
 	    Other
     end;
 setup(DevType, []) ->
     {error, {device_not_found, DevType}}.
-    
+
 
 %%
 %% @doc setup a clu context with all devices.

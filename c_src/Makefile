@@ -11,6 +11,11 @@ ERLDIR	:= $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir
 ERL_C_INCLUDE_DIR := $(ERLDIR)/usr/include
 OCL_DIR := $(shell cd ..; pwd)
 
+## Windows start
+ifneq (, $(findstring MINGW32,$(OSNAME)))
+MINGW = Yes
+endif
+
 MAC_OS_X  = No
 WIN32_GCC = No
 WIN32_CL  = No
@@ -24,17 +29,32 @@ SSE3      = No
 SSE4      = No
 EXT       = so
 
+ifneq ($(MINGW), Yes)
+CONFIG_FILE_64 = config.64.build
+CONFIG_FILE_32 = config.32.build
 ifeq ($(WORDSIZE), 64)
-include config.64.build
+include $(CONFIG_FILE_64)
 endif
 ifeq ($(WORDSIZE), 32)
-include config.32.build
+include $(CONFIG_FILE_32)
 endif
+else
+# Skip configure on windows for now we don't have
+# 64bits support anyway, autoconf and lib are a mess
+# to install
+ifeq ($(WORDSIZE), 64)
+   CL_BUILD=false
+else
+   CL_BUILD=true
+endif
+endif
+
+
 
 ifeq ($(TYPE), debug)
 OBJDIR=../obj/debug
 LIBDIR=../lib/debug
-CFLAGS += -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE 
+CFLAGS += -Ddebug -DDEBUG -g -Wall -Wextra -Wswitch-default -Wswitch-enum -D_THREAD_SAFE
 CFLAGS += -D_REENTRANT -fno-common -I$(ERL_C_INCLUDE_DIR)
 WIN_DEBUG = -Ddebug -DDEBUG
 endif
@@ -55,7 +75,8 @@ endif
 ifeq ($(WORDSIZE), 64)
 CFLAGS += -O3 -fPIC -m64 -DWORDSIZE=64
 endif
-LD_SHARED	:= $(CC) -shared -lOpenCL
+LD_SHARED	:= $(CC) -shared
+LDFLAGS	        += -lOpenCL
 endif
 
 ifeq ($(OSNAME), Darwin)
@@ -68,11 +89,6 @@ ifeq ($(WORDSIZE), 64)
 CFLAGS += -O3 -fPIC -m64 -DWORDSIZE=64 -DDARWIN -no-cpp-precomp
 LD_SHARED	:= $(CC) -m64 -bundle -flat_namespace -undefined suppress
 endif
-endif
-
-## Windows start
-ifneq (, $(findstring MINGW32,$(OSNAME)))
-MINGW = Yes
 endif
 
 ifeq ($(MINGW), Yes)
@@ -185,11 +201,11 @@ OCL_SIMD_OBJS = $(SIMD_OBJS:%=$(OBJDIR)/%)
 
 all:	all32 all64
 
-all32:	config.32.build
+all32:	$(CONFIG_FILE_32)
 	$(MAKE) nif TYPE=release WORDSIZE=32
 	$(MAKE) nif TYPE=debug   WORDSIZE=32
 
-all64:	config.64.build
+all64:	$(CONFIG_FILE_64)
 	$(MAKE) nif TYPE=release WORDSIZE=64
 	$(MAKE) nif TYPE=debug   WORDSIZE=64
 
