@@ -2099,15 +2099,23 @@ static int get_binary_list(ErlNifEnv* env, const ERL_NIF_TERM term,
 // Copy a "local" binary to a new process independent environment
 // fill the binary structure with the new data and return it.
 //
-static ERL_NIF_TERM ecl_copy_binary(ErlNifEnv* src_env, ErlNifEnv* dst_env,
-				    ErlNifBinary* bin)
+static int ecl_make_binary(ErlNifEnv* src_env,
+			   const ERL_NIF_TERM src,
+			   ErlNifEnv* dst_env,
+			   ErlNifBinary* bin)
 {
-    ERL_NIF_TERM b;
+    ERL_NIF_TERM ref_counted;
 
-    // make it a complete binary, may be a io_list !
-    b = enif_make_binary(src_env, bin);
-    // copy to destination environment
-    return enif_make_copy(dst_env, b); 
+    if (enif_is_binary(src_env, src)) {
+	// Update refc (and/or fix heap binaries)
+	ref_counted = enif_make_copy(dst_env, src);
+	return enif_inspect_binary(dst_env, ref_counted, bin);
+    } else {
+	//  iolist to binary
+	if (!enif_inspect_iolist_as_binary(src_env, src, bin))
+	    return 0;
+	return enif_make_binary(dst_env, bin);
+    }
 }
 
 
@@ -3961,25 +3969,25 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!enif_get_ulong(env, argv[3], &size))
 	return enif_make_badarg(env);
-    if (!enif_inspect_binary(env, argv[4], &bin))
-	return enif_make_badarg(env);
+    /*  Check argv[4] (bin) last */
     if (!get_object_list(env, argv[5], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
     if (!get_bool(env, argv[6], &want_event))
 	return enif_make_badarg(env);
 
+    if (!(bin_env = enif_alloc_env())) {  // create binary environment
+	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
+    }
+    if (!ecl_make_binary(env, argv[4], bin_env, &bin)) {
+	enif_free_env(bin_env);
+	return enif_make_badarg(env);
+    }
+    
     // handle binary and iolist as binary
     if (bin.size < size) {   // FIXME: handle offset! 
 	return enif_make_badarg(env);
     }
-
-    // copy the binary new environment 
-    if (!(bin_env = enif_alloc_env())) {  // create binary environment
-	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
-    }
-
-    (void) ecl_copy_binary(env, bin_env, &bin);
 
     err = clEnqueueWriteBuffer(o_queue->queue, buffer,
 			       CL_FALSE,
@@ -4115,14 +4123,19 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!enif_get_ulong(env, argv[5], &slice_pitch))
 	return enif_make_badarg(env);
-    if (!enif_inspect_binary(env, argv[6], &bin))
-	return enif_make_badarg(env);
+    /*  Check argv[6] (bin) last */
     if (!get_object_list(env, argv[7], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
     if (!get_bool(env, argv[8], &want_event))
-	return enif_make_badarg(env);
-    
+        return enif_make_badarg(env);
+    if (!(bin_env = enif_alloc_env())) {  // create binary environment
+        return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
+    }
+    if (!ecl_make_binary(env, argv[6], bin_env, &bin)) {
+       enif_free_env(bin_env);
+       return enif_make_badarg(env);
+    }
 
     // calculate the read size of the image FIXME: check error return
     clGetImageInfo(buffer, CL_IMAGE_ELEMENT_SIZE, sizeof(psize), &psize, 0);
@@ -4130,10 +4143,6 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     if (bin.size < size) {
 	return enif_make_badarg(env);
     }
-    if (!(bin_env = enif_alloc_env())) {  // create binary environment
-	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
-    }
-    (void) ecl_copy_binary(env, bin_env, &bin);
 
     err = clEnqueueWriteImage(o_queue->queue, buffer,
 			      CL_FALSE,
