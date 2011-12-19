@@ -103,10 +103,10 @@ build_source(E, Source) ->
 	ok ->
 	    Status = [cl:get_program_build_info(Program, Dev, status)
 		      || Dev <- E#cl.devices],
-	    case lists:any(fun({ok, success}) -> true; 
-			      (_) -> false end, Status) 
+	    case lists:any(fun({ok, success}) -> true;
+			      (_) -> false end, Status)
 	    of
-		true -> 
+		true ->
 		    {ok,Program};
 		false ->
 		    Logs = get_program_logs(Program),
@@ -137,7 +137,7 @@ compile_file(File) ->
 	    {error,{_,_Logs}} ->
 		%% Listed in build_source, should it be?
 		%% lists:foreach(
-		%%   fun(Log) -> io:format("~s\n", [Log]) end, 
+		%%   fun(Log) -> io:format("~s\n", [Log]) end,
 		%%   Logs),
 		Result;
 	    {ok,Program} ->
@@ -176,7 +176,7 @@ build_binary(E, {DeviceList,BinaryList}) ->
 	ok ->
 	    {ok,Program};
 	Error ->
-	    Logs = 
+	    Logs =
 		map(fun(Device) ->
 			    {ok,Log} = cl:get_program_build_info(Program,
 								  Device,log),
@@ -191,14 +191,14 @@ build_binary(E, {DeviceList,BinaryList}) ->
 apply_kernel_args(Kernel, Args) ->
     {ok,N} = cl:get_kernel_info(Kernel, num_args),
     Arity = length(Args),
-    if N /= Arity -> 
+    if N /= Arity ->
 	    {ok,Name} = cl:get_kernel_info(Kernel, function_name),
 	    erlang:error({bad_arity,Name,N});
        true ->
-	    try 
+	    try
 		apply_args(Kernel, 0, Args)
-	    catch 
-		error:{badmatch,Error} -> 
+	    catch
+		error:{badmatch,Error} ->
 		    erlang:error(Error)
 	    end
     end.
@@ -211,7 +211,7 @@ apply_args(Kernel,I,[A|As]) ->
     %%io:format("kernel set arg ~w to ~p\n", [I,A]),
     ok = cl:set_kernel_arg(Kernel,I,A),
     apply_args(Kernel,I+1,As);
-apply_args(_Kernel, _I, []) -> 
+apply_args(_Kernel, _I, []) ->
     ok.
 
 %% manual wait for event to complete (crash on failure)

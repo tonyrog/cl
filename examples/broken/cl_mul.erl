@@ -67,7 +67,7 @@ dump_data(Bin) ->
 
 test() ->
     test(all).
-    
+
 test(DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
     Data = test_data(),
@@ -83,7 +83,7 @@ examples_dir() ->
 run(Data, DevType) ->
     E = clu:setup(DevType),
     io:format("platform created\n"),
-    
+
     Filename = filename:join(examples_dir(),"mul4x4.cl"),
     io:format("build: ~s\n", [Filename]),
     {ok,Program} = clu:build_source_file(E, Filename),
@@ -110,7 +110,7 @@ run(Data, DevType) ->
 
     dump_data(Data),
 
-    %% Write data into input array 
+    %% Write data into input array
     {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, Data, []),
     io:format("write data enqueued\n"),
     erlang:display_string("enqueu write\n"),
@@ -132,12 +132,12 @@ run(Data, DevType) ->
 					     [Global], [LocalWork], [Event1]),
     io:format("nd range [~w, ~w] kernel enqueued\n",
 	      [[Global],[LocalWork]]),
-    
+
     %% Enqueue the read from device memory (wait for kernel to finish)
     {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),
     io:format("read buffer enqueued\n"),
 
-    %% Now flush the queue to make things happend 
+    %% Now flush the queue to make things happend
     ok = cl:flush(Queue),
     io:format("flushed\n"),
 

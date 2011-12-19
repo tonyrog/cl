@@ -10,7 +10,7 @@ __kernel void mul4x4(__global float* input,
     int ix;
     __global float* b;
     __global float* c;
-    
+
     ix = get_global_id(0);
     if (ix < count) {
         int i,j,k;
@@ -29,9 +29,9 @@ __kernel void mul4x4(__global float* input,
     		c[4*i+j] = s1;
 	    }
 	}
-	
+
     }
 }
 
 
-	 
+

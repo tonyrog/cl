@@ -26,12 +26,12 @@ test() ->
       fun(Result) ->
 	      [ X || <<X:32/native-float>> <= Result ]
       end, ResultList).
-	
-%% 
+
+%%
 %% Run a map operation over data
 %% Restrictions: the output must currently equal the size of
 %%
-%% 
+%%
 run(Function, Data) ->
     E = clu:setup(all),  %% gpu needs more work
     {_NArgs,ItemSize,Source} = p_program(Function),
@@ -59,7 +59,7 @@ run(Function, Data) ->
 		       K#kwork { weight = (K#kwork.freq*K#kwork.units)/Tw }
 	       end, Kws),
     io:format("Kws1 = ~p\n", [Kws1]),
-    
+
     %% Split data according to Weights but start with data
     %% That have hard requirements on work_group_size
     Kws11 = lists:reverse(lists:keysort(#kwork.local,Kws1)),
@@ -75,21 +75,21 @@ run(Function, Data) ->
 		     K#kwork { imem=I, omem=O }
 	     end, Kws2),
     io:format("Kws3 = ~p\n", [Kws3]),
-    
+
     %% Enque input data
     Kws4 = map(
 	fun(K) ->
 		Nk = byte_size(K#kwork.idata),
 		Count = Nk div K#kwork.isize,
 		{ok,E1} = cl:enqueue_write_buffer(K#kwork.queue,
-						  K#kwork.imem, 
-						  0, Nk, 
+						  K#kwork.imem,
+						  0, Nk,
 						  K#kwork.idata, []),
 		%% Set kernel arguments
 		ok = cl:set_kernel_arg(Kernel, 0, K#kwork.imem),
 		ok = cl:set_kernel_arg(Kernel, 1, K#kwork.omem),
 		ok = cl:set_kernel_arg(Kernel, 2, Count),
-	      
+
 		%% Enqueue the kernel
 		Global = Count,
 		io:format("Global=~w, Local=~w\n", [Global,K#kwork.local]),
@@ -100,7 +100,7 @@ run(Function, Data) ->
 		%% Enqueue the read from device memory (wait for kernel to finish)
 		{ok,E3} = cl:enqueue_read_buffer(K#kwork.queue,
 						 K#kwork.omem,0,Nk,[E2]),
-		%% Now flush the queue to make things happend 
+		%% Now flush the queue to make things happend
 		ok = cl:flush(K#kwork.queue),
 		%% FIXME: here we should release E1,E2
 		K#kwork { e1=E1,e2=E2,e3=E3 }
@@ -122,7 +122,7 @@ run(Function, Data) ->
 		   %% cl:release_event(K#kwork.e3),
 		   Bin
 	   end, Kws4),
-    
+
 
     cl:release_kernel(Kernel),
     cl:release_program(Program),
@@ -150,10 +150,10 @@ kwork_set_data([K|Ks], Data) ->
 	    Rd = R*K#kwork.isize,
 	    [K#kwork { idata = <<Data/binary, 0:Rd/unit:8>> } | Ks]
     end.
-    
+
 %%
 %% Function:
-%%     fun(<<X:32/T>>,P1,..,Pn) -> 
+%%     fun(<<X:32/T>>,P1,..,Pn) ->
 %%         F(X,P1,...Pn)
 %%
 %% Translates to
@@ -185,10 +185,10 @@ p_program(Function) ->
 add_dot(Ts) ->
     case lists:last(Ts) of
 	{dot,_} -> Ts;
-	E -> 
+	E ->
 	    Ts ++ [{dot,element(2,E)}]
     end.
-	    
+
 
 p_fun([{'fun',_Ln1,{clauses,[{clause,_Ln3,H,[],B}]}}]) ->
     As = p_header(H),
@@ -303,7 +303,7 @@ t_type(Size,Type) ->
        Size == 16 -> {Scalar,16};
        true -> erlang:error({bad_vector_type,Scalar,Size})
     end.
-    
+
 t_type(cl_char)   -> 'char';
 t_type(cl_uchar)  -> 'uchar';
 t_type(cl_short)  -> 'short';

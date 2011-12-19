@@ -14,14 +14,14 @@ APP_FILE= $(APP_NAME).app
 APP_SRC= $(APP_FILE).src
 APP_TARGET= $(EBIN)/$(APP_FILE)
 
-override ERLC_FLAGS = 
+override ERLC_FLAGS =
 
 
 OBJS = $(MODULES:%=$(EBIN)/%.beam)
 
 TARGET_FILES = $(OBJS) $(APP_TARGET)
 
-debug: ERLC_FLAGS += -Ddebug 
+debug: ERLC_FLAGS += -Ddebug
 
 all: $(TARGET_FILES)
 
@@ -35,7 +35,7 @@ depend:
 	edep -MM -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
 
 dialyze:
-	dialyzer --src -o dia.out $(ERLC_FLAGS) -c $(MODULES:%=%.erl) 
+	dialyzer --src -o dia.out $(ERLC_FLAGS) -c $(MODULES:%=%.erl)
 
 edoc:
 	erl -noshell -pa doc -run edoc_run application "cl" '".."' '[{private,true},no_packages,{sort_functions,false}]'

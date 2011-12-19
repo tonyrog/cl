@@ -13,7 +13,7 @@
 
 source() ->
 "
-__kernel void square( __global float* input, 
+__kernel void square( __global float* input,
                       __global float* output,
                       const unsigned int count)
 {
@@ -31,7 +31,7 @@ dump_data(Bin) ->
 
 test() ->
     test(all).
-    
+
 test(DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
     Data = test_data(),
@@ -69,7 +69,7 @@ run(Data, DevType) ->
     clu:apply_kernel_args(Kernel, [Input, Output, Count]),
     io:format("kernel args set\n"),
 
-    %% Write data into input array 
+    %% Write data into input array
     {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, Data, []),
     io:format("write data enqueued\n"),
     erlang:display_string("enqueu write\n"),
@@ -84,12 +84,12 @@ run(Data, DevType) ->
 					     [Global], [Local], [Event1]),
     io:format("nd range [~p, ~p] kernel enqueued\n",
 	      [[Global],[Local]]),
-    
+
     %% Enqueue the read from device memory (wait for kernel to finish)
     {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),
     io:format("read buffer enqueued\n"),
 
-    %% Now flush the queue to make things happend 
+    %% Now flush the queue to make things happend
     ok = cl:flush(Queue),
     io:format("flushed\n"),
 

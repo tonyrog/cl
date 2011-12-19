@@ -15,7 +15,7 @@ typedef struct {
 } VabIndex;
 
 
-void find_faces(int V0, int V1, FaceIndex Fi, __global int *Fs, 
+void find_faces(int V0, int V1, FaceIndex Fi, __global int *Fs,
 		int * F1, int *F2, int *CCW);
 
 __kernel void gen_faces(
@@ -35,7 +35,7 @@ __kernel void gen_faces(
       return;
   const FaceIndex fi = FiIn[face_id];
   float4 center = {0.0,0.0,0.0,0.0};
-  
+
   for(i=0; i < fi.len; i++) {
       center.xyz += VsIn[FsIn[fi.start+i]].xyz;
   }
@@ -54,13 +54,13 @@ __kernel void gen_faces(
     // Add center to all face verts
 
     //lock(v_id, locks); VsOut[v_id] += center; unlock(v_id, locks);
-    // locking doesn't work (for me) do it in a separate pass 
+    // locking doesn't work (for me) do it in a separate pass
     // single threaded
-    
-    // Create Faces    
+
+    // Create Faces
     FsOut[id].x = v_id;
-    FsOut[id].y = -5; 
-    FsOut[id].z = ov_id; 
+    FsOut[id].y = -5;
+    FsOut[id].z = ov_id;
     FsOut[id].w = -5;
   }
 }
@@ -80,7 +80,7 @@ __kernel void add_center(
   FaceIndex fi;
   uint v_id, ov_id;
   float4 center;
-  float4 zero = {0.0,0.0,0.0,0.0}; 
+  float4 zero = {0.0,0.0,0.0,0.0};
 
   for(face_id=0; face_id < noFs; face_id++) {
       FaceIndex fi = FiIn[face_id];
@@ -88,7 +88,7 @@ __kernel void add_center(
       center = VsOut[ov_id];
       center.w = 0.0;
       for(i=0; i < fi.len; i++) {
-	  int v_id = FsIn[fi.start+i];	  
+	  int v_id = FsIn[fi.start+i];
 	  float4 v = VsOut[v_id];
 	  uint he_c = trunc(v.w);
 	  he_c = he_c % 4;
@@ -150,13 +150,13 @@ __kernel void gen_edges(__global float4 *VsIn,
       center /= 4.0;
       center.w = 16.0; // Valance 4 and 0 hard edges ((4 << 2) | 2)
   }
-  
+
   // New vertex at edge center position
   VsOut[ov_id] = center;
-  // Complete faces 
+  // Complete faces
   int F11=-1,F12=-1,F21=-1,F22=-1, CCW1,CCW2;
   const int oe_id = edge_id*4;
-  // Be sure to create faces with the correct order   
+  // Be sure to create faces with the correct order
   if(edge.z >= 0) { // Edge is not a border
       FaceIndex IF1 = FiIn[edge.z];
       find_faces(edge.x,edge.y,IF1,FsIn,&F11,&F12,&CCW1);
@@ -187,7 +187,7 @@ __kernel void gen_edges(__global float4 *VsIn,
   } else {
       EsOut[oe_id+1] = hole_edge;
   }
-  // Hmm init only when declaring var on nvidia? 
+  // Hmm init only when declaring var on nvidia?
   const int4 e2 = {hov_id,edge.x,F11,F21};
   EsOut[oe_id+2] = e2;
   const int4 e3 = {hov_id,edge.y,F12,F22};
@@ -204,7 +204,7 @@ __kernel void add_edge_verts(
 {
   const int thread = get_global_id(0);
   if (thread >= 1) return;  // Should only run by one "thread"
-  
+
   int id;
   int4 edge;
   float4 v0,v1;
@@ -224,8 +224,8 @@ __kernel void add_edge_verts(
 	  } else { // Only add soft edges if vertex have <2 hardedges
 	      v0 = VsIn[edge.x];
 	      v1 = VsIn[edge.y];
-	      
-	      hard_v0 = trunc(v0.w);	  
+
+	      hard_v0 = trunc(v0.w);
 	      hard_v1 = trunc(v1.w);
 	      hard_v0 = hard_v0 % 4;
 	      hard_v1 = hard_v1 % 4;
@@ -234,11 +234,11 @@ __kernel void add_edge_verts(
 		  VsOut[edge.y] += v0;
 	      }
 	      if(hard_v0 < 2) {
-		  v1.w = 0.0;	  
+		  v1.w = 0.0;
 		  VsOut[edge.x] += v1;
 	      }
 	  }
-      }    
+      }
   }
 }
 
@@ -252,7 +252,7 @@ __kernel void move_verts(
   const int v_id = get_global_id(0);
   if(v_id >= noOutVs)
     return;
-  if(v_id >= noInVs) {  
+  if(v_id >= noInVs) {
     // Copy buffer VsIn and VsOut should be equal
     // after this pass
     VsIn[v_id] = VsOut[v_id];
@@ -260,8 +260,8 @@ __kernel void move_verts(
   }
   float4 v_in  = VsIn[v_id];
   float4 v_out = VsOut[v_id];
-  uint hc = trunc(v_in.w);  
-  uint vc = hc; 
+  uint hc = trunc(v_in.w);
+  uint vc = hc;
   hc = hc % 4;
   vc = vc / 4;
   if(hc < 2) {
@@ -312,8 +312,8 @@ __kernel void create_vab(
 	// Output V1
 	Vab[vab+0] = v1.x;  Vab[vab+3] = normal.x;
 	Vab[vab+1] = v1.y;  Vab[vab+4] = normal.y;
-	Vab[vab+2] = v1.z;  Vab[vab+5] = normal.z;   
-	// Output V2        
+	Vab[vab+2] = v1.z;  Vab[vab+5] = normal.z;
+	// Output V2
 	Vab[vab+6] = v2.x;  Vab[vab+9]  = normal.x;
 	Vab[vab+7] = v2.y;  Vab[vab+10] = normal.y;
 	Vab[vab+8] = v2.z;  Vab[vab+11] = normal.z;
@@ -324,7 +324,7 @@ __kernel void create_vab(
 	// Output V4
 	Vab[vab+18] = v4.x; Vab[vab+21] = normal.x;
 	Vab[vab+19] = v4.y; Vab[vab+22] = normal.y;
-	Vab[vab+20] = v4.z; Vab[vab+23] = normal.z;    
+	Vab[vab+20] = v4.z; Vab[vab+23] = normal.z;
     }
 }
 __kernel void collect_face_info(
@@ -335,7 +335,7 @@ __kernel void collect_face_info(
 				)
 {
     const int id = get_global_id(0);
-    if(id >= noFs) 
+    if(id >= noFs)
 	return;
     const int f_sz = 4*6;
     int4 face = Fs[id];
@@ -345,11 +345,11 @@ __kernel void collect_face_info(
     v3 = Vs[face.z];
     v4 = Vs[face.w];
     normal = normalize(cross(v3-v1,v4-v2));
-    // Output V1    
+    // Output V1
     Vab[id*f_sz+0] = v1.x;  Vab[id*f_sz+3] = normal.x;
     Vab[id*f_sz+1] = v1.y;  Vab[id*f_sz+4] = normal.y;
-    Vab[id*f_sz+2] = v1.z;  Vab[id*f_sz+5] = normal.z;   
-    // Output V2        
+    Vab[id*f_sz+2] = v1.z;  Vab[id*f_sz+5] = normal.z;
+    // Output V2
     Vab[id*f_sz+6] = v2.x;  Vab[id*f_sz+9]  = normal.x;
     Vab[id*f_sz+7] = v2.y;  Vab[id*f_sz+10] = normal.y;
     Vab[id*f_sz+8] = v2.z;  Vab[id*f_sz+11] = normal.z;
@@ -360,14 +360,14 @@ __kernel void collect_face_info(
     // Output V4
     Vab[id*f_sz+18] = v4.x; Vab[id*f_sz+21] = normal.x;
     Vab[id*f_sz+19] = v4.y; Vab[id*f_sz+22] = normal.y;
-    Vab[id*f_sz+20] = v4.z; Vab[id*f_sz+23] = normal.z;    
+    Vab[id*f_sz+20] = v4.z; Vab[id*f_sz+23] = normal.z;
 }
 
 
 // Helpers
 // Find the order of faces so that vertices for a face
 // comes in the ccw order
-void find_faces(int V0, int V1, FaceIndex Fi, __global int *Fs, 
+void find_faces(int V0, int V1, FaceIndex Fi, __global int *Fs,
 		int * F1, int *F2, int *CCW)
 {
     int fva,fvb;

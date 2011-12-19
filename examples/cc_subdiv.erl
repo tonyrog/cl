@@ -1,18 +1,18 @@
 %%%-------------------------------------------------------------------
 %%% File    : cc_subdiv.erl
 %%% Author  : Dan Gudmundsson
-%%% Description : Catmull Clark subdivision in OpenCL 
+%%% Description : Catmull Clark subdivision in OpenCL
 %%%               The example is the same as I will use in wings3D
 %%% Created : 8 Feb 2011
 %%%-------------------------------------------------------------------
 -module(cc_subdiv).
 -compile(export_all).
 
--include_lib("wx/include/wx.hrl"). 
--include_lib("wx/include/gl.hrl"). 
+-include_lib("wx/include/wx.hrl").
+-include_lib("wx/include/gl.hrl").
 -include_lib("cl/include/cl.hrl").
 
--record(cli,      {context, kernels, q, cl, device, 
+-record(cli,      {context, kernels, q, cl, device,
 		   %% CL temp buffers and respective sizes
 		   vab, vab_sz=0, fl, fl_sz=0, fi, fi_sz=0}).
 -record(cl_mem,   {v, v_no, f, fs_no, e, e_no, fi, fi0}).
@@ -28,7 +28,7 @@
 -record(state, {f,    % wxFrame
 		cl,   % CL record above
 		gl,   % wxGLCanvas
-		orig, % Orig Mesh 
+		orig, % Orig Mesh
 		sd    % Sub Mesh
 	       }).
 
@@ -41,7 +41,7 @@ start() ->
     GLAttrs = [?WX_GL_RGBA,?WX_GL_DOUBLEBUFFER,0],
     Canvas = wxGLCanvas:new(Frame, [{attribList, GLAttrs},{size, {800,600}}]),
     Self = self(),
-    Redraw = fun(_Ev,_) ->   
+    Redraw = fun(_Ev,_) ->
 		     DC = wxPaintDC:new(Canvas),
  		     Self ! repaint,
  		     wxPaintDC:destroy(DC)
@@ -65,7 +65,7 @@ start() ->
     R.
 
 loop(R, S = #state{f=Frame, cl=CL}) ->
-    receive 
+    receive
 	#wx{event=#wxClose{}} ->
 	    quit;
 	#wx{id=?wxID_EXIT} ->
@@ -85,8 +85,8 @@ loop(R, S = #state{f=Frame, cl=CL}) ->
 draw(R, #state{gl=Canvas, orig=OrigMesh, sd=SDMesh}) ->
     gl:clear(?GL_COLOR_BUFFER_BIT bor ?GL_DEPTH_BUFFER_BIT),
     gl:matrixMode(?GL_MODELVIEW),
-    gl:loadIdentity(),  
-    glu:lookAt(15,15,15, 0,0,0, 0,1,0),    
+    gl:loadIdentity(),
+    glu:lookAt(15,15,15, 0,0,0, 0,1,0),
     drawBox(R),
     gl:disable(?GL_BLEND),
     gl:color4f(1.0,1.0,0.0,1.0),
@@ -135,8 +135,8 @@ subdiv_1(N,
     Args2 = [FsIn, FiIn, VsOut, NoFs, NoVs],
     W1 = cl_apply(add_center, Args2, 1, [W0], CL),
 
-    Args3 = [VsIn, FsIn, EsIn, FiIn, 
-	     VsOut, FsOut, EsOut, 
+    Args3 = [VsIn, FsIn, EsIn, FiIn,
+	     VsOut, FsOut, EsOut,
 	     NoFs, NoVs, NoEs],
     W2 = cl_apply(gen_edges, Args3, NoEs, [W1], CL),
     Args4 = [VsIn, VsOut, EsIn, NoEs],
@@ -146,7 +146,7 @@ subdiv_1(N,
     Wait = cl_apply(move_verts, Args5, NoVs1, [W3], CL),
     %% cl_vs("cvs_out3", N, VsOut, NoVs1, CL, Wait),
     [cl:release_event(Ev) || Ev <- [W0,W1,W2,W3]],
-    subdiv_1(N-1, Out, 
+    subdiv_1(N-1, Out,
 	      In#cl_mem{fi=FiOut, v_no=NoVs1+NoFs1+NoEs1,
 			fs_no=NoFs1*4, e_no=NoEs1*4},
 	      CL, [Wait]);
@@ -157,10 +157,10 @@ initCL() ->
     Opts = [],
     Prefered = proplists:get_value(cl_type, Opts, cpu),
     Other = [gpu,cpu] -- [Prefered],
-    CL = case clu:setup(Prefered) of 
-	     {error, _} -> 
+    CL = case clu:setup(Prefered) of
+	     {error, _} ->
 		 case clu:setup(Other) of
-		     {error, R} -> 
+		     {error, R} ->
 			 exit({no_opencl_device, R});
 		     Cpu -> Cpu
 		 end;
@@ -181,7 +181,7 @@ initCL() ->
 	{error, {Err={error,build_program_failure}, _}} ->
 	    %% io:format("~s", [Str]),
 	    exit(Err);
-	{ok, Program} -> 
+	{ok, Program} ->
 	    {ok, MaxWGS} = cl:get_device_info(Device, max_work_group_size),
 	    {ok, Kernels0} = cl:create_kernels_in_program(Program),
 	    Kernels = [kernel_info(K,Device, MaxWGS) || K <- Kernels0],
@@ -205,7 +205,7 @@ cl_apply(Name, Args, No, Wait, #cli{q=Q, kernels=Ks}) ->
 	    io:format("Bad args ~p: ~p~n",[Name, Args]),
 	    erlang:raise(error,Reason, erlang:get_stacktrace())
     end,
-    {GWG,WG} = if  No > WG0  -> 
+    {GWG,WG} = if  No > WG0  ->
 		       {(1+(No div WG0))*WG0, WG0};
 		   true -> {No,No}
 	       end,
@@ -218,11 +218,11 @@ cl_allocate(Base, CL0=#cli{context=Ctxt}) ->
     {ok,FsIn}  = cl:create_buffer(Ctxt, [], MaxFs*16),
     {ok,EsIn}  = cl:create_buffer(Ctxt, [], MaxEs*16),
     {ok,VsIn}  = cl:create_buffer(Ctxt, [], MaxVs*16),
-    
+
     {ok,FsOut} = cl:create_buffer(Ctxt, [], MaxFs*16),
     {ok,EsOut} = cl:create_buffer(Ctxt, [], MaxEs*16),
     {ok,VsOut} = cl:create_buffer(Ctxt, [], MaxVs*16),
-   
+
     CL = #cli{fi=FiOut} = check_temp_buffs(CL0, MaxFs),
     FiIn = FiOut,
     {#cl_mem{v=VsIn, f=FsIn, e=EsIn, fi=FiIn, fi0=FiIn,
@@ -231,30 +231,30 @@ cl_allocate(Base, CL0=#cli{context=Ctxt}) ->
 	     v_no=NoVs+NoFs+NoEs, fs_no=NoFs1, e_no=NoEs*4},
      CL}.
 
-cl_write_input(#base{f=Fs,e=Es,v=Vs}, 
-	       #cl_mem{v=VsIn,f=FsIn,e=EsIn}, #cl_mem{v=VsOut}, 
+cl_write_input(#base{f=Fs,e=Es,v=Vs},
+	       #cl_mem{v=VsIn,f=FsIn,e=EsIn}, #cl_mem{v=VsOut},
 	       #cli{q=Q}) ->
     {ok, W1} = cl:enqueue_write_buffer(Q,  VsIn, 0, byte_size(Vs), Vs, []),
     {ok, W2} = cl:enqueue_write_buffer(Q, VsOut, 0, byte_size(Vs), Vs, []),
     {ok, W3} = cl:enqueue_write_buffer(Q,  FsIn, 0, byte_size(Fs), Fs, []),
     {ok, W4} = cl:enqueue_write_buffer(Q,  EsIn, 0, byte_size(Es), Es, []),
     [W1,W2,W3,W4].
-    
+
 cl_release(#cl_mem{v=Vs,f=Fs,e=Es, fi0=Fi0}, All) ->
     Vs /= undefined andalso cl:release_mem_object(Vs),
     Fs /= undefined andalso cl:release_mem_object(Fs),
     Es /= undefined andalso cl:release_mem_object(Es),
     All andalso cl:release_mem_object(Fi0).
 
-check_temp_buffs(CL=#cli{context=Ctxt, 
-			 vab=Vab0, vab_sz=VabSz0, 
-			 fl=FL0, fl_sz=FLSz0, 
+check_temp_buffs(CL=#cli{context=Ctxt,
+			 vab=Vab0, vab_sz=VabSz0,
+			 fl=FL0, fl_sz=FLSz0,
 			 fi=Fi0, fi_sz=FiSz0}, MaxFs0) ->
-    MaxFs = trunc(MaxFs0*1.5),  
+    MaxFs = trunc(MaxFs0*1.5),
     %% Overallocate so we don't need new buffers all the time
-    GenFi = fun() -> 
-		    << <<(C*4):?I32, 4:?I32>> || 
-			C <- lists:seq(0, MaxFs-1) >> 
+    GenFi = fun() ->
+		    << <<(C*4):?I32, 4:?I32>> ||
+			C <- lists:seq(0, MaxFs-1) >>
 	    end,
     {Vab,VabSz} = check_temp(Vab0,VabSz0,MaxFs*(3+3)*4*4,
 			     Ctxt,[write_only],none),
@@ -262,13 +262,13 @@ check_temp_buffs(CL=#cli{context=Ctxt,
 			   Ctxt,[read_only],none),
     {Fi,FiSz} = check_temp(Fi0,FiSz0,MaxFs*2*4,
 			   Ctxt,[read_only],GenFi),
-    CLI = CL#cli{vab=Vab, vab_sz=VabSz, 
-		 fl=FL, fl_sz=FLSz, 
+    CLI = CL#cli{vab=Vab, vab_sz=VabSz,
+		 fl=FL, fl_sz=FLSz,
 		 fi=Fi, fi_sz=FiSz},
     put({?MODULE, cl}, CLI),
     CLI.
 
-check_temp(Buff, Current, Req, _, _, _) 
+check_temp(Buff, Current, Req, _, _, _)
   when Current >= Req ->
     {Buff, Current};
 check_temp(undefined, _, Req, Ctxt, Opt, none) ->
@@ -285,26 +285,26 @@ verify_size(#base{f=Fs, e=Es, v=Vs, level=N}, #cli{device=Device}) ->
     NoFs = size(Fs) div 16,
     NoEs = size(Es) div 16,
     NoVs = size(Vs) div 16,
-    
+
     {ok, DevTotal} = cl:get_device_info(Device, max_mem_alloc_size),
     Res = verify_size_1(N-1, N, NoFs*4, NoEs*4, NoVs+NoEs+NoFs, DevTotal),
     case Res of
-	false -> 
+	false ->
 	    io:format("Can not subdivide, out of memory~n",[]),
 	    exit(out_of_memory);
 	{MaxFs, MaxEs, MaxVs} ->
 	    {NoFs, NoEs, NoVs, NoFs*4, MaxFs, MaxEs, MaxVs}
     end.
-	
+
 verify_size_1(N, No, Fs, Es, Vs, CardMax) ->
     VertexSz = (3+3)*4*4,
     Total = Fs*VertexSz+2*(Fs*16+Es*16+Vs*16),
     case Total < CardMax of
 	true when N == 0 ->
 	    {Fs,Es,Vs};
-	true -> 
+	true ->
 	    case verify_size_1(N-1, No, Fs*4, Es*4, Vs+Fs+Es, CardMax) of
-		false -> 
+		false ->
 		    io:format("Out of memory, does not meet the number of sub-division"
 			      "levels ~p(~p)~n",[No-N,No]),
 		    {Fs,Es,Vs};
@@ -324,7 +324,7 @@ initGL(Canvas) ->
     gl:matrixMode(?GL_PROJECTION),
     gl:loadIdentity(),
     gl:ortho( -10.0, 10.0, -10.0*H/W, 10.0*H/W, -100.0, 100.0),
-    
+
     gl:enable(?GL_DEPTH_TEST),
     gl:depthFunc(?GL_LESS),
     gl:clearColor(0.8,0.8,0.8,1.0),
@@ -333,7 +333,7 @@ initGL(Canvas) ->
     %% Nowadays you should really use a shader to do the lighting but I'm lazy.
     gl:enable(?GL_COLOR_MATERIAL),
     gl:enable(?GL_LIGHTING),
-    gl:lightfv(?GL_LIGHT0, ?GL_DIFFUSE,  {1,1,1,1}), 
+    gl:lightfv(?GL_LIGHT0, ?GL_DIFFUSE,  {1,1,1,1}),
     gl:lightfv(?GL_LIGHT0, ?GL_SPECULAR, {0.5,0.5,0.5,1}),
     gl:lightfv(?GL_LIGHT0, ?GL_POSITION, {0.71,0.71,0.0,0.0}),
     gl:enable(?GL_LIGHT0),
@@ -343,16 +343,16 @@ initGL(Canvas) ->
 
 -define(VS, {{ 0.5,  0.5, -0.5},  %1
 	     { 0.5, -0.5, -0.5},  %2
-	     {-0.5, -0.5, -0.5},   
+	     {-0.5, -0.5, -0.5},
 	     {-0.5,  0.5, -0.5},  %4
 	     {-0.5,  0.5,  0.5},
 	     { 0.5,  0.5,  0.5},  %6
-	     { 0.5, -0.5,  0.5}, 
+	     { 0.5, -0.5,  0.5},
 	     {-0.5, -0.5,  0.5}}).%8
 
--define(FS, 
-	%% Faces    Normal   
-	[{{1,2,3,4},{0,0,-1} },   % 
+-define(FS,
+	%% Faces    Normal
+	[{{1,2,3,4},{0,0,-1} },   %
 	 {{3,8,5,4},{-1,0,0}},   %
 	 {{1,6,7,2},{1,0,0} },   %
 	 {{6,5,8,7},{0,0,1} },   %
@@ -364,7 +364,7 @@ drawBox(Deg) ->
     gl:loadIdentity(),
     gl:rotatef(Deg, 0.0, 1.0, 0.3),
     gl:rotatef(20, 1.0, 0.0, 1.0),
-    gl:'begin'(?GL_QUADS),    
+    gl:'begin'(?GL_QUADS),
     lists:foreach(fun(Face) -> drawFace(Face,?VS) end, ?FS),
     gl:'end'().
 
@@ -382,8 +382,8 @@ setup_menus(Frame) ->
     true = wxMenuBar:append(MenuBar, Menu, "File"),
     wxMenu:append(Menu, ?wxID_ABOUT,"About"),
     wxMenu:append(Menu, ?wxID_EXIT, "Quit"),
-    
-    ok = wxFrame:connect(Frame, command_menu_selected), 
+
+    ok = wxFrame:connect(Frame, command_menu_selected),
     ok = wxFrame:setMenuBar(Frame,MenuBar).
 
 about_box(Frame, #cli{device=Device}) ->
@@ -391,7 +391,7 @@ about_box(Frame, #cli{device=Device}) ->
     OsInfo = [wx_misc:getOsDescription(),gl:getString(?GL_VENDOR),
 	      gl:getString(?GL_RENDERER),gl:getString(?GL_VERSION)],
 
-    DeviceInfo = [{Type, cl:get_device_info(Device, Type)} 
+    DeviceInfo = [{Type, cl:get_device_info(Device, Type)}
 		  || Type <- [name, vendor, version]],
 
     spawn(fun() ->
@@ -400,15 +400,15 @@ about_box(Frame, #cli{device=Device}) ->
 		      " OpenCL and OpenGL, Catmull-Clark subdivision is done in OpenCL\n"
 		      " The transparent \"box\" is the original mesh and the subdivided"
 		      " yellow pipes is the result of the subdivision\n\n",
-		  
+
 		  Info = io_lib:format("Os:         ~s~n~nGL Vendor:     ~s~n"
 				       "GL Renderer:  ~s~nGL Version:    ~s~n",
-				       OsInfo), 
+				       OsInfo),
 		  CLInfo = [io_lib:format("~-25.w   ~s~n",[Type,I]) ||
 			       {Type, {ok, I}} <- DeviceInfo],
 
-		  MD = wxMessageDialog:new(Frame, [Str, Info, "\nOpenCL info:\n",CLInfo], 
-					   [{style, ?wxOK}, 
+		  MD = wxMessageDialog:new(Frame, [Str, Info, "\nOpenCL info:\n",CLInfo],
+					   [{style, ?wxOK},
 					    {caption, "Opengl Example"}]),
 		  wxDialog:showModal(MD),
 		  wxDialog:destroy(MD)
@@ -502,7 +502,7 @@ edges() ->
       255,255,255,55,0,0,0,47,0,0,0,255,255,255,255,7,0,0,0,55,0,0,0,46,0,0,
       0,47,0,0,0>>.
 
-verts() -> 
+verts() ->
     <<0,0,128,191,0,0,128,63,0,0,128,63,0,0,192,65,0,0,128,191,0,0,128,191,0,
       0,128,63,0,0,192,65,0,0,128,191,0,0,128,63,205,204,140,63,0,0,128,65,0,
       0,128,191,0,0,128,191,205,204,140,63,0,0,128,65,0,0,128,63,0,0,128,191,

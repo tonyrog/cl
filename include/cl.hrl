@@ -62,14 +62,14 @@
 -define(cl_pointer(X),  X:?POINTER_SIZE/native-unsigned-integer).
 -define(cl_size(X),     X:?SIZE_SIZE/native-unsigned-integer).
 
-%% vector types,  OpenCL requires that all types be naturally aligned. 
+%% vector types,  OpenCL requires that all types be naturally aligned.
 -define(cl_char2(X1,X2), ?cl_char(X1), ?cl_char(X2)).
 -define(cl_char4(X1,X2,X3,X4),
 	?cl_char(X1), ?cl_char(X2), ?cl_char(X3), ?cl_char(X4)).
--define(cl_char8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_char8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_char(X1), ?cl_char(X2), ?cl_char(X3), ?cl_char(X4),
 	?cl_char(X5), ?cl_char(X6), ?cl_char(X7), ?cl_char(X8)).
--define(cl_char16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_char16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_char(X1), ?cl_char(X2), ?cl_char(X3), ?cl_char(X4),
 	?cl_char(X5), ?cl_char(X6), ?cl_char(X7), ?cl_char(X8),
 	?cl_char(X9), ?cl_char(X10), ?cl_char(X11), ?cl_char(X12),
@@ -78,10 +78,10 @@
 -define(cl_uchar2(X1,X2), ?cl_uchar(X1), ?cl_uchar(X2)).
 -define(cl_uchar4(X1,X2,X3,X4),
 	?cl_uchar(X1), ?cl_uchar(X2), ?cl_uchar(X3), ?cl_uchar(X4)).
--define(cl_uchar8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_uchar8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_uchar(X1), ?cl_uchar(X2), ?cl_uchar(X3), ?cl_uchar(X4),
 	?cl_uchar(X5), ?cl_uchar(X6), ?cl_uchar(X7), ?cl_uchar(X8)).
--define(cl_uchar16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_uchar16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_uchar(X1), ?cl_uchar(X2), ?cl_uchar(X3), ?cl_uchar(X4),
 	?cl_uchar(X5), ?cl_uchar(X6), ?cl_uchar(X7), ?cl_uchar(X8),
 	?cl_uchar(X9), ?cl_uchar(X10), ?cl_uchar(X11), ?cl_uchar(X12),
@@ -90,10 +90,10 @@
 -define(cl_short2(X1,X2), ?cl_short(X1), ?cl_short(X2)).
 -define(cl_short4(X1,X2,X3,X4),
 	?cl_short(X1), ?cl_short(X2), ?cl_short(X3), ?cl_short(X4)).
--define(cl_short8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_short8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_short(X1), ?cl_short(X2), ?cl_short(X3), ?cl_short(X4),
 	?cl_short(X5), ?cl_short(X6), ?cl_short(X7), ?cl_short(X8)).
--define(cl_short16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_short16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_short(X1), ?cl_short(X2), ?cl_short(X3), ?cl_short(X4),
 	?cl_short(X5), ?cl_short(X6), ?cl_short(X7), ?cl_short(X8),
 	?cl_short(X9), ?cl_short(X10), ?cl_short(X11), ?cl_short(X12),
@@ -102,10 +102,10 @@
 -define(cl_ushort2(X1,X2), ?cl_ushort(X1), ?cl_ushort(X2)).
 -define(cl_ushort4(X1,X2,X3,X4),
 	?cl_ushort(X1), ?cl_ushort(X2), ?cl_ushort(X3), ?cl_ushort(X4)).
--define(cl_ushort8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_ushort8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_ushort(X1), ?cl_ushort(X2), ?cl_ushort(X3), ?cl_ushort(X4),
 	?cl_ushort(X5), ?cl_ushort(X6), ?cl_ushort(X7), ?cl_ushort(X8)).
--define(cl_ushort16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_ushort16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_ushort(X1), ?cl_ushort(X2), ?cl_ushort(X3), ?cl_ushort(X4),
 	?cl_ushort(X5), ?cl_ushort(X6), ?cl_ushort(X7), ?cl_ushort(X8),
 	?cl_ushort(X9), ?cl_ushort(X10), ?cl_ushort(X11), ?cl_ushort(X12),
@@ -114,10 +114,10 @@
 -define(cl_int2(X1,X2), ?cl_int(X1), ?cl_int(X2)).
 -define(cl_int4(X1,X2,X3,X4),
 	?cl_int(X1), ?cl_int(X2), ?cl_int(X3), ?cl_int(X4)).
--define(cl_int8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_int8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_int(X1), ?cl_int(X2), ?cl_int(X3), ?cl_int(X4),
 	?cl_int(X5), ?cl_int(X6), ?cl_int(X7), ?cl_int(X8)).
--define(cl_int16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_int16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_int(X1), ?cl_int(X2), ?cl_int(X3), ?cl_int(X4),
 	?cl_int(X5), ?cl_int(X6), ?cl_int(X7), ?cl_int(X8),
 	?cl_int(X9), ?cl_int(X10), ?cl_int(X11), ?cl_int(X12),
@@ -126,10 +126,10 @@
 -define(cl_uint2(X1,X2), ?cl_uint(X1), ?cl_uint(X2)).
 -define(cl_uint4(X1,X2,X3,X4),
 	?cl_uint(X1), ?cl_uint(X2), ?cl_uint(X3), ?cl_uint(X4)).
--define(cl_uint8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_uint8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_uint(X1), ?cl_uint(X2), ?cl_uint(X3), ?cl_uint(X4),
 	?cl_uint(X5), ?cl_uint(X6), ?cl_uint(X7), ?cl_uint(X8)).
--define(cl_uint16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_uint16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_uint(X1), ?cl_uint(X2), ?cl_uint(X3), ?cl_uint(X4),
 	?cl_uint(X5), ?cl_uint(X6), ?cl_uint(X7), ?cl_uint(X8),
 	?cl_uint(X9), ?cl_uint(X10), ?cl_uint(X11), ?cl_uint(X12),
@@ -138,10 +138,10 @@
 -define(cl_long2(X1,X2), ?cl_long(X1), ?cl_long(X2)).
 -define(cl_long4(X1,X2,X3,X4),
 	?cl_long(X1), ?cl_long(X2), ?cl_long(X3), ?cl_long(X4)).
--define(cl_long8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_long8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_long(X1), ?cl_long(X2), ?cl_long(X3), ?cl_long(X4),
 	?cl_long(X5), ?cl_long(X6), ?cl_long(X7), ?cl_long(X8)).
--define(cl_long16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_long16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_long(X1), ?cl_long(X2), ?cl_long(X3), ?cl_long(X4),
 	?cl_long(X5), ?cl_long(X6), ?cl_long(X7), ?cl_long(X8),
 	?cl_long(X9), ?cl_long(X10), ?cl_long(X11), ?cl_long(X12),
@@ -150,10 +150,10 @@
 -define(cl_ulong2(X1,X2), ?cl_ulong(X1), ?cl_ulong(X2)).
 -define(cl_ulong4(X1,X2,X3,X4),
 	?cl_ulong(X1), ?cl_ulong(X2), ?cl_ulong(X3), ?cl_ulong(X4)).
--define(cl_ulong8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_ulong8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_ulong(X1), ?cl_ulong(X2), ?cl_ulong(X3), ?cl_ulong(X4),
 	?cl_ulong(X5), ?cl_ulong(X6), ?cl_ulong(X7), ?cl_ulong(X8)).
--define(cl_ulong16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_ulong16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_ulong(X1), ?cl_ulong(X2), ?cl_ulong(X3), ?cl_ulong(X4),
 	?cl_ulong(X5), ?cl_ulong(X6), ?cl_ulong(X7), ?cl_ulong(X8),
 	?cl_ulong(X9), ?cl_ulong(X10), ?cl_ulong(X11), ?cl_ulong(X12),
@@ -162,10 +162,10 @@
 -define(cl_float2(X1,X2), ?cl_float(X1), ?cl_float(X2)).
 -define(cl_float4(X1,X2,X3,X4),
 	?cl_float(X1), ?cl_float(X2), ?cl_float(X3), ?cl_float(X4)).
--define(cl_float8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_float8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_float(X1), ?cl_float(X2), ?cl_float(X3), ?cl_float(X4),
 	?cl_float(X5), ?cl_float(X6), ?cl_float(X7), ?cl_float(X8)).
--define(cl_float16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_float16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_float(X1), ?cl_float(X2), ?cl_float(X3), ?cl_float(X4),
 	?cl_float(X5), ?cl_float(X6), ?cl_float(X7), ?cl_float(X8),
 	?cl_float(X9), ?cl_float(X10), ?cl_float(X11), ?cl_float(X12),
@@ -174,10 +174,10 @@
 -define(cl_double2(X1,X2), ?cl_double(X1), ?cl_double(X2)).
 -define(cl_double4(X1,X2,X3,X4),
 	?cl_double(X1), ?cl_double(X2), ?cl_double(X3), ?cl_double(X4)).
--define(cl_double8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_double8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_double(X1), ?cl_double(X2), ?cl_double(X3), ?cl_double(X4),
 	?cl_double(X5), ?cl_double(X6), ?cl_double(X7), ?cl_double(X8)).
--define(cl_double16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
+-define(cl_double16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
 	?cl_double(X1), ?cl_double(X2), ?cl_double(X3), ?cl_double(X4),
 	?cl_double(X5), ?cl_double(X6), ?cl_double(X7), ?cl_double(X8),
 	?cl_double(X9), ?cl_double(X10), ?cl_double(X11), ?cl_double(X12),
