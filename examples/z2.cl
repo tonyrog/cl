@@ -4,8 +4,8 @@
 // f(n) = f(n)^2 + c
 //
 
-__kernel void z2(const float x, const float y, 
-		 const float xs, const float ys, 
+__kernel void z2(const float x, const float y,
+		 const float xs, const float ys,
 		 const unsigned int n,
 		 __global unsigned int* out)
 {

@@ -1,7 +1,7 @@
 Welcome to the Erlang OpenCL binding
 
 To get started you need erlang, preferably R14. You also need
-GCC and a machine with OpenCL installed. 
+GCC and a machine with OpenCL installed.
 
 To build: just run make
 
@@ -9,7 +9,7 @@ To build examples: Goto the examples directory and run make.
 
 Make sure erlang finds the cl/ebin directory.
 
-Windows Users: 
+Windows Users:
 I'm assuming you got an mingw environment, otherwise you are on your own.
 
 mkdir -p /opt/local/include/CL
@@ -30,7 +30,7 @@ OpenCL with ATI drivers for CPU usage don't work when erlang
 is started within a mingw shell but does if you start it from
 a Windows CMD.exe shell.
 
-If you don't like mingws compiler you can use Microsoft compiler by running 
+If you don't like mingws compiler you can use Microsoft compiler by running
 $ make MCL=true
 This assumes that you have all the environment variables set.
 They can be set by adding first in your 'msys.bat':

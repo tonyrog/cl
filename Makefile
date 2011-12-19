@@ -10,6 +10,6 @@ all32:
 doc:
 	(cd src; make edoc)
 
-clean:  
+clean:
 	(cd c_src; make $@)
 	(cd src; make $@)

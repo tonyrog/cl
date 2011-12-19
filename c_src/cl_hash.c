@@ -1,5 +1,5 @@
 /*
-** Linear hash 
+** Linear hash
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -170,7 +170,7 @@ static void lhash_shrink(lhash_t* lh)
 	lh->p--;
 
     bp = &LHASH_BUCKET(lh, lh->p);
-    while(*bp != 0) 
+    while(*bp != 0)
 	bp = &(*bp)->next;
 
     *bp = LHASH_BUCKET(lh, lh->nactive);
@@ -192,7 +192,7 @@ lhash_t* lhash_new(char* name, int thres, lhash_func_t* func)
 
     if (!(tp = (lhash_t*) malloc(sizeof(lhash_t))))
 	return 0;
-    
+
     if (!lhash_init(tp, name, thres, func)) {
 	free(tp);
 	return 0;
@@ -342,7 +342,7 @@ void lhash_info(lhash_t* lh)
     }
     printf("  Name: %s\r\n", lh->name);
     printf("  Size: %d\r\n", lh->szm+1);
-    printf("Active: %d\r\n", lh->nactive);    
+    printf("Active: %d\r\n", lh->nactive);
     printf(" Split: %d\r\n", lh->p);
     printf(" Items: %d\r\n", lh->nitems);
     printf(" Slots: %d\r\n", lh->nslots);

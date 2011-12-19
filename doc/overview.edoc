@@ -3,7 +3,7 @@
 @title Erlang binding to OpenCL 1.0.
 @doc This is a binding to OpenCL. You can find
 the PDF specification at http://www.khronos.org/opencl. This API will
-conform as close as possible to the C specification. In cases where the API 
+conform as close as possible to the C specification. In cases where the API
 has special quirks or features, this will be noted.
 
 

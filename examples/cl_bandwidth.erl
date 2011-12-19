@@ -16,7 +16,7 @@ test_data(Length) ->
 
 test() ->
     test(all).
-    
+
 test(DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
     Data = test_data(?DATA_SIZE),
@@ -24,7 +24,7 @@ test(DevType) ->
 
 test(Length, DevType) when is_number(Length) ->
     Data = test_data(Length),
-    run(Data, DevType).    
+    run(Data, DevType).
 
 %%
 %% execute a kernel that squares floating point numbers
@@ -51,7 +51,7 @@ run(Data, DevType) ->
 	write_loop(1000, Queue, Input, Data, N),
 
     io:format("Bandwidth tested with write size: ~p bytes\n\n", [N]),
-    
+
     io:format("Write total milliseconds: ~p\n", [WriteTotal]),
     io:format("Bandwidth rate: ~p KB per second\n\n", [trunc((N / (WriteTotal/1000))/1024)]),
 
@@ -85,9 +85,9 @@ write_loop(I, Queue, Mem, Data, N, TBest, TQBest) ->
 	    write_loop(I-1, Queue, Mem, Data, N, TBest, TQBest)
     end.
 
-	    
-	    
 
 
-    
-    
+
+
+
+

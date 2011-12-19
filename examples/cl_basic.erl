@@ -28,11 +28,11 @@ test(DevType) ->
     io:format("Context2: ~p\n", [ContextInfo2]),
 
     foreach(fun(Device) ->
-		    test_queue(E, Device)  end, 
+		    test_queue(E, Device)  end,
 	    E#cl.devices),
 
     foreach(fun(Device) ->
-		    test_sampler(E, Device)  end, 
+		    test_sampler(E, Device)  end,
 	    E#cl.devices),
 
     test_program(E#cl.context, E#cl.devices),
@@ -87,7 +87,7 @@ __kernel void program1(int n, int m) {
 				{ok,EventInfo} = cl:get_event_info(Event),
 				io:format("EventInfo: ~p\n", [EventInfo]),
 				cl:flush(Queue),
-				io:format("Event Status:=~p\n", 
+				io:format("Event Status:=~p\n",
 					  [cl:wait(Event,1000)])
 			end, Kernels)
 	      end, DeviceList),
@@ -102,7 +102,7 @@ __kernel void program1(int n, int m) {
     end,
     cl:release_program(Program),
     ok.
-    
+
 
 test_queue(E, Device) ->
     {ok,Queue} = cl:create_queue(E#cl.context,Device,[]),
@@ -111,14 +111,14 @@ test_queue(E, Device) ->
     io:format("QueueInfo: ~p\n", [QueueInfo]),
     cl:release_queue(Queue),
     ok.
-    
+
 
 test_buffer(E) ->
     %% Read/Write buffer
     {ok,Buffer} = cl:create_buffer(E#cl.context,[read_write],1024),
     io:format("Buffer: ~p\n", [Buffer]),
     {ok,BufferInfo} = cl:get_mem_object_info(Buffer),
-    io:format("BufferInfo: ~p\n", [BufferInfo]),    
+    io:format("BufferInfo: ~p\n", [BufferInfo]),
     cl:release_mem_object(Buffer),
 
     %% Read only buffer
@@ -130,7 +130,7 @@ test_buffer(E) ->
     cl:release_mem_object(Buffer2),
     ok.
 
-    
+
 
 test_sampler(E, Device) ->
     {ok,DeviceInfo} = cl:get_device_info(Device),
@@ -143,7 +143,7 @@ test_sampler(E, Device) ->
 	    {ok,Sampler1Info} = cl:get_sampler_info(Sampler1),
 	    io:format("Sampler1Info: ~p\n", [Sampler1Info]),
 	    cl:release_sampler(Sampler1),
-	    
+
 	    %% Sampler2
 	    {ok,Sampler2} = cl:create_sampler(E#cl.context,false,repeat,linear),
 	    io:format("Sampler2: ~p\n", [Sampler2]),
@@ -152,12 +152,12 @@ test_sampler(E, Device) ->
 	    cl:release_sampler(Sampler2),
 	    ok;
 	false ->
-	    io:format("No image support for device ~s ~n",[Name])	    
+	    io:format("No image support for device ~s ~n",[Name])
     end.
 
 
 
-	      
-    
-    
-    
+
+
+
+

@@ -30,7 +30,7 @@ test0(Size) ->
     io:format("Res2 = ~p\n", [Res2]),
     {ok,E3} = cl:enqueue_read_buffer(Q, Buf, 0, N, []),
     case cl:wait(E3,3000) of
-	{ok, Data} -> 
+	{ok, Data} ->
 	    io:format("read_buffer: verified\n"),
 	    ok;
 	Res3 ->
@@ -47,7 +47,7 @@ __kernel void program1(int n, int m) {
     int result = n + k;
 }
 ".
-    
+
 
 test1() ->
     test1(cpu, ok).
@@ -82,7 +82,7 @@ test1(Type, Prog) ->
     end.
 
 
-    
+
 
 make_buffer(0) ->  <<>>;
 make_buffer(1) ->  <<1>>;
@@ -94,7 +94,7 @@ make_buffer(N) ->
        true ->
 	    list_to_binary([Bin,Bin])
     end.
-    
+
 
 
 

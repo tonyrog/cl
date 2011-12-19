@@ -115,7 +115,7 @@ ifeq ($(WORDSIZE), 64)
 CFLAGS += -shared -I$(OPENCL_DIR)/include -m64 -DWIN32 -DWORDSIZE=64
 endif
 
-LD_SHARED	:= $(CC) -shared 
+LD_SHARED	:= $(CC) -shared
 
 ## Optimizations is broken on mingw 4.4.0 (it crashes with it on)
 GCC_VERSION = $(shell gcc -dumpversion)
@@ -218,7 +218,7 @@ config.64.build:	configure
 configure:	configure.in
 	autoheader; autoconf
 
-clean: 
+clean:
 	$(MAKE) clean_internal TYPE=release WORDSIZE=32
 	$(MAKE) clean_internal TYPE=debug   WORDSIZE=32
 	$(MAKE) clean_internal TYPE=release WORDSIZE=64
@@ -235,17 +235,17 @@ release:
 	$(MAKE) nif TYPE=release
 
 ifeq ($(CL_BUILD), false)
-nif: 
-	@echo 
+nif:
+	@echo
 	@echo Skipping nif for wordsize=$(WORDSIZE), not supported on this system
-	@echo 
+	@echo
 else
 nif: $(CL_NIF)
 endif
 
 depend:
 
-ifeq ($(WIN32_CL),No) 
+ifeq ($(WIN32_CL),No)
 clean_internal:
 	-rm -f $(OBJDIR)/$(WORDSIZE)/*.$(OBJ)
 	-rm -f $(LIBDIR)/$(WORDSIZE)/*.$(EXT)
