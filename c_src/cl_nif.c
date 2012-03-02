@@ -36,6 +36,10 @@ typedef cl_bool bool;
 #include "erl_nif.h"
 #include "cl_hash.h"
 
+// size_t has is long most of the time (but not win64)
+// FIXME WIN64
+#define ecl_get_sizet(a1,a2,a3) enif_get_ulong(a1,a2,(unsigned long*)a3)
+
 #define sizeof_array(a) (sizeof(a) / sizeof(a[0]))
 
 #ifdef DEBUG
@@ -1429,7 +1433,7 @@ static int get_enum(ErlNifEnv* env, const ERL_NIF_TERM key,
 	return 0;
     while(kv->key) {
 	if (*kv->key == key) {
-	    *num = kv->value;
+	    *num = (cl_uint) kv->value;
 	    return 1;
 	}
 	kv++;
@@ -1726,12 +1730,11 @@ error:
 static int ecl_thread_stop(ecl_thread_t* thr, void** exit_value)
 {
     ecl_message_t m;
-    int r;
 
     m.type   = ECL_MESSAGE_STOP;
     m.env    = 0;
     ecl_message_send(thr, &m);
-    r=enif_thread_join(thr->tid, exit_value);
+    enif_thread_join(thr->tid, exit_value);
     ecl_queue_destroy(&thr->q);
     enif_free(thr);
     return 0;
@@ -2042,8 +2045,8 @@ static int get_object_list(ErlNifEnv* env, const ERL_NIF_TERM term,
 
 
 
-static int get_ulong_list(ErlNifEnv* env, const ERL_NIF_TERM term,
-			  unsigned long* rvec, size_t* rlen)
+static int get_sizet_list(ErlNifEnv* env, const ERL_NIF_TERM term,
+			  size_t* rvec, size_t* rlen)
 {
     size_t maxlen = *rlen;
     size_t n = 0;
@@ -2053,7 +2056,7 @@ static int get_ulong_list(ErlNifEnv* env, const ERL_NIF_TERM term,
 	ERL_NIF_TERM head, tail;
 	
 	if (enif_get_list_cell(env, list, &head, &tail)) {
-	    if (!enif_get_ulong(env, head, rvec))
+	    if (!ecl_get_sizet(env, head, rvec))
 		return 0;
 	    n++;
 	    rvec++;
@@ -2099,15 +2102,23 @@ static int get_binary_list(ErlNifEnv* env, const ERL_NIF_TERM term,
 // Copy a "local" binary to a new process independent environment
 // fill the binary structure with the new data and return it.
 //
-static ERL_NIF_TERM ecl_copy_binary(ErlNifEnv* src_env, ErlNifEnv* dst_env,
-				    ErlNifBinary* bin)
+static int ecl_make_binary(ErlNifEnv* src_env,
+			   const ERL_NIF_TERM src,
+			   ErlNifEnv* dst_env,
+			   ErlNifBinary* bin)
 {
-    ERL_NIF_TERM b;
+    ERL_NIF_TERM ref_counted;
 
-    // make it a complete binary, may be a io_list !
-    b = enif_make_binary(src_env, bin);
-    // copy to destination environment
-    return enif_make_copy(dst_env, b); 
+    if (enif_is_binary(src_env, src)) {
+	// Update refc (and/or fix heap binaries)
+	ref_counted = enif_make_copy(dst_env, src);
+	return enif_inspect_binary(dst_env, ref_counted, bin);
+    } else {
+	//  iolist to binary
+	if (!enif_inspect_iolist_as_binary(src_env, src, bin))
+	    return 0;
+	return enif_make_binary(dst_env, bin);
+    }
 }
 
 
@@ -2817,7 +2828,7 @@ static ERL_NIF_TERM ecl_create_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_bitfields(env, argv[1], &mem_flags, kv_mem_flags))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[2], &size))
+    if (!ecl_get_sizet(env, argv[2], &size))
 	return enif_make_badarg(env);
     if (!enif_inspect_iolist_as_binary(env, argv[3], &bin))
 	return enif_make_badarg(env);
@@ -2877,11 +2888,11 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
 		  kv_channel_type))
 	return enif_make_badarg(env);	
 
-    if (!enif_get_ulong(env, argv[3], &width))
+    if (!ecl_get_sizet(env, argv[3], &width))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[4], &height))
+    if (!ecl_get_sizet(env, argv[4], &height))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[5], &row_pitch))
+    if (!ecl_get_sizet(env, argv[5], &row_pitch))
 	return enif_make_badarg(env);
 
     if (!enif_inspect_iolist_as_binary(env, argv[6], &bin))
@@ -2939,15 +2950,15 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
 		  kv_channel_type))
 	return enif_make_badarg(env);	
 
-    if (!enif_get_ulong(env, argv[3], &width))
+    if (!ecl_get_sizet(env, argv[3], &width))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[4], &height))
+    if (!ecl_get_sizet(env, argv[4], &height))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[5], &depth))
+    if (!ecl_get_sizet(env, argv[5], &depth))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[6], &row_pitch))
+    if (!ecl_get_sizet(env, argv[6], &row_pitch))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[7], &slice_pitch))
+    if (!ecl_get_sizet(env, argv[7], &slice_pitch))
 	return enif_make_badarg(env);
 
     if (!enif_inspect_iolist_as_binary(env, argv[8], &bin))
@@ -3548,32 +3559,32 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 		case OCL_CHAR:
 		    if (!enif_get_long(env, values[i], &lval))
 			return enif_make_badarg(env);
-		    *((cl_char*)ptr) = lval;
+		    *((cl_char*)ptr) = (cl_char) lval;
 		    break;
 		case OCL_UCHAR:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_uchar*)ptr) = luval;
+		    *((cl_uchar*)ptr) = (cl_uchar) luval;
 		    break;
 		case OCL_SHORT:
 		    if (!enif_get_long(env, values[i], &lval))
 			return enif_make_badarg(env);
-		    *((cl_short*)ptr) = lval;
+		    *((cl_short*)ptr) = (cl_short) lval;
 		    break;
 		case OCL_USHORT:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_ushort*)ptr) = luval;
+		    *((cl_ushort*)ptr) = (cl_ushort) luval;
 		    break;
 		case OCL_INT:
 		    if (!enif_get_long(env, values[i], &lval))
 			return enif_make_badarg(env);
-		    *((cl_int*)ptr) = lval;
+		    *((cl_int*)ptr) = (cl_int) lval;
 		    break;
 		case OCL_UINT:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_uint*)ptr) = luval;
+		    *((cl_uint*)ptr) = (cl_uint) luval;
 		    break;
 		case OCL_LONG:
 		    if (!enif_get_int64(env, values[i], &i64val))
@@ -3588,12 +3599,12 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 		case OCL_HALF:
 		    if (!enif_get_ulong(env, values[i], &luval))
 			return enif_make_badarg(env);
-		    *((cl_half*)ptr) = luval;
+		    *((cl_half*)ptr) = (cl_half) luval;
 		    break;
 		case OCL_FLOAT:
 		    if (!enif_get_double(env, values[i], &fval))
 			return enif_make_badarg(env);
-		    *((cl_float*)ptr) = fval;
+		    *((cl_float*)ptr) = (cl_float) fval;
 		    break;
 
 		case OCL_DOUBLE:
@@ -3635,7 +3646,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 	goto do_kernel_arg;
     }
     else if (enif_get_double(env, argv[2], &fval)) {
-	float_arg = fval;
+	float_arg = (float) fval;
 	arg_value = &float_arg;
 	arg_size = sizeof(float_arg);
 	goto do_kernel_arg;
@@ -3680,7 +3691,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg_size(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!enif_get_uint(env, argv[1], &arg_index))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[1], &arg_size))
+    if (!ecl_get_sizet(env, argv[1], &arg_size))
 	return enif_make_badarg(env);
 
     err = clSetKernelArg(o_kernel->obj.kernel,
@@ -3795,9 +3806,9 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_object(env, argv[1], &kernel_r, false, (void**) &kernel))
 	return enif_make_badarg(env);
-    if (!get_ulong_list(env, argv[2], global_work_size, &work_dim))
+    if (!get_sizet_list(env, argv[2], global_work_size, &work_dim))
 	return enif_make_badarg(env);	
-    if (!get_ulong_list(env, argv[3], local_work_size, &temp_dim))
+    if (!get_sizet_list(env, argv[3], local_work_size, &temp_dim))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[4], &event_r, false, 
 			 (void**) wait_list, &num_events))
@@ -3896,9 +3907,9 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_object(env, argv[1], &mem_r, false, (void**)&buffer))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[2], &offset))
+    if (!ecl_get_sizet(env, argv[2], &offset))
 	return enif_make_badarg(env);	
-    if (!enif_get_ulong(env, argv[3], &size))
+    if (!ecl_get_sizet(env, argv[3], &size))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[4], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -3957,32 +3968,32 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_object(env, argv[1], &mem_r, false, (void**)&buffer))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[2], &offset))
+    if (!ecl_get_sizet(env, argv[2], &offset))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[3], &size))
+    if (!ecl_get_sizet(env, argv[3], &size))
 	return enif_make_badarg(env);
-    if (!enif_inspect_binary(env, argv[4], &bin))
-	return enif_make_badarg(env);
+    /*  Check argv[4] (bin) last */
     if (!get_object_list(env, argv[5], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
     if (!get_bool(env, argv[6], &want_event))
 	return enif_make_badarg(env);
 
-    // handle binary and iolist as binary
-    if (bin.size < size) {   // FIXME: handle offset! 
-	return enif_make_badarg(env);
-    }
-
-    // copy the binary new environment 
     if (!(bin_env = enif_alloc_env())) {  // create binary environment
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
     }
+    if (!ecl_make_binary(env, argv[4], bin_env, &bin)) {
+	enif_free_env(bin_env);
+	return enif_make_badarg(env);
+    }
 
-    (void) ecl_copy_binary(env, bin_env, &bin);
+    // handle binary and iolist as binary
+    if (bin.size < size) {   // FIXME: handle offset!
+	return enif_make_badarg(env);
+    }
 
     err = clEnqueueWriteBuffer(o_queue->queue, buffer,
-			       CL_FALSE,
+			       !want_event, // FALSE for async
 			       offset,
 			       size,
 			       bin.data,
@@ -3994,11 +4005,13 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	    ERL_NIF_TERM t;
 	    t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
 	    return enif_make_tuple2(env, ATOM(ok), t);
+	} else {
+	    enif_free_env(bin_env);
 	}
 	return ATOM(ok);
     }
     else {
-	enif_free_env(bin_env);	
+	enif_free_env(bin_env);
 	return ecl_make_error(env, err);
     }
 }
@@ -4032,14 +4045,14 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
     if (!get_object(env, argv[1], &mem_r, false, (void**)&buffer))
 	return enif_make_badarg(env);
     origin[0] = origin[1] = origin[2] = 0;
-    if (!get_ulong_list(env, argv[2], origin, &num_origin))
+    if (!get_sizet_list(env, argv[2], origin, &num_origin))
 	return enif_make_badarg(env);
     region[0] = region[1] = region[2] = 1;
-    if (!get_ulong_list(env, argv[3], region, &num_region))
+    if (!get_sizet_list(env, argv[3], region, &num_region))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[4], &row_pitch))
+    if (!ecl_get_sizet(env, argv[4], &row_pitch))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[5], &slice_pitch))
+    if (!ecl_get_sizet(env, argv[5], &slice_pitch))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -4106,23 +4119,28 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     if (!get_object(env, argv[1], &mem_r, false, (void**)&buffer))
 	return enif_make_badarg(env);
     origin[0] = origin[1] = origin[2] = 0;
-    if (!get_ulong_list(env, argv[2], origin, &num_origin))
+    if (!get_sizet_list(env, argv[2], origin, &num_origin))
 	return enif_make_badarg(env);
     region[0] = region[1] = region[2] = 1;
-    if (!get_ulong_list(env, argv[3], region, &num_region))
+    if (!get_sizet_list(env, argv[3], region, &num_region))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[4], &row_pitch))
+    if (!ecl_get_sizet(env, argv[4], &row_pitch))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[5], &slice_pitch))
+    if (!ecl_get_sizet(env, argv[5], &slice_pitch))
 	return enif_make_badarg(env);
-    if (!enif_inspect_binary(env, argv[6], &bin))
-	return enif_make_badarg(env);
+    /*  Check argv[6] (bin) last */
     if (!get_object_list(env, argv[7], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
     if (!get_bool(env, argv[8], &want_event))
-	return enif_make_badarg(env);
-    
+        return enif_make_badarg(env);
+    if (!(bin_env = enif_alloc_env())) {  // create binary environment
+        return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
+    }
+    if (!ecl_make_binary(env, argv[6], bin_env, &bin)) {
+       enif_free_env(bin_env);
+       return enif_make_badarg(env);
+    }
 
     // calculate the read size of the image FIXME: check error return
     clGetImageInfo(buffer, CL_IMAGE_ELEMENT_SIZE, sizeof(psize), &psize, 0);
@@ -4130,13 +4148,9 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     if (bin.size < size) {
 	return enif_make_badarg(env);
     }
-    if (!(bin_env = enif_alloc_env())) {  // create binary environment
-	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
-    }
-    (void) ecl_copy_binary(env, bin_env, &bin);
 
     err = clEnqueueWriteImage(o_queue->queue, buffer,
-			      CL_FALSE,
+			      !want_event, // FALSE for ASYNC
 			      origin,
 			      region,
 			      row_pitch,
@@ -4150,6 +4164,8 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 	    ERL_NIF_TERM t;
 	    t = ecl_make_event(env, event, false, true, bin_env, NULL, o_queue);
 	    return enif_make_tuple2(env, ATOM(ok), t);
+	} else {
+	    enif_free_env(bin_env);
 	}
 	return ATOM(ok);
     }
@@ -4184,13 +4200,13 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
     if (!get_object(env, argv[2], &mem_r, false, (void**)&dst_image))
 	return enif_make_badarg(env);
     src_origin[0] = src_origin[1] = src_origin[2] = 0;
-    if (!get_ulong_list(env, argv[3], src_origin, &num_src_origin))
+    if (!get_sizet_list(env, argv[3], src_origin, &num_src_origin))
 	return enif_make_badarg(env);
     dst_origin[0] = dst_origin[1] = dst_origin[2] = 0;
-    if (!get_ulong_list(env, argv[4], dst_origin, &num_dst_origin))
+    if (!get_sizet_list(env, argv[4], dst_origin, &num_dst_origin))
 	return enif_make_badarg(env);
     region[0] = region[1] = region[2] = 1;
-    if (!get_ulong_list(env, argv[5], region, &num_region))
+    if (!get_sizet_list(env, argv[5], region, &num_region))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -4237,12 +4253,12 @@ static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc,
     if (!get_object(env, argv[2], &mem_r, false, (void**)&dst_buffer))
 	return enif_make_badarg(env);
     origin[0] =  origin[1] = origin[2] = 0;
-    if (!get_ulong_list(env, argv[3], origin, &num_src_origin))
+    if (!get_sizet_list(env, argv[3], origin, &num_src_origin))
 	return enif_make_badarg(env);
     region[0] = region[1] = region[2] = 1;
-    if (!get_ulong_list(env, argv[4], region, &num_region))
+    if (!get_sizet_list(env, argv[4], region, &num_region))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[5], &dst_offset))
+    if (!ecl_get_sizet(env, argv[5], &dst_offset))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -4291,13 +4307,13 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_object(env, argv[2], &mem_r, false, (void**)&dst_image))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[3], &src_offset))
+    if (!ecl_get_sizet(env, argv[3], &src_offset))
 	return enif_make_badarg(env);
     origin[0] =  origin[1] = origin[2] = 0;
-    if (!get_ulong_list(env, argv[4], origin, &num_src_origin))
+    if (!get_sizet_list(env, argv[4], origin, &num_src_origin))
 	return enif_make_badarg(env);
     region[0] = region[1] = region[2] = 1;
-    if (!get_ulong_list(env, argv[5], region, &num_region))
+    if (!get_sizet_list(env, argv[5], region, &num_region))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -4340,9 +4356,9 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_bitfields(env, argv[2], &map_flags, kv_map_flags))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[3], &offset))
+    if (!ecl_get_sizet(env, argv[3], &offset))
 	return enif_make_badarg(env);
-    if (!enif_get_ulong(env, argv[4], &size))
+    if (!ecl_get_sizet(env, argv[4], &size))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[5], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -4396,10 +4412,10 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
     if (!get_bitfields(env, argv[2], &map_flags, kv_map_flags))
 	return enif_make_badarg(env);
     origin[0] = origin[1] = origin[2] = 0;
-    if (!get_ulong_list(env, argv[3], origin, &num_origin))
+    if (!get_sizet_list(env, argv[3], origin, &num_origin))
 	return enif_make_badarg(env);
     region[0] = region[1] = region[2] = 1;
-    if (!get_ulong_list(env, argv[4], region, &num_region))
+    if (!get_sizet_list(env, argv[4], region, &num_region))
 	return enif_make_badarg(env);
     if (!get_object_list(env, argv[5], &event_r, false,
 			 (void**) wait_list, &num_events))
@@ -5094,9 +5110,9 @@ static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 static void ecl_unload(ErlNifEnv* env, void* priv_data)
 {
     ecl_env_t* ecl = priv_data;
-    UNUSED(env);
     cl_uint i;
     cl_uint j;
+    UNUSED(env);
 
     for (i = 0; i < ecl->nplatforms; i++) {
 	ecl_object_t* obj;

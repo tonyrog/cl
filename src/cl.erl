@@ -177,7 +177,7 @@ init() ->
 	      4 -> filename:join([Lib,"32","cl_nif"]);
 	      8 -> filename:join([Lib,"64","cl_nif"])
 	  end,
-    io:format("Loading: ~s\n", [Nif]),
+    %% io:format("Loading: ~s\n", [Nif]),
     erlang:load_nif(Nif, 0).
 
 %%
