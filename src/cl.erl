@@ -2007,9 +2007,9 @@ wait_for_event(Event) ->
 %%    {'error',cl_error()} | {'error',timeout}
 %% 
 %%
-%% @doc  Waits on the host thread for commands identified by event objects to complete. 
+%% @doc  Waits for commands identified by event objects to complete. 
 %%
-%%  Waits on the host thread for commands identified by event objects
+%%  Waits for commands identified by event objects
 %%  in event_list to complete. A command is considered complete if its
 %%  execution status is CL_COMPLETE or a negative value.
 
@@ -2036,6 +2036,22 @@ wait1(Ref, Event, Timeout) when ?is_event(Event) ->
     after Timeout ->
 	    {error, timeout}
     end.
+
+%%  
+%% @spec async_wait_for_event(Event::cl_event()) -> 
+%%    {'ok',reference()} | {'error',cl_error()}
+%%
+%% @doc  Initiate an asynchronous wait operation.
+%%
+%%  Generate a wait operation that will run non blocking.
+%%  A reference is return that can be used to match the event
+%%  that is sent when the event has completed or resulted in an error.
+%%  The event returned has the form <code>{cl_event, Ref, Result}</code>
+%%  where Ref is the reference that was returned from the call and
+%%  Result may be one of binary() | 'complete' or {error,cl_error()}.
+%%
+-spec async_wait_for_event(Event::cl_event()) ->
+    {'ok',reference()} | {'error',cl_error()}.
 
 async_wait_for_event(_Event) ->
     erlang:error(nif_not_loaded).
