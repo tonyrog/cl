@@ -1,3 +1,19 @@
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
+%%%
+%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%%
+%%% This software is licensed as described in the file COPYRIGHT, which
+%%% you should have received as part of this distribution. The terms
+%%% are also available at http://www.rogvall.se/docs/copyright.txt.
+%%%
+%%% You may opt to use, copy, modify, merge, publish, distribute and/or sell
+%%% copies of the Software, and permit persons to whom the Software is
+%%% furnished to do so, under the terms of the COPYRIGHT file.
+%%%
+%%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+%%% KIND, either express or implied.
+%%%
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% File    : cl.erl
 %%% Author  : Tony Rogvall <tony@rogvall.se>
 %%% Description : Erlang OpenCL  interface
@@ -167,8 +183,10 @@
 
 -ifdef(debug).
 -define(VARIANT, "debug").
+-define(DBG(F,A), io:format((F),(A))).
 -else.
 -define(VARIANT, "release").
+-define(DBG(F,A), ok).
 -endif.
 
 init() ->
@@ -177,7 +195,7 @@ init() ->
 	      4 -> filename:join([Lib,"32","cl_nif"]);
 	      8 -> filename:join([Lib,"64","cl_nif"])
 	  end,
-    %% io:format("Loading: ~s\n", [Nif]),
+    ?DBG("Loading: ~s\n", [Nif]),
     erlang:load_nif(Nif, 0).
 
 %%

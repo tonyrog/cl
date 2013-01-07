@@ -1,3 +1,19 @@
+/****** BEGIN COPYRIGHT *******************************************************
+ *
+ * Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+ *
+ * This software is licensed as described in the file COPYRIGHT, which
+ * you should have received as part of this distribution. The terms
+ * are also available at http://www.rogvall.se/docs/copyright.txt.
+ *
+ * You may opt to use, copy, modify, merge, publish, distribute and/or sell
+ * copies of the Software, and permit persons to whom the Software is
+ * furnished to do so, under the terms of the COPYRIGHT file.
+ *
+ * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+ * KIND, either express or implied.
+ *
+ ****** END COPYRIGHT ********************************************************/
 //
 // NIF interface for OpenCL binding
 //
@@ -4652,6 +4668,8 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     UNUSED(env);
     UNUSED(load_info);
 
+    DBG("ecl_load");
+
     if (!(ecl = enif_alloc(sizeof(ecl_env_t))))
 	return -1;
     if (!(ecl->ref_lock = enif_rwlock_create("ref_lock")))
@@ -5093,6 +5111,7 @@ static int  ecl_reload(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     UNUSED(env);
     UNUSED(load_info);
     UNUSED(priv_data);
+    DBG("ecl_reload");
     // FIXME
     return 0;
 }
@@ -5102,6 +5121,7 @@ static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 {
     UNUSED(env);
     UNUSED(load_info);
+    DBG("ecl_upgrade");
     // FIXME
     *priv_data = *old_priv_data;
     return 0;
@@ -5113,7 +5133,7 @@ static void ecl_unload(ErlNifEnv* env, void* priv_data)
     cl_uint i;
     cl_uint j;
     UNUSED(env);
-
+    DBG("ecl_unload");
     for (i = 0; i < ecl->nplatforms; i++) {
 	ecl_object_t* obj;
 
@@ -5135,6 +5155,10 @@ static void ecl_unload(ErlNifEnv* env, void* priv_data)
     enif_rwlock_destroy(ecl->ref_lock);
     enif_free(ecl);
 }
+
+#warning "testing only, REMOVE before release"
+#define ERL_NIF_INIT_BODY \
+    DBG("erl_nif_init")
 
 ERL_NIF_INIT(cl, ecl_funcs, 
 	     ecl_load, ecl_reload, 
