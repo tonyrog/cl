@@ -5156,9 +5156,11 @@ static void ecl_unload(ErlNifEnv* env, void* priv_data)
     enif_free(ecl);
 }
 
+/*
 #warning "testing only, REMOVE before release"
-#define ERL_NIF_INIT_BODY \
-    DBG("erl_nif_init")
+#define ERL_NIF_INIT_BODY			\
+     DBG("erl_nif_init")
+*/
 
 ERL_NIF_INIT(cl, ecl_funcs, 
 	     ecl_load, ecl_reload, 
