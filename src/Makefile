@@ -14,7 +14,7 @@ APP_FILE= $(APP_NAME).app
 APP_SRC= $(APP_FILE).src
 APP_TARGET= $(EBIN)/$(APP_FILE)
 
-override ERLC_FLAGS = 
+override ERLC_FLAGS = +debug_info
 
 
 OBJS = $(MODULES:%=$(EBIN)/%.beam)
