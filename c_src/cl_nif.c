@@ -282,7 +282,6 @@ static int ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 
 static void ecl_unload(ErlNifEnv* env, void* priv_data);
 
-
 static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc, 
 			    const ERL_NIF_TERM argv[]);
 
@@ -340,6 +339,11 @@ static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc,
 						   const ERL_NIF_TERM argv[]);
 static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[]);
+
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_unload_platform_compiler(ErlNifEnv* env, int argc, 
+						 const ERL_NIF_TERM argv[]);
+#endif
 static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[]);
 static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc, 
@@ -369,6 +373,16 @@ static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc,
 
 static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[]);
+
+#if CL_VERSION_1_2 == 1
+
+static ERL_NIF_TERM ecl_enqueue_marker_with_wait_list(ErlNifEnv* env,
+						      int argc,
+						      const ERL_NIF_TERM argv[]);
+static ERL_NIF_TERM ecl_enqueue_barrier_with_wait_list(ErlNifEnv* env,
+						       int argc,
+						       const ERL_NIF_TERM argv[]);
+#endif
 
 static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc, 
 						const ERL_NIF_TERM argv[]);
@@ -454,6 +468,9 @@ ErlNifFunc ecl_funcs[] =
     { "create_program_with_source", 2, ecl_create_program_with_source },
     { "create_program_with_binary", 3, ecl_create_program_with_binary },
     { "async_build_program",        3, ecl_async_build_program },
+#if CL_VERSION_1_2 == 1
+    { "unload_platform_compiler",   1, ecl_unload_platform_compiler },
+#endif
     { "unload_compiler",            0, ecl_unload_compiler },
     { "get_program_info",           2, ecl_get_program_info },
     { "get_program_build_info",     3, ecl_get_program_build_info },
@@ -471,6 +488,10 @@ ErlNifFunc ecl_funcs[] =
     { "enqueue_nd_range_kernel",    6, ecl_enqueue_nd_range_kernel },
     { "enqueue_marker",             1, ecl_enqueue_marker },
     { "enqueue_barrier",            1, ecl_enqueue_barrier },
+#if CL_VERSION_1_2 == 1
+    { "enqueue_barrier_with_wait_list", 2, ecl_enqueue_barrier_with_wait_list },
+    { "enqueue_marker_with_wait_list",  2, ecl_enqueue_marker_with_wait_list },
+#endif
     { "enqueue_wait_for_events",    2, ecl_enqueue_wait_for_events },
     { "enqueue_read_buffer",        5, ecl_enqueue_read_buffer },
     { "enqueue_write_buffer",       7, ecl_enqueue_write_buffer },
@@ -765,6 +786,7 @@ DECL_ATOM(default);
 DECL_ATOM(cpu);
 DECL_ATOM(gpu);
 DECL_ATOM(accelerator);
+DECL_ATOM(custom);
 
 // fp_config
 DECL_ATOM(denorm);
@@ -803,6 +825,10 @@ DECL_ATOM(copy_host_ptr);
 DECL_ATOM(buffer);
 DECL_ATOM(image2d);
 DECL_ATOM(image3d);
+DECL_ATOM(image2d_array);
+DECL_ATOM(image1d);
+DECL_ATOM(image1d_array);
+DECL_ATOM(image1d_buffer);
 
 // addressing_mode
 // DECL_ATOM(none);
@@ -916,6 +942,9 @@ ecl_kv_t kv_device_type[] = {  // bitfield
     { &ATOM(accelerator), CL_DEVICE_TYPE_ACCELERATOR },
     { &ATOM(default),     CL_DEVICE_TYPE_DEFAULT },
     { &ATOM(all),         CL_DEVICE_TYPE_ALL },
+#if CL_VERSION_1_2 == 1
+    { &ATOM(custom),      CL_DEVICE_TYPE_CUSTOM },
+#endif
     { 0, 0}
 };
 
@@ -969,6 +998,12 @@ ecl_kv_t kv_mem_object_type[] = { // enum
     { &ATOM(buffer), CL_MEM_OBJECT_BUFFER },
     { &ATOM(image2d), CL_MEM_OBJECT_IMAGE2D },
     { &ATOM(image3d), CL_MEM_OBJECT_IMAGE3D },
+#if CL_VERSION_1_2 == 1
+    { &ATOM(image2d_array), CL_MEM_OBJECT_IMAGE2D_ARRAY },
+    { &ATOM(image1d), CL_MEM_OBJECT_IMAGE1D },
+    { &ATOM(image1d_array), CL_MEM_OBJECT_IMAGE1D_ARRAY },
+    { &ATOM(image1d_buffer), CL_MEM_OBJECT_IMAGE1D_BUFFER },
+#endif
     { 0, 0 }
 };
 
@@ -1079,6 +1114,7 @@ DECL_ATOM(snorm_int8);
 DECL_ATOM(snorm_int16);
 DECL_ATOM(unorm_int8);
 DECL_ATOM(unorm_int16);
+DECL_ATOM(unorm_int24);
 DECL_ATOM(unorm_short_565);
 DECL_ATOM(unorm_short_555);
 DECL_ATOM(unorm_int_101010);
@@ -1107,9 +1143,13 @@ ecl_kv_t kv_channel_type[] = { // enum
     { &ATOM(unsigned_int32), CL_UNSIGNED_INT32 },
     { &ATOM(half_float), CL_HALF_FLOAT },
     { &ATOM(float), CL_FLOAT },
+#if CL_VERSION_1_2 == 1
+    { &ATOM(unorm_int24), CL_UNORM_INT24 },
+#endif
     { 0, 0 }
 };
 
+// channel order
 DECL_ATOM(r);
 DECL_ATOM(a);
 DECL_ATOM(rg);
@@ -1123,6 +1163,8 @@ DECL_ATOM(luminance);
 DECL_ATOM(rx);
 DECL_ATOM(rgx);
 DECL_ATOM(rgbx);
+// DECL_ATOM(depth);
+DECL_ATOM(depth_stencil);
 
 // 1.1 features! in apple 1.0?
 #ifndef CL_Rx
@@ -1151,6 +1193,10 @@ ecl_kv_t kv_channel_order[] = {
     { &ATOM(rx), CL_Rx },
     { &ATOM(rgx), CL_RGx },
     { &ATOM(rgbx), CL_RGBx },
+#if CL_VERSION_1_2 == 1
+    { &ATOM(depth), CL_DEPTH },
+    { &ATOM(depth_stencil), CL_DEPTH_STENCIL },
+#endif
     { 0, 0 }
 };
 
@@ -2921,11 +2967,33 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
     }
     else if (width && height)
 	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
+#if CL_VERSION_1_2 == 1
+    {
+	cl_image_desc desc;
 
+	desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+	desc.image_width = width;
+	desc.image_height = height;
+	desc.image_depth = 1;       // used with IMAGE3D
+	desc.image_array_size = 1;  // used with IMAGE2D/3D_ARRAY?
+	desc.image_row_pitch = row_pitch;
+	desc.image_slice_pitch = 0;  // maybe 0 for 2D image
+	desc.num_mip_levels = 0;  // must be 0
+	desc.num_samples= 0;      // must be 0
+	desc.buffer = NULL;       // used when CL_MEM_OBJECT_IMAGE1D_BUFFER
+
+	mem = clCreateImage(o_context->context,
+			    mem_flags,
+			    &format,
+			    &desc,
+			    host_ptr,
+			    &err);
+    }
+#else
     mem = clCreateImage2D(o_context->context, mem_flags, &format,
 			  width, height, row_pitch,
 			  host_ptr, &err);
-
+#endif
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
@@ -2987,11 +3055,33 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
     }
     else if (width && height && depth)
 	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
+#if CL_VERSION_1_2 == 1
+    {
+	cl_image_desc desc;
 
+	desc.image_type = CL_MEM_OBJECT_IMAGE3D;
+	desc.image_width = width;
+	desc.image_height = height;
+	desc.image_depth = depth;       // used with IMAGE3D
+	desc.image_array_size = 1;  // used with IMAGE2D/3D_ARRAY?
+	desc.image_row_pitch = row_pitch;
+	desc.image_slice_pitch = slice_pitch;  // maybe 0 for 2D image
+	desc.num_mip_levels = 0;  // must be 0
+	desc.num_samples= 0;      // must be 0
+	desc.buffer = NULL;       // used when CL_MEM_OBJECT_IMAGE1D_BUFFER
+
+	mem = clCreateImage(o_context->context,
+			    mem_flags,
+			    &format,
+			    &desc,
+			    host_ptr,
+			    &err);
+    }
+#else
     mem = clCreateImage3D(o_context->context, mem_flags, &format,
 			  width, height, depth, row_pitch, slice_pitch,
 			  host_ptr, &err);
-
+#endif
     if (mem) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
@@ -3319,6 +3409,22 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
     }
 }
 
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_unload_platform_compiler(ErlNifEnv* env, int argc, 
+						 const ERL_NIF_TERM argv[])
+{
+    cl_int err;
+    cl_platform_id   platform;
+    UNUSED(argc);
+    if (!get_object(env, argv[0], &platform_r, true,(void**)&platform))
+	return enif_make_badarg(env);
+    err = clUnloadPlatformCompiler(platform);
+    if (err)
+	return ecl_make_error(env, err);
+    return ATOM(ok);    
+}
+#endif
+
 static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
@@ -3326,10 +3432,21 @@ static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc,
     UNUSED(argc);
     UNUSED(argv);
 
+#if CL_VERSION_1_2 == 1 
+    {
+	ecl_env_t* ecl = enif_priv_data(env);
+	cl_platform_id platform;
+	if (ecl->nplatforms <= 0)
+	    return ecl_make_error(env, CL_INVALID_VALUE);
+	platform = (cl_platform_id) ecl->platform[0].o_platform->opaque;
+	err = clUnloadPlatformCompiler(platform);
+    }
+#else
     err = clUnloadCompiler();
+#endif
     if (err)
 	return ecl_make_error(env, err);
-    return ATOM(ok);    
+    return ATOM(ok);
 }
 
 // Special util to extract program binaries
@@ -3793,7 +3910,7 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
 	}
 	return ATOM(ok);
     }
-    return ecl_make_error(env, err);    
+    return ecl_make_error(env, err);
 }
 //
 // cl:enqueue_nd_range_kernel(Queue::cl_queue(), Kernel::cl_kernel(),
@@ -3864,11 +3981,21 @@ static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc,
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
+#if CL_VERSION_1_2 == 1
+    if (!(err = clEnqueueMarkerWithWaitList(o_queue->queue, 
+					    0, NULL,
+					    &event))) {
+	ERL_NIF_TERM t;
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+#else // deprecated in 1.2 available in 1.1
     if (!(err = clEnqueueMarker(o_queue->queue, &event))) {
 	ERL_NIF_TERM t;
 	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
 	return enif_make_tuple2(env, ATOM(ok), t);
     }
+#endif
     return ecl_make_error(env, err);
 }
 
@@ -3890,11 +4017,16 @@ static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[1], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-
+#if CL_VERSION_1_2 == 1
+    err = clEnqueueMarkerWithWaitList(queue, 
+				      num_events,
+				      num_events ? wait_list : NULL,
+				      NULL);
+#else
     err = clEnqueueWaitForEvents(queue,
 				 num_events,
-				 num_events ? wait_list : 0);
-
+				 num_events ? wait_list : NULL);
+#endif
     if (!err)
 	return ATOM(ok);
     return ecl_make_error(env, err);    
@@ -4505,11 +4637,92 @@ static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc,
 
     if (!get_object(env, argv[0], &command_queue_r, false,(void**)&queue))
 	return enif_make_badarg(env);
+#if CL_VERSION_1_2 == 1
+    if (!(err = clEnqueueBarrierWithWaitList(queue,0,NULL,NULL))) {
+	return ATOM(ok);
+    }
+#else  // deprecated in 1.2, available in 1.1
     if (!(err = clEnqueueBarrier(queue))) {
 	return ATOM(ok);
     }
+#endif
     return ecl_make_error(env, err);    
 }
+
+#if CL_VERSION_1_2 == 1
+//
+// cl:enqueue_barrier_with_wait_list(Queue::cl_queue(),
+//                                   WaitList::[cl_event()]) ->
+//    {'ok',cl_event()} | {'error', cl_error()}
+//
+static ERL_NIF_TERM ecl_enqueue_barrier_with_wait_list(ErlNifEnv* env,
+						       int argc, 
+						       const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_queue;
+    cl_event      wait_list[MAX_WAIT_LIST];
+    size_t        num_events = MAX_WAIT_LIST;
+    cl_event         event;
+    cl_int           err;
+    cl_bool          want_event = true;  // make this an arg?
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[1], &event_r, false,
+			 (void**) wait_list, &num_events))
+	return enif_make_badarg(env);
+    err = clEnqueueBarrierWithWaitList(o_queue->queue,num_events,
+				       num_events ? wait_list : NULL,
+				       want_event ? &event : NULL );
+    if (!err) {
+	if (want_event) {
+	    ERL_NIF_TERM t;
+	    t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	    return enif_make_tuple2(env, ATOM(ok), t);
+	}
+	return ATOM(ok);
+    }
+    return ecl_make_error(env, err);
+}
+
+//
+// cl:enqueue_marker_with_wait_list(Queue::cl_queue(),
+//                                   WaitList::[cl_event()]) ->
+//    {'ok',cl_event()} | {'error', cl_error()}
+//
+static ERL_NIF_TERM ecl_enqueue_marker_with_wait_list(ErlNifEnv* env,
+						      int argc, 
+						      const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_queue;
+    cl_event      wait_list[MAX_WAIT_LIST];
+    size_t        num_events = MAX_WAIT_LIST;
+    cl_int           err;
+    cl_event         event;
+    cl_bool          want_event = true;  // make this an arg?
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[1], &event_r, false,
+			 (void**) wait_list, &num_events))
+	return enif_make_badarg(env);
+    err = clEnqueueMarkerWithWaitList(o_queue->queue,num_events,
+				      num_events ? wait_list : NULL,
+				      want_event ? &event : NULL );
+    if (!err) {
+	if (want_event) {
+	    ERL_NIF_TERM t;
+	    t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	    return enif_make_tuple2(env, ATOM(ok), t);
+	}
+	return ATOM(ok);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
+
 
 //
 // cl:async_flush(Queue::cl_queue()) -> reference()
@@ -4768,6 +4981,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(snorm_int16);
     LOAD_ATOM(unorm_int8);
     LOAD_ATOM(unorm_int16);
+    LOAD_ATOM(unorm_int24);
     LOAD_ATOM(unorm_short_565);
     LOAD_ATOM(unorm_short_555);
     LOAD_ATOM(unorm_int_101010);
@@ -4793,6 +5007,8 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(rx);
     LOAD_ATOM(rgx);
     LOAD_ATOM(rgbx);
+    LOAD_ATOM(depth);
+    LOAD_ATOM(depth_stencil);
 
     // Load options & flags
 
@@ -4977,6 +5193,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(cpu);
     LOAD_ATOM(gpu);
     LOAD_ATOM(accelerator);
+    LOAD_ATOM(custom);
 
     // fp_config
     LOAD_ATOM(denorm);
@@ -5015,6 +5232,10 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(buffer);
     LOAD_ATOM(image2d);
     LOAD_ATOM(image3d);
+    LOAD_ATOM(image2d_array);
+    LOAD_ATOM(image1d);
+    LOAD_ATOM(image1d_array);
+    LOAD_ATOM(image1d_buffer);
 
     // addressing_mode
     LOAD_ATOM(none);

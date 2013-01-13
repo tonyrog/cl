@@ -119,6 +119,7 @@
 -export([retain_program/1]).
 -export([build_program/3, async_build_program/3]).
 -export([unload_compiler/0]).
+-export([unload_platform_compiler/1]).
 -export([program_info/0]).
 -export([get_program_info/1,get_program_info/2]).
 -export([program_build_info/0]).
@@ -142,6 +143,8 @@
 -export([nowait_enqueue_nd_range_kernel/5]).
 -export([enqueue_marker/1]).
 -export([enqueue_barrier/1]).
+-export([enqueue_marker_with_wait_list/2]).
+-export([enqueue_barrier_with_wait_list/2]).
 -export([enqueue_wait_for_events/2]).
 -export([enqueue_read_buffer/5]).
 -export([enqueue_write_buffer/6]).
@@ -1485,6 +1488,13 @@ async_build_program(_Program, _DeviceList, _Options) ->
 unload_compiler() ->   
     erlang:error(nif_not_loaded).
 
+%% @spec unload_platform_compiler(Platform :: cl_platform_id()) ->
+%%   'ok' | {'error', cl_error()}
+-spec unload_platform_compiler(Platform::cl_platform_id()) ->
+    'ok' | {'error', cl_error()}.
+unload_platform_compiler(_Platform) ->
+    erlang:error(nif_not_loaded).
+
 program_info() ->
     [
      reference_count,
@@ -1856,6 +1866,27 @@ enqueue_write_buffer(_Queue, _Buffer, _Offset, _Size, _Data, _WaitList,
 
 enqueue_barrier(_Queue) ->
     erlang:error(nif_not_loaded).
+
+%% @spec enqueue_marker_with_wait_list(Queue::cl_queue(),
+%%                    WaitList::[cl_event()]) ->
+%%    {'ok', cl_event()} | {'error', cl_error()}
+
+-spec enqueue_marker_with_wait_list(Queue::cl_queue(),
+				    WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_marker_with_wait_list(_Queue, _WaitList) ->
+    erlang:error(nif_not_loaded).    
+
+%% @spec enqueue_barrier_with_wait_list(Queue::cl_queue(),
+%%                    WaitList::[cl_event()]) ->
+%%    {'ok', cl_event()} | {'error', cl_error()}
+-spec enqueue_barrier_with_wait_list(Queue::cl_queue(),
+				     WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+enqueue_barrier_with_wait_list(_Queue, _WaitList) ->
+    erlang:error(nif_not_loaded).
+    
 
 
 enqueue_read_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
