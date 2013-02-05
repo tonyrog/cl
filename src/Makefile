@@ -1,6 +1,8 @@
 
 MODULES = \
 	cl  \
+	cl11 \
+	cl12 \
 	clu
 
 EBIN = ../ebin
@@ -24,8 +26,6 @@ TARGET_FILES = $(OBJS) $(APP_TARGET)
 debug: ERLC_FLAGS += -Ddebug 
 
 all: $(TARGET_FILES)
-
-all32: $(TARGET_FILES)
 
 debug: all
 

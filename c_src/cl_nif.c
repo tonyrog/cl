@@ -197,7 +197,6 @@ typedef enum {
 #define OCL_DEVICE_GLOBAL_MEM_CACHE_TYPE OCL_ENUM
 #define OCL_PLATFORM_INFO                OCL_UINT
 #define OCL_DEVICE_INFO                  OCL_UINT
-#define OCL_DEVICE_FP_CONFIG             OCL_BITFIELD
 #define OCL_DEVICE_EXEC_CAPABILITIES     OCL_BITFIELD
 #define OCL_QUEUE_PROPERTIES             OCL_BITFIELD
 #define OCL_DEVICE_LOCAL_MEM_TYPE        OCL_ENUM
@@ -206,6 +205,7 @@ typedef enum {
 #define OCL_SAMPLER_ADDRESSING_MODE      OCL_ENUM
 #define OCL_SAMPLER_FILTER_MODE          OCL_ENUM
 #define OCL_BUILD_STATUS                 OCL_ENUM
+#define OCL_DEVICE_DOUBLE_FP_CONFIG      OCL_BITFIELD
 
 typedef struct {
     ERL_NIF_TERM*  key;
@@ -605,57 +605,6 @@ DECL_ATOM(double4);
 DECL_ATOM(double8);
 DECL_ATOM(double16);
 
-// Device info
-DECL_ATOM(type);
-DECL_ATOM(vendor_id);
-DECL_ATOM(max_compute_units);
-DECL_ATOM(max_work_item_dimensions);
-DECL_ATOM(max_work_group_size);
-DECL_ATOM(max_work_item_sizes);
-DECL_ATOM(preferred_vector_width_char);
-DECL_ATOM(preferred_vector_width_short);
-DECL_ATOM(preferred_vector_width_int);
-DECL_ATOM(preferred_vector_width_long);
-DECL_ATOM(preferred_vector_width_float);
-DECL_ATOM(preferred_vector_width_double);
-DECL_ATOM(max_clock_frequency);
-DECL_ATOM(address_bits);
-DECL_ATOM(max_read_image_args);
-DECL_ATOM(max_write_image_args);
-DECL_ATOM(max_mem_alloc_size);
-DECL_ATOM(image2d_max_width);
-DECL_ATOM(image2d_max_height);
-DECL_ATOM(image3d_max_width);
-DECL_ATOM(image3d_max_height);
-DECL_ATOM(image3d_max_depth);
-DECL_ATOM(image_support);
-DECL_ATOM(max_parameter_size);
-DECL_ATOM(max_samplers);
-DECL_ATOM(mem_base_addr_align);
-DECL_ATOM(min_data_type_align_size);
-DECL_ATOM(single_fp_config);
-DECL_ATOM(global_mem_cache_type);
-DECL_ATOM(global_mem_cacheline_size);
-DECL_ATOM(global_mem_cache_size);
-DECL_ATOM(global_mem_size);
-DECL_ATOM(max_constant_buffer_size);
-DECL_ATOM(max_constant_args);
-DECL_ATOM(local_mem_type);
-DECL_ATOM(local_mem_size);
-DECL_ATOM(error_correction_support);
-DECL_ATOM(profiling_timer_resolution);
-DECL_ATOM(endian_little);
-DECL_ATOM(available);
-DECL_ATOM(compiler_available);
-DECL_ATOM(execution_capabilities);
-DECL_ATOM(queue_properties);
-DECL_ATOM(name);
-DECL_ATOM(vendor);
-DECL_ATOM(driver_version);
-DECL_ATOM(profile);
-DECL_ATOM(version);
-DECL_ATOM(extensions);
-DECL_ATOM(platform);
 
 // Platform info
 // DECL_ATOM(profile);
@@ -795,6 +744,8 @@ DECL_ATOM(round_to_nearest);
 DECL_ATOM(round_to_zero);
 DECL_ATOM(round_to_inf);
 DECL_ATOM(fma);
+DECL_ATOM(soft_float);
+DECL_ATOM(correctly_rounded_divide_sqrt);
 
 // mem_cache_type
 DECL_ATOM(none);
@@ -825,6 +776,7 @@ DECL_ATOM(copy_host_ptr);
 DECL_ATOM(buffer);
 DECL_ATOM(image2d);
 DECL_ATOM(image3d);
+// version1.2
 DECL_ATOM(image2d_array);
 DECL_ATOM(image1d);
 DECL_ATOM(image1d_array);
@@ -955,6 +907,10 @@ ecl_kv_t kv_fp_config[] = {  // bitfield
     { &ATOM(round_to_zero), CL_FP_ROUND_TO_ZERO },
     { &ATOM(round_to_inf), CL_FP_ROUND_TO_INF },
     { &ATOM(fma), CL_FP_FMA },
+#if CL_VERSION_1_2 == 1
+    { &ATOM(soft_float), CL_FP_SOFT_FLOAT },
+    { &ATOM(correctly_rounded_divide_sqrt),CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT},
+#endif
     { 0, 0 }
 };
 
@@ -1200,6 +1156,120 @@ ecl_kv_t kv_channel_order[] = {
     { 0, 0 }
 };
 
+// partition_property
+DECL_ATOM(equally);
+DECL_ATOM(by_counts);
+DECL_ATOM(by_counts_list_end);
+DECL_ATOM(by_affinity_domain);
+
+#if CL_VERSION_1_2 == 1
+ecl_kv_t kv_device_partition_property[] = {
+    { &ATOM(equally), CL_DEVICE_PARTITION_EQUALLY },
+    { &ATOM(by_counts), CL_DEVICE_PARTITION_BY_COUNTS },
+    { &ATOM(by_counts_list_end), CL_DEVICE_PARTITION_BY_COUNTS_LIST_END },
+    { &ATOM(by_affinity_domain), CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN },
+    { 0, 0}
+};
+#endif
+
+DECL_ATOM(numa);
+DECL_ATOM(l4_cache);
+DECL_ATOM(l3_cache);
+DECL_ATOM(l2_cache);
+DECL_ATOM(l1_cache);
+DECL_ATOM(next_partitionable);
+
+#if CL_VERSION_1_2 == 1    
+ecl_kv_t kv_device_affinity_domain[] = { 
+    { &ATOM(numa), CL_DEVICE_AFFINITY_DOMAIN_NUMA },
+    { &ATOM(l4_cache), CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE },
+    { &ATOM(l3_cache), CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE },
+    { &ATOM(l2_cache), CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE },
+    { &ATOM(l1_cache), CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE },
+    { &ATOM(next_partitionable), CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE },
+    { 0, 0}
+};
+#endif
+
+// Device info
+DECL_ATOM(type);
+DECL_ATOM(vendor_id);
+DECL_ATOM(max_compute_units);
+DECL_ATOM(max_work_item_dimensions);
+DECL_ATOM(max_work_group_size);
+DECL_ATOM(max_work_item_sizes);
+DECL_ATOM(preferred_vector_width_char);
+DECL_ATOM(preferred_vector_width_short);
+DECL_ATOM(preferred_vector_width_int);
+DECL_ATOM(preferred_vector_width_long);
+DECL_ATOM(preferred_vector_width_float);
+DECL_ATOM(preferred_vector_width_double);
+DECL_ATOM(max_clock_frequency);
+DECL_ATOM(address_bits);
+DECL_ATOM(max_read_image_args);
+DECL_ATOM(max_write_image_args);
+DECL_ATOM(max_mem_alloc_size);
+DECL_ATOM(image2d_max_width);
+DECL_ATOM(image2d_max_height);
+DECL_ATOM(image3d_max_width);
+DECL_ATOM(image3d_max_height);
+DECL_ATOM(image3d_max_depth);
+DECL_ATOM(image_support);
+DECL_ATOM(max_parameter_size);
+DECL_ATOM(max_samplers);
+DECL_ATOM(mem_base_addr_align);
+DECL_ATOM(min_data_type_align_size);
+DECL_ATOM(single_fp_config);
+DECL_ATOM(global_mem_cache_type);
+DECL_ATOM(global_mem_cacheline_size);
+DECL_ATOM(global_mem_cache_size);
+DECL_ATOM(global_mem_size);
+DECL_ATOM(max_constant_buffer_size);
+DECL_ATOM(max_constant_args);
+DECL_ATOM(local_mem_type);
+DECL_ATOM(local_mem_size);
+DECL_ATOM(error_correction_support);
+DECL_ATOM(profiling_timer_resolution);
+DECL_ATOM(endian_little);
+DECL_ATOM(available);
+DECL_ATOM(compiler_available);
+DECL_ATOM(execution_capabilities);
+DECL_ATOM(queue_properties);
+DECL_ATOM(name);
+DECL_ATOM(vendor);
+DECL_ATOM(driver_version);
+DECL_ATOM(profile);
+DECL_ATOM(version);
+DECL_ATOM(extensions);
+DECL_ATOM(platform);
+
+// 1.2
+DECL_ATOM(double_fp_config);
+DECL_ATOM(preferred_vector_width_half);
+DECL_ATOM(host_unified_memory);
+DECL_ATOM(native_vector_width_char);
+DECL_ATOM(native_vector_width_short);
+DECL_ATOM(native_vector_width_int);
+DECL_ATOM(native_vector_width_long);
+DECL_ATOM(native_vector_width_float);
+DECL_ATOM(native_vector_width_double);
+DECL_ATOM(native_vector_width_half);
+DECL_ATOM(opencl_c_version);
+DECL_ATOM(linker_available);
+DECL_ATOM(built_in_kernels);
+DECL_ATOM(image_max_buffer_size);
+DECL_ATOM(image_max_array_size);
+DECL_ATOM(parent_device);
+DECL_ATOM(partition_max_sub_devices);
+DECL_ATOM(partition_properties);
+DECL_ATOM(partition_affinity_domain);
+DECL_ATOM(partition_type);
+// DECL_ATOM(reference_count);
+DECL_ATOM(preferred_interop_user_sync);
+DECL_ATOM(printf_buffer_size);
+DECL_ATOM(image_pitch_alignment);
+DECL_ATOM(image_base_address_alignment);
+
 // Map device info index 0...N => cl_device_info x Data type
 ecl_info_t device_info[] = 
 {
@@ -1252,7 +1322,42 @@ ecl_info_t device_info[] =
     { &ATOM(profile), CL_DEVICE_PROFILE, false, OCL_STRING, 0 },
     { &ATOM(version), CL_DEVICE_VERSION, false, OCL_STRING, 0 },
     { &ATOM(extensions), CL_DEVICE_EXTENSIONS, false, OCL_STRING, 0 },
-    { &ATOM(platform), CL_DEVICE_PLATFORM, false, OCL_PLATFORM, 0 }
+    { &ATOM(platform), CL_DEVICE_PLATFORM, false, OCL_PLATFORM, 0 },
+
+#if CL_VERSION_1_2 == 1
+    { &ATOM(double_fp_config), CL_DEVICE_DOUBLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
+    { &ATOM(preferred_vector_width_half), CL_DEVICE_PREFERRED_VECTOR_WIDTH_HALF,false, OCL_UINT, 0},
+    { &ATOM(host_unified_memory), CL_DEVICE_HOST_UNIFIED_MEMORY,false,OCL_BOOL,0},
+    { &ATOM(native_vector_width_char), CL_DEVICE_NATIVE_VECTOR_WIDTH_CHAR,false,OCL_UINT, 0},
+    { &ATOM(native_vector_width_short), CL_DEVICE_NATIVE_VECTOR_WIDTH_SHORT,false,OCL_UINT, 0},
+    { &ATOM(native_vector_width_int), CL_DEVICE_NATIVE_VECTOR_WIDTH_INT,false,OCL_UINT, 0},
+    { &ATOM(native_vector_width_long), CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG,false,OCL_UINT, 0},
+    { &ATOM(native_vector_width_float), CL_DEVICE_NATIVE_VECTOR_WIDTH_FLOAT,false,OCL_UINT, 0},
+    { &ATOM(native_vector_width_double), CL_DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE,false,OCL_UINT, 0},
+    { &ATOM(native_vector_width_half), CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF,false,OCL_UINT, 0},
+    { &ATOM(opencl_c_version), CL_DEVICE_OPENCL_C_VERSION,false,OCL_STRING, 0},
+    { &ATOM(linker_available), CL_DEVICE_LINKER_AVAILABLE,false,OCL_BOOL, 0},
+    { &ATOM(built_in_kernels), CL_DEVICE_BUILT_IN_KERNELS,false, OCL_STRING, 0},
+    { &ATOM(image_max_buffer_size), CL_DEVICE_IMAGE_MAX_BUFFER_SIZE,false,OCL_SIZE, 0},
+    { &ATOM(image_max_array_size), CL_DEVICE_IMAGE_MAX_ARRAY_SIZE,false,OCL_SIZE, 0},
+    { &ATOM(parent_device), CL_DEVICE_PARENT_DEVICE,false,OCL_DEVICE, 0},
+    { &ATOM(partition_max_sub_devices), CL_DEVICE_PARTITION_MAX_SUB_DEVICES,false,OCL_SIZE, 0},
+    { &ATOM(partition_properties), CL_DEVICE_PARTITION_PROPERTIES,true,
+      OCL_ENUM, kv_device_partition_property },
+
+    { &ATOM(partition_affinity_domain), CL_DEVICE_PARTITION_AFFINITY_DOMAIN,false,OCL_ENUM, kv_device_affinity_domain },
+    // Property list / array , verify this!
+    { &ATOM(partition_type), CL_DEVICE_PARTITION_TYPE, true, OCL_ENUM, kv_device_partition_property },
+    { &ATOM(reference_count), CL_DEVICE_REFERENCE_COUNT, false, OCL_UINT, 0 },
+    { &ATOM(preferred_interop_user_sync), CL_DEVICE_PREFERRED_INTEROP_USER_SYNC,false, OCL_BOOL, 0},
+    { &ATOM(printf_buffer_size), CL_DEVICE_PRINTF_BUFFER_SIZE,false, OCL_SIZE, 0 },
+#ifdef CL_DEVICE_IMAGE_PITCH_ALIGNMENT
+    { &ATOM(image_pitch_alignment), CL_DEVICE_IMAGE_PITCH_ALIGNMENT, false, OCL_SIZE, 0 },
+#endif
+#ifdef CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT
+    { &ATOM(image_base_address_alignment), CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT, false, OCL_SIZE, 0 },
+#endif
+#endif
 };
 
 // Map device info index 0...N => cl_device_info x Data type
@@ -5010,6 +5115,20 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(depth);
     LOAD_ATOM(depth_stencil);
 
+    // partition_property 
+    LOAD_ATOM(equally);
+    LOAD_ATOM(by_counts);
+    LOAD_ATOM(by_counts_list_end);
+    LOAD_ATOM(by_affinity_domain);
+
+    // affinity_domain
+    LOAD_ATOM(numa);
+    LOAD_ATOM(l4_cache);
+    LOAD_ATOM(l3_cache);
+    LOAD_ATOM(l2_cache);
+    LOAD_ATOM(l1_cache);
+    LOAD_ATOM(next_partitionable);
+
     // Load options & flags
 
     // Device info
@@ -5063,6 +5182,32 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(version);
     LOAD_ATOM(extensions);
     LOAD_ATOM(platform);
+
+    LOAD_ATOM(double_fp_config);
+    LOAD_ATOM(preferred_vector_width_half);
+    LOAD_ATOM(host_unified_memory);
+    LOAD_ATOM(native_vector_width_char);
+    LOAD_ATOM(native_vector_width_short);
+    LOAD_ATOM(native_vector_width_int);
+    LOAD_ATOM(native_vector_width_long);
+    LOAD_ATOM(native_vector_width_float);
+    LOAD_ATOM(native_vector_width_double);
+    LOAD_ATOM(native_vector_width_half);
+    LOAD_ATOM(opencl_c_version);
+    LOAD_ATOM(linker_available);
+    LOAD_ATOM(built_in_kernels);
+    LOAD_ATOM(image_max_buffer_size);
+    LOAD_ATOM(image_max_array_size);
+    LOAD_ATOM(parent_device);
+    LOAD_ATOM(partition_max_sub_devices);
+    LOAD_ATOM(partition_properties);
+    LOAD_ATOM(partition_affinity_domain);
+    LOAD_ATOM(partition_type);
+    LOAD_ATOM(reference_count);
+    LOAD_ATOM(preferred_interop_user_sync);
+    LOAD_ATOM(printf_buffer_size);
+    LOAD_ATOM(image_pitch_alignment);
+    LOAD_ATOM(image_base_address_alignment);
 
      // Platform info
     LOAD_ATOM(profile);
@@ -5202,6 +5347,8 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(round_to_zero);
     LOAD_ATOM(round_to_inf);
     LOAD_ATOM(fma);
+    LOAD_ATOM(soft_float);
+    LOAD_ATOM(correctly_rounded_divide_sqrt);
 
     // mem_cache_type
     LOAD_ATOM(none);
