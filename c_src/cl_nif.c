@@ -282,6 +282,9 @@ static int ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 
 static void ecl_unload(ErlNifEnv* env, void* priv_data);
 
+static ERL_NIF_TERM ecl_versions(ErlNifEnv* env, int argc, 
+				 const ERL_NIF_TERM argv[]);
+
 static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc, 
 			    const ERL_NIF_TERM argv[]);
 
@@ -434,7 +437,8 @@ static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc,
 ErlNifFunc ecl_funcs[] =
 {
     { "noop",                        0, ecl_noop },
-
+    { "versions",                    0, ecl_versions },
+    
     // Platform
     { "get_platform_ids",           0, ecl_get_platform_ids },
     { "get_platform_info",          2, ecl_get_platform_info },
@@ -728,6 +732,7 @@ DECL_ATOM(invalid_operation);
 DECL_ATOM(invalid_gl_object);
 DECL_ATOM(invalid_buffer_size);
 DECL_ATOM(invalid_mip_level);
+DECL_ATOM(invalid_global_work_size);
 
 // cl_device_type
 DECL_ATOM(all);
@@ -1063,6 +1068,7 @@ ecl_kv_t kv_execution_status[] = { // enum
     { &ATOM(invalid_gl_object), CL_INVALID_GL_OBJECT },
     { &ATOM(invalid_buffer_size), CL_INVALID_BUFFER_SIZE },
     { &ATOM(invalid_mip_level), CL_INVALID_MIP_LEVEL },
+    { &ATOM(invalid_global_work_size), CL_INVALID_GLOBAL_WORK_SIZE },
     { 0, 0 }
 };
 
@@ -1549,6 +1555,8 @@ ERL_NIF_TERM ecl_error(cl_int err)
 	return ATOM(invalid_buffer_size);
     case CL_INVALID_MIP_LEVEL: 
 	return ATOM(invalid_mip_level);
+    case CL_INVALID_GLOBAL_WORK_SIZE:
+	return ATOM(invalid_global_work_size);
     default: 
 	return ATOM(unknown);
     }
@@ -2774,6 +2782,31 @@ static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc,
     UNUSED(argc);
     UNUSED(argv);
     return ATOM(ok);
+}
+
+// version - return list of API versions supported
+static ERL_NIF_TERM ecl_versions(ErlNifEnv* env, int argc,
+				 const ERL_NIF_TERM argv[])
+{
+    UNUSED(env);
+    UNUSED(argc);
+    UNUSED(argv);
+    ERL_NIF_TERM list = enif_make_list(env, 0);
+    ERL_NIF_TERM vsn;
+
+#if CL_VERSION_1_0 == 1
+    vsn = enif_make_tuple2(env, enif_make_int(env, 1), enif_make_int(env, 0));
+    list = enif_make_list_cell(env, vsn, list);
+#endif
+#if CL_VERSION_1_1 == 1
+    vsn = enif_make_tuple2(env, enif_make_int(env, 1), enif_make_int(env, 1));
+    list = enif_make_list_cell(env, vsn, list);
+#endif
+#if CL_VERSION_1_2 == 1
+    vsn = enif_make_tuple2(env, enif_make_int(env, 1), enif_make_int(env, 2));
+    list = enif_make_list_cell(env, vsn, list);
+#endif
+    return list;
 }
 
 static ERL_NIF_TERM ecl_get_platform_ids(ErlNifEnv* env, int argc,
@@ -5331,6 +5364,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(invalid_gl_object);
     LOAD_ATOM(invalid_buffer_size);
     LOAD_ATOM(invalid_mip_level);
+    LOAD_ATOM(invalid_global_work_size);
 
     // cl_device_type
     LOAD_ATOM(all);

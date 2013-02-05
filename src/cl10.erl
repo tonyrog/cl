@@ -17,11 +17,11 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
-%%%    OpenCL 1.1 API
+%%%    OpenCL 1.0 API
 %%% @end
 %%% Created : 13 Jan 2013 by Tony Rogvall <tony@rogvall.se>
 
--module(cl11).
+-module(cl10).
 
 -on_load(init/0).
 
@@ -122,8 +122,8 @@
 -export([async_wait_for_event/1, wait_for_event/1]).
 
 init() ->
-    case lists:member({1,1}, cl:versions()) of
-	false -> erlang:error(cl_1_1_not_supported);
+    case lists:member({1,0}, cl:versions()) of
+	false -> erlang:error(cl_1_0_not_supported);
 	true -> ok
     end.
 
@@ -136,7 +136,7 @@ get_platform_info(A1) -> cl:get_platform_info(A1).
 get_platform_info(A1,A2) -> cl:get_platform_info(A1,A2).
 get_device_ids() -> cl:get_device_ids().
 get_device_ids(A1,A2) -> cl:get_device_ids(A1,A2).
-device_info() -> cl:device_info_10(cl:device_info_11([])).
+device_info() -> cl:device_info_10([]).
 get_device_info(A1) -> cl:get_device_info(A1).
 get_device_info(A1,A2) -> cl:get_device_info(A1,A2).
 create_context(A1) -> cl:create_context(A1).

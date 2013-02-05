@@ -72,6 +72,7 @@
 
 -export([start/0, start/1, stop/0]).
 -export([noop/0]).
+-export([versions/0]).
 %% Platform
 -export([get_platform_ids/0]).
 -export([platform_info/0]).
@@ -79,9 +80,9 @@
 %% Devices
 -export([get_device_ids/0, get_device_ids/2]).
 -export([device_info/0]).
--export([device_info_10/0]).
--export([device_info_11/0]).
--export([device_info_12/0]).
+-export([device_info_10/1]).
+-export([device_info_11/1]).
+-export([device_info_12/1]).
 -export([get_device_info/1,get_device_info/2]).
 %% Context
 -export([create_context/1]).
@@ -247,6 +248,17 @@ stop()  ->
 -spec noop() -> 'ok' | {'error', cl_error()}.
 
 noop() ->
+    erlang:error(nif_not_loaded).
+
+%%
+%% @spec versions() -> [{Major::integer(),Minor::integer()}]
+%%
+%% @doc Run a no operation towards the NIF object. This call can be used
+%% to messure the call overhead to the NIF objeect.
+%%
+-spec versions() -> [{Major::integer(),Minor::integer()}].
+
+versions() ->
     erlang:error(nif_not_loaded).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -460,10 +472,10 @@ get_device_ids(_Platform, _Type) ->
 %% @see get_device_info/2
 -spec device_info() -> [cl_device_info_key()].
     
-device_info() -> %% inlined ?
-    device_info_10() ++ device_info_11() ++ device_info_12().
+device_info() ->
+    device_info_10(device_info_11(device_info_12([]))).
 	
-device_info_10() ->
+device_info_10(L) ->
     [
      type, 
      vendor_id, 
@@ -514,9 +526,10 @@ device_info_10() ->
      profile,
      version,
      extensions,
-     platform].
+     platform | L
+    ].
 
-device_info_11() ->
+device_info_11(L) ->
     [
      preferred_vector_width_half,
      host_unified_memory,
@@ -527,10 +540,10 @@ device_info_11() ->
      native_vector_width_float,
      native_vector_width_double,
      native_vector_width_half,
-     opencl_c_version
+     opencl_c_version | L
     ].
 
-device_info_12() ->
+device_info_12(L) ->
     [
      double_fp_config,
      linker_available,
@@ -544,7 +557,7 @@ device_info_12() ->
      partition_type,
      reference_count,
      preferred_interop_user_sync,
-     printf_buffer_size
+     printf_buffer_size | L
 %%     image_pitch_alignment,
 %%     image_base_address_alignment
     ].

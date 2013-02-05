@@ -26,7 +26,6 @@
 -on_load(init/0).
 
 -export([start/0, start/1, stop/0]).
--export([noop/0]).
 -export([get_platform_ids/0]).
 -export([platform_info/0]).
 -export([get_platform_info/1,get_platform_info/2]).
@@ -111,15 +110,14 @@
 -export([async_wait_for_event/1, wait_for_event/1]).
 
 init() ->
-    cl:start(),
-    
-    %% make sure that openCL 1.2 is supported
-    ok.
+    case lists:member({1,2}, cl:versions()) of
+	false -> erlang:error(cl_1_2_not_supported);
+	true -> ok
+    end.
 
 start(Args) ->  cl:start(Args).
 start() -> cl:start().
 stop() -> cl:stop().
-noop() ->  cl:noop().
 get_platform_ids() -> cl:get_platform_ids().
 platform_info() -> cl:platform_info().
 get_platform_info(A1) -> cl:get_platform_info(A1).
@@ -127,9 +125,7 @@ get_platform_info(A1,A2) -> cl:get_platform_info(A1,A2).
 get_device_ids() -> cl:get_device_ids().
 get_device_ids(A1,A2) -> cl:get_device_ids(A1,A2).
 device_info() ->
-    cl:device_info_10() ++ 
-	cl:device_info_11()++
-	cl:device_info_12().
+    cl:device_info_10(cl:device_info_11(cl:device_info_12([]))).
 get_device_info(A1) -> cl:get_device_info(A1).
 get_device_info(A1,A2) -> cl:get_device_info(A1,A2).
 create_context(A1) -> cl:create_context(A1).

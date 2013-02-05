@@ -17,38 +17,33 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
-%%%    OpenCL 1.1 API
+%%%    DUMMY OpenCL 1.3 API - place holder
 %%% @end
 %%% Created : 13 Jan 2013 by Tony Rogvall <tony@rogvall.se>
 
--module(cl11).
+-module(cl13).
 
 -on_load(init/0).
 
 -export([start/0, start/1, stop/0]).
-%% Platform
 -export([get_platform_ids/0]).
 -export([platform_info/0]).
 -export([get_platform_info/1,get_platform_info/2]).
-%% Devices
 -export([get_device_ids/0, get_device_ids/2]).
 -export([device_info/0]).
 -export([get_device_info/1,get_device_info/2]).
-%% Context
 -export([create_context/1]).
 -export([create_context_from_type/1]).
 -export([release_context/1]).
 -export([retain_context/1]).
 -export([context_info/0]).
 -export([get_context_info/1,get_context_info/2]).
-%% Command queue
 -export([create_queue/3]).
 -export([set_queue_property/3]).
 -export([release_queue/1]).
 -export([retain_queue/1]).
 -export([queue_info/0]).
 -export([get_queue_info/1,get_queue_info/2]).
-%% Memory object
 -export([create_buffer/3, create_buffer/4]).
 -export([release_mem_object/1]).
 -export([retain_mem_object/1]).
@@ -57,27 +52,22 @@
 -export([image_info/0]).
 -export([get_image_info/1,get_image_info/2]).
 -export([get_supported_image_formats/3]).
--export([create_image2d/7]).
--export([create_image3d/9]).
-
-%% Sampler 
+-export([create_image/5]).
 -export([create_sampler/4]).
 -export([release_sampler/1]).
 -export([retain_sampler/1]).
 -export([sampler_info/0]).
 -export([get_sampler_info/1,get_sampler_info/2]).
-%% Program
 -export([create_program_with_source/2]).
 -export([create_program_with_binary/3]).
 -export([release_program/1]).
 -export([retain_program/1]).
 -export([build_program/3, async_build_program/3]).
--export([unload_compiler/0]).
+-export([unload_platform_compiler/1]).
 -export([program_info/0]).
 -export([get_program_info/1,get_program_info/2]).
 -export([program_build_info/0]).
 -export([get_program_build_info/2,get_program_build_info/3]).
-%% Kernel
 -export([create_kernel/2]).
 -export([create_kernels_in_program/1]).
 -export([set_kernel_arg/3]).
@@ -88,14 +78,13 @@
 -export([get_kernel_info/1,get_kernel_info/2]).
 -export([kernel_workgroup_info/0]).
 -export([get_kernel_workgroup_info/2,get_kernel_workgroup_info/3]).
-%% Events
 -export([enqueue_task/3, enqueue_task/4]).
 -export([nowait_enqueue_task/3]).
 -export([enqueue_nd_range_kernel/5]).
 -export([enqueue_nd_range_kernel/6]).
 -export([nowait_enqueue_nd_range_kernel/5]).
--export([enqueue_marker/1]).
--export([enqueue_barrier/1]).
+-export([enqueue_marker_with_wait_list/2]).
+-export([enqueue_barrier_with_wait_list/2]).
 -export([enqueue_wait_for_events/2]).
 -export([enqueue_read_buffer/5]).
 -export([enqueue_write_buffer/6]).
@@ -116,14 +105,13 @@
 -export([event_info/0]).
 -export([get_event_info/1, get_event_info/2]).
 -export([wait/1, wait/2]).
-
 -export([async_flush/1, flush/1]).
 -export([async_finish/1, finish/1]).
 -export([async_wait_for_event/1, wait_for_event/1]).
 
 init() ->
-    case lists:member({1,1}, cl:versions()) of
-	false -> erlang:error(cl_1_1_not_supported);
+    case lists:member({1,3}, cl:versions()) of
+	false -> erlang:error(cl_1_3_not_supported);
 	true -> ok
     end.
 
@@ -136,7 +124,8 @@ get_platform_info(A1) -> cl:get_platform_info(A1).
 get_platform_info(A1,A2) -> cl:get_platform_info(A1,A2).
 get_device_ids() -> cl:get_device_ids().
 get_device_ids(A1,A2) -> cl:get_device_ids(A1,A2).
-device_info() -> cl:device_info_10(cl:device_info_11([])).
+device_info() ->
+    cl:device_info_10(cl:device_info_11(cl:device_info_12([]))).
 get_device_info(A1) -> cl:get_device_info(A1).
 get_device_info(A1,A2) -> cl:get_device_info(A1,A2).
 create_context(A1) -> cl:create_context(A1).
@@ -163,12 +152,8 @@ get_mem_object_info(A1,A2) -> cl:get_mem_object_info(A1,A2).
 image_info() -> cl:image_info().
 get_image_info(A1) -> cl:get_image_info(A1).
 get_image_info(A1,A2) -> cl:get_image_info(A1,A2).
-get_supported_image_formats(A1,A2,A3) -> 
-    cl:get_supported_image_formats(A1,A2,A3).
-create_image2d(A1,A2,A3,A4,A5,A6,A7) -> 
-    cl:create_image2d(A1,A2,A3,A4,A5,A6,A7).
-create_image3d(A1,A2,A3,A4,A5,A6,A7,A8,A9) -> 
-    cl:create_image3d(A1,A2,A3,A4,A5,A6,A7,A8,A9).
+get_supported_image_formats(A1,A2,A3) -> cl:get_supported_image_formats(A1,A2,A3).
+create_image(A1,A2,A3,A4,A5) -> cl:create_image(A1,A2,A3,A4,A5).
 create_sampler(A1,A2,A3,A4) -> cl:create_sampler(A1,A2,A3,A4).
 release_sampler(A1) -> cl:release_sampler(A1).
 retain_sampler(A1) -> cl:retain_sampler(A1).
@@ -181,7 +166,7 @@ release_program(A1) -> cl:release_program(A1).
 retain_program(A1) -> cl:retain_program(A1).
 build_program(A1,A2,A3) -> cl:build_program(A1,A2,A3).
 async_build_program(A1,A2,A3) -> cl:async_build_program(A1,A2,A3).
-unload_compiler() -> cl:unload_compiler().
+unload_platform_compiler(A1) -> cl:unload_platform_compiler(A1).
 program_info() -> cl:program_info().
 get_program_info(A1) -> cl:get_program_info(A1).
 get_program_info(A1,A2) -> cl:get_program_info(A1,A2).
@@ -205,29 +190,31 @@ enqueue_task(A1,A2,A3,A4) -> cl:enqueue_task(A1,A2,A3,A4).
 nowait_enqueue_task(A1,A2,A3) -> cl:nowait_enqueue_task(A1,A2,A3).
 enqueue_nd_range_kernel(A1,A2,A3,A4,A5) -> 
     cl:enqueue_nd_range_kernel(A1,A2,A3,A4,A5).
-enqueue_nd_range_kernel(A1,A2,A3,A4,A5,A6) -> 
+enqueue_nd_range_kernel(A1,A2,A3,A4,A5,A6) ->
     cl:enqueue_nd_range_kernel(A1,A2,A3,A4,A5,A6).
-nowait_enqueue_nd_range_kernel(A1,A2,A3,A4,A5) -> 
+nowait_enqueue_nd_range_kernel(A1,A2,A3,A4,A5) ->
     cl:nowait_enqueue_nd_range_kernel(A1,A2,A3,A4,A5).
-enqueue_marker(A1) -> cl:enqueue_marker(A1).
-enqueue_barrier(A1) -> cl:enqueue_barrier(A1).
+enqueue_marker_with_wait_list(A1,A2) -> 
+    cl:enqueue_marker_with_wait_list(A1,A2).
+enqueue_barrier_with_wait_list(A1,A2) ->
+    cl:enqueue_barrier_with_wait_list(A1,A2).
 enqueue_wait_for_events(A1,A2) -> 
     cl:enqueue_wait_for_events(A1,A2).
 enqueue_read_buffer(A1,A2,A3,A4,A5) ->
     cl:enqueue_read_buffer(A1,A2,A3,A4,A5).
-enqueue_write_buffer(A1,A2,A3,A4,A5,A6) -> 
+enqueue_write_buffer(A1,A2,A3,A4,A5,A6) ->
     cl:enqueue_write_buffer(A1,A2,A3,A4,A5,A6).
 enqueue_write_buffer(A1,A2,A3,A4,A5,A6,A7) ->
     cl:enqueue_write_buffer(A1,A2,A3,A4,A5,A6,A7).
-nowait_enqueue_write_buffer(A1,A2,A3,A4,A5,A6) -> 
+nowait_enqueue_write_buffer(A1,A2,A3,A4,A5,A6) ->
     cl:nowait_enqueue_write_buffer(A1,A2,A3,A4,A5,A6).
-enqueue_read_image(A1,A2,A3,A4,A5,A6,A7) -> 
+enqueue_read_image(A1,A2,A3,A4,A5,A6,A7) ->
     cl:enqueue_read_image(A1,A2,A3,A4,A5,A6,A7).
-enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8) -> 
+enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8) ->
     cl:enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8).
 enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8,A9) ->
     cl:enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8,A9).
-nowait_enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8) -> 
+nowait_enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8) ->
     cl:nowait_enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8).
 enqueue_copy_image(A1,A2,A3,A4,A5,A6) ->
     cl:enqueue_copy_image(A1,A2,A3,A4,A5,A6).
@@ -235,11 +222,11 @@ enqueue_copy_image_to_buffer(A1,A2,A3,A4,A5,A6,A7) ->
     cl:enqueue_copy_image_to_buffer(A1,A2,A3,A4,A5,A6,A7).
 enqueue_copy_buffer_to_image(A1,A2,A3,A4,A5,A6,A7) ->
     cl:enqueue_copy_buffer_to_image(A1,A2,A3,A4,A5,A6,A7).
-enqueue_map_buffer(A1,A2,A3,A4,A5,A6) -> 
+enqueue_map_buffer(A1,A2,A3,A4,A5,A6) ->
     cl:enqueue_map_buffer(A1,A2,A3,A4,A5,A6).
-enqueue_map_image(A1,A2,A3,A4,A5,A6) -> 
+enqueue_map_image(A1,A2,A3,A4,A5,A6) ->
     cl:enqueue_map_image(A1,A2,A3,A4,A5,A6).
-enqueue_unmap_mem_object(A1,A2,A3) -> 
+enqueue_unmap_mem_object(A1,A2,A3) ->
     cl:enqueue_unmap_mem_object(A1,A2,A3).
 release_event(A1) -> cl:release_event(A1).
 retain_event(A1) -> cl:retain_event(A1).

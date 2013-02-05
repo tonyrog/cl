@@ -1,8 +1,10 @@
 
 MODULES = \
 	cl  \
+	cl10 \
 	cl11 \
 	cl12 \
+	cl13 \
 	clu
 
 EBIN = ../ebin
@@ -31,9 +33,6 @@ debug: all
 
 release: all
 
-depend:
-	edep -MM -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
-
 dialyze:
 	dialyzer --src -o dia.out $(ERLC_FLAGS) -c $(MODULES:%=%.erl) 
 
@@ -45,9 +44,10 @@ clean:
 	rm -f $(OBJS)
 
 $(APP_TARGET): $(APP_SRC) ../vsn.mk
-	sed -e 's;%VSN%;$(VSN);'  $< > $@
+	sed -e 's;git;\"$(VSN)\";'  $< > $@
 
--include depend.mk
+cl.erl:	../include/cl.hrl
+
 
 $(EBIN)/%.beam:	%.erl
 	$(ERLC) $(ERLC_FLAGS) -o $(EBIN) $<
