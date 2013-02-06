@@ -473,7 +473,13 @@ get_device_ids(_Platform, _Type) ->
 -spec device_info() -> [cl_device_info_key()].
     
 device_info() ->
-    device_info_10(device_info_11(device_info_12([]))).
+    lists:foldl(
+      fun({1,2},Acc) -> device_info_12(Acc);
+	 ({1,1},Acc) -> device_info_11(Acc);
+	 ({1,0},Acc) -> device_info_10(Acc);
+	 (_, Acc) -> Acc
+      end, [], versions()).
+
 	
 device_info_10(L) ->
     [
