@@ -1105,7 +1105,7 @@ ecl_kv_t kv_channel_type[] = { // enum
     { &ATOM(unsigned_int32), CL_UNSIGNED_INT32 },
     { &ATOM(half_float), CL_HALF_FLOAT },
     { &ATOM(float), CL_FLOAT },
-#if CL_VERSION_1_2 == 1
+#if (CL_VERSION_1_2 == 1) && defined(CL_UNORM_INT24)
     { &ATOM(unorm_int24), CL_UNORM_INT24 },
 #endif
     { 0, 0 }
@@ -1156,8 +1156,12 @@ ecl_kv_t kv_channel_order[] = {
     { &ATOM(rgx), CL_RGx },
     { &ATOM(rgbx), CL_RGBx },
 #if CL_VERSION_1_2 == 1
+#if defined(CL_DEPTH)
     { &ATOM(depth), CL_DEPTH },
+#endif
+#if defined(CL_DEPTH_STENCIL)
     { &ATOM(depth_stencil), CL_DEPTH_STENCIL },
+#endif
 #endif
     { 0, 0 }
 };
@@ -2654,7 +2658,9 @@ static void* ecl_context_main(void* arg)
 
     while(1) {
 	ecl_message_t m;
+	int res;
 	ecl_message_recv(self, &m);
+	UNUSED(res);
 
 	switch(m.type) {
 	case ECL_MESSAGE_STOP: {
@@ -2678,7 +2684,7 @@ static void* ecl_context_main(void* arg)
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
 		ERL_NIF_TERM reply;
-		int res;
+
 		reply = !err ? ATOM(ok) : ecl_make_error(m.env, err);
 		res = enif_send(0, &m.sender, m.env, 
 				enif_make_tuple3(m.env, 
@@ -2699,7 +2705,6 @@ static void* ecl_context_main(void* arg)
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
 		ERL_NIF_TERM reply;
-		int res;
 
 		reply = !err ? ATOM(ok) : ecl_make_error(m.env, err);
 		res = enif_send(0, &m.sender, m.env, 
@@ -2724,7 +2729,6 @@ static void* ecl_context_main(void* arg)
 	    // reply to caller pid !
 	    if (m.env) {
 		ERL_NIF_TERM reply;
-		int res;
 		
 		if (!err) {
 		    cl_int status;
@@ -2744,7 +2748,8 @@ static void* ecl_context_main(void* arg)
 			    reply = ATOM(complete);
 			break;
 		    default:
-			DBG("ecl_context_main: wait_for_event: status=%d");
+		      DBG("ecl_context_main: wait_for_event: status=%d",
+			  status);
 			// must/should be an error
 			reply = ecl_make_error(m.env, status);
 			break;
@@ -3467,6 +3472,7 @@ void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
     ErlNifEnv*        s_env;
     int res;
     UNUSED(program);
+    UNUSED(res);
 
     DBG("ecl_build_notify: done user_data=%p", user_data);
 
@@ -4635,6 +4641,7 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
     cl_int           err;
     void*            ptr;
     UNUSED(argc);
+    UNUSED(ptr);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
@@ -4690,6 +4697,7 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
     cl_int           err;
     void*            ptr;
     UNUSED(argc);
+    UNUSED(ptr);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
