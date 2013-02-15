@@ -1333,9 +1333,7 @@ ecl_info_t device_info[] =
     { &ATOM(version), CL_DEVICE_VERSION, false, OCL_STRING, 0 },
     { &ATOM(extensions), CL_DEVICE_EXTENSIONS, false, OCL_STRING, 0 },
     { &ATOM(platform), CL_DEVICE_PLATFORM, false, OCL_PLATFORM, 0 },
-
-#if CL_VERSION_1_2 == 1
-    { &ATOM(double_fp_config), CL_DEVICE_DOUBLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
+#if CL_VERSION_1_1 == 1
     { &ATOM(preferred_vector_width_half), CL_DEVICE_PREFERRED_VECTOR_WIDTH_HALF,false, OCL_UINT, 0},
     { &ATOM(host_unified_memory), CL_DEVICE_HOST_UNIFIED_MEMORY,false,OCL_BOOL,0},
     { &ATOM(native_vector_width_char), CL_DEVICE_NATIVE_VECTOR_WIDTH_CHAR,false,OCL_UINT, 0},
@@ -1346,6 +1344,9 @@ ecl_info_t device_info[] =
     { &ATOM(native_vector_width_double), CL_DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE,false,OCL_UINT, 0},
     { &ATOM(native_vector_width_half), CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF,false,OCL_UINT, 0},
     { &ATOM(opencl_c_version), CL_DEVICE_OPENCL_C_VERSION,false,OCL_STRING, 0},
+#endif
+#if CL_VERSION_1_2 == 1
+    { &ATOM(double_fp_config), CL_DEVICE_DOUBLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
     { &ATOM(linker_available), CL_DEVICE_LINKER_AVAILABLE,false,OCL_BOOL, 0},
     { &ATOM(built_in_kernels), CL_DEVICE_BUILT_IN_KERNELS,false, OCL_STRING, 0},
     { &ATOM(image_max_buffer_size), CL_DEVICE_IMAGE_MAX_BUFFER_SIZE,false,OCL_SIZE, 0},
