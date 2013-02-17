@@ -17,15 +17,16 @@
 //
 // NIF interface for OpenCL binding
 //
+
 #include <stdio.h>
+
+#ifndef WIN32
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-
-#ifndef WIN32
-#include <stdbool.h>
 #else
 #include <windows.h>
 #endif
@@ -2794,11 +2795,11 @@ static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_versions(ErlNifEnv* env, int argc,
 				 const ERL_NIF_TERM argv[])
 {
+    ERL_NIF_TERM list = enif_make_list(env, 0);
+    ERL_NIF_TERM vsn;
     UNUSED(env);
     UNUSED(argc);
     UNUSED(argv);
-    ERL_NIF_TERM list = enif_make_list(env, 0);
-    ERL_NIF_TERM vsn;
 
 #if CL_VERSION_1_0 == 1
     vsn = enif_make_tuple2(env, enif_make_int(env, 1), enif_make_int(env, 0));
