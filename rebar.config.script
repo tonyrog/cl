@@ -1,0 +1,176 @@
+%% -*- erlang -*-
+%% Config file for cl-application
+
+%% This would have been nicer if it was an escript..
+%% Start at the bottom and read upwards
+{value, {port_env, PortEnv0}, Config0} = lists:keytake(port_env, 1, CONFIG).
+
+GetEnv = fun(Var) -> 
+		 case os:getenv(Var) of
+		     [] -> false;
+		     Other -> Other
+		 end
+	 end.
+
+AddConf = fun(_Var, [], Config) -> Config;
+	     (Var, Value, Config) -> 
+		  lists:keystore(Var, 1, Config, {Var, Value})
+	  end.
+
+Error = fun(Format, Args) ->
+		io:format("~n***ERROR:~n" ++ Format ++"~n~n",Args),
+		throw(error)
+	end.
+
+ConcatDir = fun(Prefix, PostFix, Dir) ->
+		    Prefix ++ filename:join(Dir, PostFix)
+	    end.
+
+SetupUnix = fun(OCLDir) ->
+		    OCLINC_0 = "-I" ++ ConcatDir("", "include", OCLDir),
+		    OCLINC = case os:type() of
+				 {unix,  _} -> %% Add nvidia-current for non standard installation locations
+				     OCLINC_0 = " -I/usr/include/nvidia-current";
+				 _  -> OCLINC_0
+			     end,
+		    OCLLIB = "-L" ++ ConcatDir("", "lib", OCLDir),
+		    AddConf("OPENCL_LIBDIR", OCLLIB,
+			    AddConf("OPENCL_INCDIR", OCLINC, PortEnv0))
+	    end.
+%% Windows stuff below
+WinType = fun() -> 
+		  case GetEnv("TERM") of
+		      "msys"   -> mingw;
+		      "cygwin" -> cygwin;
+		      _ -> windows
+		  end
+	  end.
+
+WinEnvPrefix = fun(_, mingw)   -> 
+		       %% Both cl.exe and gcc.exe accepts Windows paths
+		       [Full|_] = string:tokens(os:cmd("where sh"), "\r\n"),
+		       filename:dirname(filename:dirname(Full));
+		  (cl, cygwin) ->
+		       io:format("WARNING: Cygwin not supported~n",[]),
+		       os:cmd("cygdrive -m /");
+		  (_, _) ->
+		       ""
+	       end.
+
+WinSetupGCC = fun(OpenCLDir) ->
+		      io:format("Using gcc as compiler~n"),
+		      Dir = case filelib:is_dir(OpenCLDir) of
+				true -> OpenCLDir;
+				false -> 
+				    EnvPrefix = WinEnvPrefix(gcc, WinType()),
+				    ExtDir = EnvPrefix++OpenCLDir,
+				    filelib:is_dir(ExtDir) orelse 
+					Error("Could not find OpenCL Dir in:~n"
+					      "  ~s~n  ~s~n"
+					      " set OPENCL_DIR=/path/to/opencl", 
+					      [OpenCLDir, ExtDir]),
+				    ExtDir
+			    end,
+		      Inc = ConcatDir("-I", "include", Dir),
+		      Lib = ConcatDir("-L", "lib", Dir),
+
+		      E0 = AddConf("OPENCL_LIBDIR", Lib,
+				   AddConf("OPENCL_INCDIR", Inc, PortEnv0)),
+		      GCCConf =[{"win32", "CC" , GetEnv("CC")},
+				{"win32", "DRV_CC_TEMPLATE",
+				 "$CC -c $CFLAGS $DRV_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
+				{"win32", "DRV_LINK_TEMPLATE",
+				 "$CC $PORT_IN_FILES $LDFLAGS $DRV_LDFLAGS -o $PORT_OUT_FILE"},
+				{"win32", "DRV_CFLAGS" , "-g -Wall $ERL_CFLAGS"},
+				{"win32", "DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
+				{"win32", "LDFLAGS", "$LDFLAGS $OPENCL_LIBDIR -lOpenCL"},
+				{"win32", "ERL_LDFLAGS", ""}],
+		      Replace = fun(New = {Os, Val, _}, Env) ->
+					Add = fun({POs, PVal, _}, {_,Acc}) 
+						    when POs =:= Os, Val =:= PVal ->
+						      {true, [New|Acc]};
+						 (Old,{Found,Acc}) -> {Found, [Old|Acc]}
+					      end,
+					case lists:foldl(Add, {false,[]}, Env) of
+					    {true,  Repl} -> Repl;
+					    {false, Repl} -> [New|Repl]
+					end
+				end,
+		      lists:foldl(Replace, E0, GCCConf)
+	      end.
+
+
+Win32VerifyLinkCmd = fun() ->
+			     LinkOut = os:cmd("link --version"),
+			     case LinkOut of
+				 "Microsoft" ++ _ -> ok;
+				 _ -> 
+				     Dir = filename:dirname(os:find_executable("cl.exe")),
+				     Path = os:getenv("PATH"),
+				     os:putenv("PATH", filename:nativename(Dir) ++ ";" ++ Path),
+				     io:format("WARNING: Wrong link.exe (non Microsoft) found, "
+					       "setting cl.exe's dir first in PATH~n", [])
+			     end
+		     end.
+
+WinSetupCL = fun(OpenCLDir) ->
+		     io:format("Using cl.exe as compiler~n"),
+		     Win32VerifyLinkCmd(),
+		     Dir = case filelib:is_dir(OpenCLDir) of
+			       true -> OpenCLDir;
+			       false -> 
+				   EnvPrefix = WinEnvPrefix(cl, WinType()),
+				   ExtDir = EnvPrefix++OpenCLDir,
+				   filelib:is_dir(ExtDir) orelse 
+				       Error("Could not find OpenCL Dir in:~n"
+					     "  ~s~n  ~s~n"
+					     " set OPENCL_DIR=/path/to/opencl", 
+					     [OpenCLDir, ExtDir]),
+				   ExtDir
+			   end,
+		     Inc = ConcatDir("/I ", "include", Dir),
+		     Lib = ConcatDir("", "lib", Dir),
+		     AddConf("OPENCL_LIBDIR", Lib,
+			     AddConf("OPENCL_INCDIR", Inc, PortEnv0))
+	     end.
+
+SetupWin32 = fun(OpenCLDir) ->
+		     %% Do we want to compile with Microsoft's toolchain
+		     case os:find_executable("cl.exe") of
+			 false ->
+			     os:find_executable("gcc") orelse 
+				 Error("No known compiler found",[]),
+			     WinSetupGCC(OpenCLDir);
+			 _ ->
+			     case GetEnv("CC") of
+				 "gcc"     -> WinSetupGCC(OpenCLDir);
+				 "gcc.exe" -> WinSetupGCC(OpenCLDir);
+				 "cc"      -> WinSetupGCC(OpenCLDir);
+				 "cc.exe"  -> WinSetupGCC(OpenCLDir);
+				 false     -> WinSetupCL(OpenCLDir);
+				 Other     -> Error("No known compiler found: CC=~s",[Other])
+			     end
+		     end
+	     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+OCLDir = case GetEnv("OPENCL_DIR") of
+	     false -> 
+		 case os:type() of
+		     {unix,  _} -> [];
+		     {darwin,_} -> [];
+		     {win32, _} -> "/opt/local/"
+		 end;
+	     Dir -> Dir
+	 end.
+
+PortEnv = case os:type() of
+	      {win32, _} -> %% Massage Windows paths 
+		  SetupWin32(OCLDir);
+	      _ ->
+		  SetupUnix(OCLDir)
+	  end.
+
+%% io:format("Config ~p~n",[PortEnv]).
+[{port_env, PortEnv}|Config0].
