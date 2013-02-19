@@ -29,8 +29,9 @@ ConcatDir = fun(Prefix, PostFix, Dir) ->
 SetupUnix = fun(OCLDir) ->
 		    OCLINC_0 = "-I" ++ ConcatDir("", "include", OCLDir),
 		    OCLINC = case os:type() of
-				 {unix,  _} -> %% Add nvidia-current for non standard installation locations
-				     OCLINC_0 = " -I/usr/include/nvidia-current";
+				 {unix,  linux} -> %% Add nvidia-current for non standard installation locations
+				     OCLINC_0 ++
+					 " -I/usr/include/nvidia-current";
 				 _  -> OCLINC_0
 			     end,
 		    OCLLIB = "-L" ++ ConcatDir("", "lib", OCLDir),
