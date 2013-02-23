@@ -69,6 +69,7 @@ endif
 ifeq ($(OSNAME), Linux)
 LINUX = Yes
 CFLAGS += -I/usr/include/nvidia-current
+CFLAGS += -I/opt/AMDAPP/include
 ifeq ($(WORDSIZE), 32)
 CFLAGS += -O3 -fPIC -m32 -DWORDSIZE=32
 endif
