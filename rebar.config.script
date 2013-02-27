@@ -73,7 +73,14 @@ WinSetupGCC = fun(OpenCLDir) ->
 				    ExtDir
 			    end,
 		      Inc = ConcatDir("-I", "include", Dir),
-		      Lib = ConcatDir("-L", "lib", Dir),
+		      Type = case erlang:system_info(wordsize) of
+				 4 -> "x86";
+				 8 -> "x64"
+			     end,
+		      Lib = case filelib:is_dir(filename:join([Dir, "lib", Type])) of
+				true  -> ConcatDir("-L", filename:join("lib", Type), Dir);
+				false -> ConcatDir("-L", "lib", Dir)
+			    end,
 
 		      E0 = AddConf("OPENCL_LIBDIR", Lib,
 				   AddConf("OPENCL_INCDIR", Inc, PortEnv0)),
@@ -130,7 +137,15 @@ WinSetupCL = fun(OpenCLDir) ->
 				   ExtDir
 			   end,
 		     Inc = ConcatDir("/I ", "include", Dir),
-		     Lib = ConcatDir("", "lib", Dir),
+		     Type = case erlang:system_info(wordsize) of
+				4 -> "x86";
+				8 -> "x64"
+			    end,
+		     Lib = case filelib:is_dir(filename:join([Dir, "lib", Type])) of
+			       true  -> ConcatDir("", filename:join("lib", Type), Dir);
+			       false -> ConcatDir("", "lib", Dir)
+			   end,
+
 		     AddConf("OPENCL_LIBDIR", Lib,
 			     AddConf("OPENCL_INCDIR", Inc, PortEnv0))
 	     end.
