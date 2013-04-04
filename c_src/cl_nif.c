@@ -46,16 +46,22 @@
 typedef cl_bool bool;
 #define true 1
 #define false 0
+#endif 
+
+
+#ifdef WIN_X64
+#define ecl_get_sizet(a1,a2,a3) enif_get_uint64(a1,a2,a3)
+#define ecl_make_sizet(a1,a2) enif_make_uint64(a1,a2)
+#else
+#define ecl_get_sizet(a1,a2,a3) enif_get_ulong(a1,a2,(unsigned long*)a3)
+#define ecl_make_sizet(a1,a2) enif_make_ulong(a1,a2)
 #endif
+
 
 #define UNUSED(a) ((void) a)
 
 #include "erl_nif.h"
 #include "cl_hash.h"
-
-// size_t has is long most of the time (but not win64)
-// FIXME WIN64
-#define ecl_get_sizet(a1,a2,a3) enif_get_ulong(a1,a2,(unsigned long*)a3)
 
 #define sizeof_array(a) (sizeof(a) / sizeof(a[0]))
 
@@ -2198,10 +2204,10 @@ static int get_object(ErlNifEnv* env, const ERL_NIF_TERM term,
 
 static int get_object_list(ErlNifEnv* env, const ERL_NIF_TERM term,
 			   ecl_resource_t* rtype, bool nullp,
-			   void** robjv, size_t* rlen)
+			   void** robjv, cl_uint* rlen)
 {
-    size_t maxlen = *rlen;
-    size_t n = 0;
+    cl_uint maxlen = *rlen;
+    cl_uint n = 0;
     ERL_NIF_TERM list = term;
 
     while(n < maxlen) {
@@ -2298,7 +2304,9 @@ static int ecl_make_binary(ErlNifEnv* src_env,
 	//  iolist to binary
 	if (!enif_inspect_iolist_as_binary(src_env, src, bin))
 	    return 0;
-	return enif_make_binary(dst_env, bin);
+	// ref count binary ?
+	enif_make_binary(dst_env, bin);
+	return 1; 
     }
 }
 
@@ -2494,7 +2502,7 @@ static ERL_NIF_TERM make_info_element(ErlNifEnv* env, ocl_type_t type, void* ptr
     case OCL_UINT: return enif_make_uint(env, *((cl_uint*)ptr));
     case OCL_HALF: return enif_make_uint(env, *((cl_half*)ptr));
     case OCL_ULONG: return enif_make_uint64(env, *((cl_ulong*)ptr));
-    case OCL_SIZE: return enif_make_ulong(env, *((size_t*)ptr));
+    case OCL_SIZE: return ecl_make_sizet(env, *((size_t*)ptr));
     case OCL_FLOAT: return enif_make_double(env, *((cl_float*)ptr));
     case OCL_DOUBLE: return enif_make_double(env, *((cl_double*)ptr));
     case OCL_BOOL: return (*((cl_bool*)ptr)) ? ATOM(true) : ATOM(false);
@@ -2509,7 +2517,7 @@ static ERL_NIF_TERM make_info_element(ErlNifEnv* env, ocl_type_t type, void* ptr
 	return make_enum(env, *((cl_int*)ptr), kv);
 
     case OCL_POINTER: 
-	return enif_make_ulong(env, *((intptr_t*)ptr));
+	return ecl_make_sizet(env, *((intptr_t*)ptr));
 
     case OCL_PLATFORM:
 	return ecl_lookup_object(env,&platform_r,*(void**)ptr,0);
@@ -2927,7 +2935,7 @@ static ERL_NIF_TERM ecl_create_context(ErlNifEnv* env, int argc,
 				       const ERL_NIF_TERM argv[])
 {
     cl_device_id     device_list[MAX_DEVICES];
-    size_t           num_devices = MAX_DEVICES;
+    cl_uint          num_devices = MAX_DEVICES;
     cl_context       context;
     cl_int err;
     ecl_notify_data_t* bp;
@@ -3406,7 +3414,7 @@ static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc,
     ecl_object_t* o_context;
     cl_program     program;
     cl_device_id   device_list[MAX_DEVICES];
-    size_t         num_devices = MAX_DEVICES;
+    cl_uint        num_devices = MAX_DEVICES;
     ErlNifBinary   binary_list[MAX_DEVICES];
     size_t         num_binaries = MAX_DEVICES;
     size_t         lengths[MAX_DEVICES];
@@ -3506,7 +3514,7 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
 {
     ecl_object_t*    o_program;
     cl_device_id     device_list[MAX_DEVICES];
-    size_t           num_devices = MAX_DEVICES;
+    cl_uint          num_devices = MAX_DEVICES;
     char             options[MAX_OPTION_LIST];
     ERL_NIF_TERM     ref;
     ecl_build_data_t* bp;
@@ -4027,7 +4035,7 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
     ecl_object_t*    o_queue;
     cl_kernel        kernel;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     cl_event         event;
     cl_int           err;
     cl_bool          want_event;
@@ -4071,7 +4079,7 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
     ecl_object_t*    o_queue;
     cl_kernel     kernel;
     cl_event      wait_list[MAX_WAIT_LIST];
-    size_t        num_events = MAX_WAIT_LIST;
+    cl_uint       num_events = MAX_WAIT_LIST;
     size_t        global_work_size[MAX_WORK_SIZE];
     size_t        local_work_size[MAX_WORK_SIZE];
     size_t        work_dim = MAX_WORK_SIZE;
@@ -4099,7 +4107,7 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
 
     err = clEnqueueNDRangeKernel(o_queue->queue, kernel,
-				 work_dim,
+				 (cl_uint) work_dim,
 				 0, // global_work_offset,
 				 global_work_size,
 				 local_work_size,
@@ -4154,7 +4162,7 @@ static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc,
 {
     cl_command_queue queue;
     cl_event      wait_list[MAX_WAIT_LIST];
-    size_t        num_events = MAX_WAIT_LIST;
+    cl_uint       num_events = MAX_WAIT_LIST;
     cl_int        err;
     UNUSED(argc);
 
@@ -4191,7 +4199,7 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
     size_t           offset;
     size_t           size;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     cl_event         event;
     ErlNifBinary*    bin;
     cl_int           err;
@@ -4250,7 +4258,7 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
     size_t           offset;
     size_t           size;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     cl_event         event;
     ErlNifBinary     bin;
     ErlNifEnv*       bin_env;
@@ -4324,7 +4332,7 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
     size_t           row_pitch;
     size_t           slice_pitch;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     size_t           num_origin = 3;
     size_t           num_region = 3;
     size_t           psize;
@@ -4396,7 +4404,7 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     size_t           row_pitch;
     size_t           slice_pitch;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     size_t           num_origin = 3;
     size_t           num_region = 3;
     size_t           psize;
@@ -4479,7 +4487,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
     size_t           dst_origin[3];
     size_t           region[3];
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     size_t           num_src_origin = 3;
     size_t           num_dst_origin = 3;
     size_t           num_region = 3;
@@ -4533,7 +4541,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc,
     size_t           region[3];
     size_t           dst_offset;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     size_t           num_src_origin = 3;
     size_t           num_region = 3;
     cl_event         event;
@@ -4588,7 +4596,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc,
     size_t           origin[3];
     size_t           region[3];
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     size_t           num_src_origin = 3;
     size_t           num_region = 3;
     cl_event         event;
@@ -4638,7 +4646,7 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
     size_t           offset;
     size_t           size;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     cl_event         event;
     cl_int           err;
     void*            ptr;
@@ -4692,7 +4700,7 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
     size_t           row_pitch;
     size_t           slice_pitch;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     size_t           num_origin = 3;
     size_t           num_region = 3;
     cl_event         event;
@@ -4748,7 +4756,7 @@ static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc,
     ecl_object_t*    o_queue;
     cl_mem           memobj;
     cl_event         wait_list[MAX_WAIT_LIST];
-    size_t           num_events = MAX_WAIT_LIST;
+    cl_uint          num_events = MAX_WAIT_LIST;
     cl_event         event;
     void* mapped_ptr;
     cl_int err;
@@ -4808,8 +4816,8 @@ static ERL_NIF_TERM ecl_enqueue_barrier_with_wait_list(ErlNifEnv* env,
 						       const ERL_NIF_TERM argv[])
 {
     ecl_object_t*    o_queue;
-    cl_event      wait_list[MAX_WAIT_LIST];
-    size_t        num_events = MAX_WAIT_LIST;
+    cl_event         wait_list[MAX_WAIT_LIST];
+    cl_uint          num_events = MAX_WAIT_LIST;
     cl_event         event;
     cl_int           err;
     cl_bool          want_event = true;  // make this an arg?
@@ -4845,7 +4853,7 @@ static ERL_NIF_TERM ecl_enqueue_marker_with_wait_list(ErlNifEnv* env,
 {
     ecl_object_t*    o_queue;
     cl_event      wait_list[MAX_WAIT_LIST];
-    size_t        num_events = MAX_WAIT_LIST;
+    cl_uint        num_events = MAX_WAIT_LIST;
     cl_int           err;
     cl_event         event;
     cl_bool          want_event = true;  // make this an arg?

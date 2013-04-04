@@ -81,9 +81,14 @@ WinSetupGCC = fun(OpenCLDir) ->
 				true  -> ConcatDir("-L", filename:join("lib", Type), Dir);
 				false -> ConcatDir("-L", "lib", Dir)
 			    end,
-
+		      
 		      E0 = AddConf("OPENCL_LIBDIR", Lib,
 				   AddConf("OPENCL_INCDIR", Inc, PortEnv0)),
+		      E1 = case erlang:system_info(wordsize) of
+			       4 -> E0;
+			       8 -> AddConf("WIN_TARGET", "-DWIN_X64", E0)
+			   end,
+
 		      GCCConf =[{"win32", "CC" , GetEnv("CC")},
 				{"win32", "DRV_CC_TEMPLATE",
 				 "$CC -c $CFLAGS $DRV_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
@@ -104,7 +109,7 @@ WinSetupGCC = fun(OpenCLDir) ->
 					    {false, Repl} -> [New|Repl]
 					end
 				end,
-		      lists:foldl(Replace, E0, GCCConf)
+		      lists:foldl(Replace, E1, GCCConf)
 	      end.
 
 
@@ -146,8 +151,12 @@ WinSetupCL = fun(OpenCLDir) ->
 			       false -> ConcatDir("", "lib", Dir)
 			   end,
 
-		     AddConf("OPENCL_LIBDIR", Lib,
-			     AddConf("OPENCL_INCDIR", Inc, PortEnv0))
+		     E0 = AddConf("OPENCL_LIBDIR", Lib,
+				  AddConf("OPENCL_INCDIR", Inc, PortEnv0)),
+		     case erlang:system_info(wordsize) of
+			 4 -> E0;
+			 8 -> AddConf("WIN_TARGET", "-DWIN_X64", E0)
+		     end
 	     end.
 
 SetupWin32 = fun(OpenCLDir) ->
