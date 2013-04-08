@@ -2128,7 +2128,7 @@ static ERL_NIF_TERM make_object(ErlNifEnv* env, const ERL_NIF_TERM type,
     else
 	return enif_make_tuple3(env,
 				type,
-				enif_make_ulong(env, (unsigned long) robject),
+				ecl_make_sizet(env, (size_t) robject),
 				enif_make_resource(env, robject));
 }
 
@@ -2139,7 +2139,7 @@ static int get_ecl_object(ErlNifEnv* env, const ERL_NIF_TERM term,
 {
     const ERL_NIF_TERM* elem;
     int arity;
-    unsigned long handle;
+    size_t handle;  // not really a size_t but the type has a good size
 
     if (nullp && (term == ATOM(undefined))) {
 	*robjectp = 0;
@@ -2151,11 +2151,11 @@ static int get_ecl_object(ErlNifEnv* env, const ERL_NIF_TERM term,
 	return 0;
     if (!enif_is_atom(env, elem[0]) || (elem[0] != rtype->type))
 	return 0;
-    if (!enif_get_ulong(env, elem[1], &handle))
+    if (!ecl_get_sizet(env, elem[1], &handle))
 	return 0;
     if (!enif_get_resource(env, elem[2], rtype->res, (void**) robjectp))
 	return 0;
-    if ((unsigned long)*robjectp != handle)
+    if ((size_t)*robjectp != handle)
 	return 0;
     return 1;
 }
@@ -3867,6 +3867,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
     int      ival;
     long     lval;
     unsigned long luval;
+    size_t   sval;
     ErlNifUInt64 u64val;
     ErlNifSInt64 i64val;
     ErlNifBinary bval;
@@ -3984,9 +3985,9 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 		    *((cl_double*)ptr) = fval;
 		    break;
 		case OCL_SIZE:
-		    if (!enif_get_ulong(env, values[i], &luval))
+		    if (!ecl_get_sizet(env, values[i], &sval))
 			return enif_make_badarg(env);
-		    *((size_t*)ptr) = luval;
+		    *((size_t*)ptr) = sval;
 		    break;
 		case OCL_BOOL:
 		case OCL_STRING:
