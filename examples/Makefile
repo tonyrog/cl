@@ -9,7 +9,7 @@ MODULES = \
 
 
 
-EBIN = ../ebin
+EBIN = .
 ERLC = erlc
 
 override ERLC_FLAGS = -W -pa ../../cl/ebin
@@ -27,7 +27,7 @@ debug: all
 release: all
 
 depend:
-	edep -MM -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
+	edep -MM -o . $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
 
 dialyze:
 	dialyzer --src -o dia.out $(ERLC_FLAGS) -c $(MODULES:%=%.erl) 
