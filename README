@@ -14,8 +14,8 @@ set ERL_LIBS=/home/username/src/
 
 Windows Users: 
 The scripts look for the OpenCL files in /opt/local/ by default.
-You can also use the environment variable OPENCL_DIR to point
-another location.
+You can also set the environment variable OPENCL_DIR to point
+to another location.
 
 This is an example of howto set up the building env:
 I'm assuming you got an mingw environment.
@@ -24,6 +24,13 @@ Download a development kit from Nvidia, ATI or Intel:
 e.g. http://software.intel.com/en-us/vcsource/tools/opencl-sdk-2013
 cp -R /c/Intel SDK/lib /opt/local/
 cp -R /c/Intel SDK/include /opt/local/
+
+If you want to build with mingw gcc use:
+CC=gcc rebar compile
+
+NOTE: That mingw64-gcc can not be linked with MSVC libs, see 
+http://sourceforge.net/apps/trac/mingw-w64/wiki/Answer%2064%20bit%20MSVC-generated%20x64%20.lib
+Follow the steps there to make a libOpenCL.dll.a and it should work.
 
 NOTE: OpenCL with ATI drivers for CPU usage don't work when erlang
 is started within a mingw shell but does if you start it from
