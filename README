@@ -25,7 +25,23 @@ e.g. http://software.intel.com/en-us/vcsource/tools/opencl-sdk-2013
 cp -R /c/Intel SDK/lib /opt/local/
 cp -R /c/Intel SDK/include /opt/local/
 
+Example building 64b from CMD:
+------------------------------
+Setup windows build environment
+
+c:\src\cl> "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+
+Setup the paths 
+
+c:\src\cl> set PATH="c:\Program Files\erl5.10.1\bin";%PATH%
+c:\src\cl> set PATH="c:\tools\git\cmd";%PATH%
+c:\src\cl> set OPENCL_DIR="c:\Intel~1\"
+
+And build
+
+c:\src\cl> ..\rebar\rebar.cmd compile
+
 NOTE: OpenCL with ATI drivers for CPU usage don't work when erlang
 is started within a mingw shell but does if you start it from
-a Windows CMD.exe shell.
+a Windows CMD.exe shell.  (This may depend on the AMD driver version)
 
