@@ -48,8 +48,13 @@ __kernel void program1(int n, int m) {
 ",
     {ok,Program} = cl:create_program_with_source(Context,Source1),
     io:format("Program: ~p\n", [Program]),
-    {ok,Info} = cl:get_program_info(Program),
-    io:format("ProgramInfo: ~p\n", [Info]),
+    %% {ok,Info} = cl:get_program_info(Program),
+    %% io:format("ProgramInfo: ~p\n", [I, Info])
+    foreach(
+      fun(I) ->
+	      {ok,Info} = cl:get_program_info(Program,I),
+	      io:format("ProgramInfo: ~w ~p\n", [I, Info])
+      end, cl:program_info()--[binary_sizes,binaries]),
     foreach(
       fun(Device) ->
 	      {ok,BuildInfo} = cl:get_program_build_info(Program,Device),
