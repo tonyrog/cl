@@ -118,7 +118,7 @@ run (Data, DevType) ->
     %% Write data into input array
     {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, Data, []),
     io:format("write data enqueued\n"),
-    erlang:display_string("enqueu write\n"),
+    erlang:display_string("enqueue write\n"),
 
     %% Set kernel arguments
     clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
