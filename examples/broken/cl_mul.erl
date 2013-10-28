@@ -14,41 +14,46 @@
 -define(DATA_SIZE, 1024).
 -define(ITEM_SIZE, (16*4)).
 
-encode_matrix(M) ->
-    cl:encode_argument({float16,M}).
+encode_matrix ({X1, X2, X3, X4
+               ,X5, X6, X7, X8
+               ,X9, X10,X11,X12
+               ,X13,X14,X15,X16}) ->
+    <<?cl_float16(X1, X2, X3, X4
+                 ,X5, X6, X7, X8
+                 ,X9, X10,X11,X12
+                 ,X13,X14,X15,X16)>>.
 
-decode_matrix(Data) ->
+decode_matrix (Data) ->
     case Data of
-    <<
-     ?cl_float(A11), ?cl_float(A12), ?cl_float(A13), ?cl_float(A14),
-     ?cl_float(A21), ?cl_float(A22), ?cl_float(A23), ?cl_float(A24),
-     ?cl_float(A31), ?cl_float(A32), ?cl_float(A33), ?cl_float(A34),
-     ?cl_float(A41), ?cl_float(A42), ?cl_float(A43), ?cl_float(A44),
-     Rest/binary
-     >> ->
-	    [{A11,A12,A13,A14,
-	      A21,A22,A23,A24,
-	      A31,A32,A33,A34,
-	      A41,A42,A43,A44} | decode_matrix(Rest)];
+    << ?cl_float16( A11, A12, A13, A14
+                  , A21, A22, A23, A24
+                  , A31, A32, A33, A34
+                  , A41, A42, A43, A44
+                  ),
+       Rest/binary >> ->
+	    [{ A11,A12,A13,A14
+             , A21,A22,A23,A24
+             , A31,A32,A33,A34
+             , A41,A42,A43,A44 } | decode_matrix(Rest)];
 	<<>> ->
 	    []
     end.
 
-id_matrix() ->
+id_matrix () ->
     {float16,{1,0,0,0,
 	      0,1,0,0,
 	      0,0,1,0,
 	      0,0,0,1}}.
 
-zero_matrix() ->
+zero_matrix () ->
     {float16,{0,0,0,0,
 	      0,0,0,0,
 	      0,0,0,0,
 	      0,0,0,0}}.
 
-r() -> random:uniform().
+r () -> random:uniform().
 
-random_matrices(N) ->
+random_matrices (N) ->
     list_to_binary(
       lists:map(
 	fun(_I) ->
@@ -67,7 +72,7 @@ dump_data(Bin) ->
 
 test() ->
     test(all).
-    
+
 test(DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
     Data = test_data(),
@@ -83,7 +88,7 @@ examples_dir() ->
 run(Data, DevType) ->
     E = clu:setup(DevType),
     io:format("platform created\n"),
-    
+
     Filename = filename:join(examples_dir(),"mul4x4.cl"),
     io:format("build: ~s\n", [Filename]),
     {ok,Program} = clu:build_source_file(E, Filename),
@@ -110,7 +115,7 @@ run(Data, DevType) ->
 
     dump_data(Data),
 
-    %% Write data into input array 
+    %% Write data into input array
     {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, Data, []),
     io:format("write data enqueued\n"),
     erlang:display_string("enqueu write\n"),
@@ -132,12 +137,12 @@ run(Data, DevType) ->
 					     [Global], [LocalWork], [Event1]),
     io:format("nd range [~w, ~w] kernel enqueued\n",
 	      [[Global],[LocalWork]]),
-    
+
     %% Enqueue the read from device memory (wait for kernel to finish)
     {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),
     io:format("read buffer enqueued\n"),
 
-    %% Now flush the queue to make things happend 
+    %% Now flush the queue to make things happend
     ok = cl:flush(Queue),
     io:format("flushed\n"),
 

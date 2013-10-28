@@ -178,13 +178,13 @@
 -define(cl_float2(X1,X2), ?cl_float(X1), ?cl_float(X2)).
 -define(cl_float4(X1,X2,X3,X4),
 	?cl_float(X1), ?cl_float(X2), ?cl_float(X3), ?cl_float(X4)).
--define(cl_float8(X1,X2,X3,X4,X5,X6,X7,X8), 
+-define(cl_float8(X1,X2,X3,X4,X5,X6,X7,X8),
 	?cl_float(X1), ?cl_float(X2), ?cl_float(X3), ?cl_float(X4),
 	?cl_float(X5), ?cl_float(X6), ?cl_float(X7), ?cl_float(X8)).
--define(cl_float16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16), 
-	?cl_float(X1), ?cl_float(X2), ?cl_float(X3), ?cl_float(X4),
-	?cl_float(X5), ?cl_float(X6), ?cl_float(X7), ?cl_float(X8),
-	?cl_float(X9), ?cl_float(X10), ?cl_float(X11), ?cl_float(X12),
+-define(cl_float16(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16),
+	?cl_float(X1),  ?cl_float(X2),  ?cl_float(X3),  ?cl_float(X4),
+	?cl_float(X5),  ?cl_float(X6),  ?cl_float(X7),  ?cl_float(X8),
+	?cl_float(X9),  ?cl_float(X10), ?cl_float(X11), ?cl_float(X12),
 	?cl_float(X13), ?cl_float(X14), ?cl_float(X15), ?cl_float(X16)).
 
 -define(cl_double2(X1,X2), ?cl_double(X1), ?cl_double(X2)).
