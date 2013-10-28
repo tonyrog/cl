@@ -5,7 +5,8 @@ MODULES = \
 	cl_map \
 	cl_binary_test \
 	cl_bandwidth \
-	cl_test
+	cl_test \
+	cl_mul
 
 
 
@@ -18,7 +19,7 @@ OBJS = $(MODULES:%=$(EBIN)/%.beam)
 
 TARGET_FILES = $(OBJS)
 
-debug: ERLC_FLAGS += -Ddebug 
+debug: ERLC_FLAGS += -Ddebug
 
 all: $(TARGET_FILES)
 
@@ -30,7 +31,7 @@ depend:
 	edep -MM -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
 
 dialyze:
-	dialyzer --src -o dia.out $(ERLC_FLAGS) -c $(MODULES:%=%.erl) 
+	dialyzer --src -o dia.out -pa ../ebin -c $(MODULES:%=%.erl)
 
 clean:
 	rm -f $(OBJS)
