@@ -21,7 +21,9 @@ encode_matrix ({X1, X2, X3, X4
     <<?cl_float16(X1, X2, X3, X4
                  ,X5, X6, X7, X8
                  ,X9, X10,X11,X12
-                 ,X13,X14,X15,X16)>>.
+                 ,X13,X14,X15,X16)>>;
+encode_matrix ({float16, M}) ->
+    encode_matrix(M).
 
 decode_matrix (Data) ->
     case Data of
@@ -121,7 +123,7 @@ run (Data, DevType) ->
     erlang:display_string("enqueue write\n"),
 
     %% Set kernel arguments
-    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
+    clu:apply_kernel_args(Kernel, [Input,Output,encode_matrix(id_matrix()),{uint,Count}]),
     io:format("kernel args set\n"),
 
     Device = hd(E#cl.devices),
