@@ -2,10 +2,11 @@
 // Multiply count 4x4 matrices with a constant matrix
 //
 
-__kernel void mul4x4 (__global float*    input,
-                      __global float*    output,
-                      const float16      a,
-                      const unsigned int count)
+__kernel void
+mul4x4 (__global float*    input,
+        __global float*    output,
+        const float16      a,
+        const unsigned int count)
 {
     size_t ix;
     __global float* b;
