@@ -2,26 +2,23 @@
 %%% Author  : Tony Rogvall <tony@rogvall.se>
 %%% Description : Multiply matrix with list of matrices
 %%% Created : 16 Nov 2009 by Tony Rogvall <tony@rogvall.se>
-
 -module(cl_mul).
 
 -compile(export_all).
-
--import(lists, [map/2]).
 
 -include("../include/cl.hrl").
 
 -define(DATA_SIZE, 1024).
 -define(ITEM_SIZE, (16*4)).
 
-encode_matrix ({X1, X2, X3, X4
-               ,X5, X6, X7, X8
-               ,X9, X10,X11,X12
-               ,X13,X14,X15,X16}) ->
-    <<?cl_float16(X1, X2, X3, X4
-                 ,X5, X6, X7, X8
-                 ,X9, X10,X11,X12
-                 ,X13,X14,X15,X16)>>;
+encode_matrix ({ X1, X2, X3, X4
+               , X5, X6, X7, X8
+               , X9, X10,X11,X12
+               , X13,X14,X15,X16}) ->
+    <<?cl_float16( X1, X2, X3, X4
+                 , X5, X6, X7, X8
+                 , X9, X10,X11,X12
+                 , X13,X14,X15,X16)>>;
 encode_matrix ({float16, M}) ->
     encode_matrix(M).
 
@@ -33,38 +30,37 @@ decode_matrix (Data) ->
                   , A41, A42, A43, A44
                   ),
        Rest/binary >> ->
-            [{ A11,A12,A13,A14
-             , A21,A22,A23,A24
-             , A31,A32,A33,A34
-             , A41,A42,A43,A44 } | decode_matrix(Rest)];
+            [{ A11, A12, A13, A14
+             , A21, A22, A23, A24
+             , A31, A32, A33, A34
+             , A41, A42, A43, A44 } | decode_matrix(Rest)];
         <<>> ->
             []
     end.
 
 id_matrix () ->
-    {float16,{1,0,0,0,
-              0,1,0,0,
-              0,0,1,0,
-              0,0,0,1}}.
+    {float16, { 1, 0, 0, 0
+              , 0, 1, 0, 0
+              , 0, 0, 1, 0
+              , 0, 0, 0, 1}}.
 
 zero_matrix () ->
-    {float16,{0,0,0,0,
-              0,0,0,0,
-              0,0,0,0,
-              0,0,0,0}}.
+    {float16, { 0, 0, 0, 0
+              , 0, 0, 0, 0
+              , 0, 0, 0, 0
+              , 0, 0, 0, 0}}.
 
 r () -> random:uniform().
 
 random_matrices (N) ->
     list_to_binary(
-      lists:map(
-    fun(_I) ->
-        M = {r(),r(),r(),r(),
-             r(),r(),r(),r(),
-             r(),r(),r(),r(),
-             r(),r(),r(),r()},
-        encode_matrix(M)
-    end, lists:seq(1, N))).
+      [begin
+           M = { r(), r(), r(), r()
+               , r(), r(), r(), r()
+               , r(), r(), r(), r()
+               , r(), r(), r(), r()},
+           encode_matrix(M)
+       end || _ <- lists:seq(1, N)]).
 
 test_data () ->
     random_matrices(4).
