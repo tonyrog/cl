@@ -33,38 +33,38 @@ decode_matrix (Data) ->
                   , A41, A42, A43, A44
                   ),
        Rest/binary >> ->
-	    [{ A11,A12,A13,A14
+            [{ A11,A12,A13,A14
              , A21,A22,A23,A24
              , A31,A32,A33,A34
              , A41,A42,A43,A44 } | decode_matrix(Rest)];
-	<<>> ->
-	    []
+        <<>> ->
+            []
     end.
 
 id_matrix () ->
     {float16,{1,0,0,0,
-	      0,1,0,0,
-	      0,0,1,0,
-	      0,0,0,1}}.
+              0,1,0,0,
+              0,0,1,0,
+              0,0,0,1}}.
 
 zero_matrix () ->
     {float16,{0,0,0,0,
-	      0,0,0,0,
-	      0,0,0,0,
-	      0,0,0,0}}.
+              0,0,0,0,
+              0,0,0,0,
+              0,0,0,0}}.
 
 r () -> random:uniform().
 
 random_matrices (N) ->
     list_to_binary(
       lists:map(
-	fun(_I) ->
-		M = {r(),r(),r(),r(),
-		     r(),r(),r(),r(),
-		     r(),r(),r(),r(),
-		     r(),r(),r(),r()},
-		encode_matrix(M)
-	end, lists:seq(1, N))).
+    fun(_I) ->
+        M = {r(),r(),r(),r(),
+             r(),r(),r(),r(),
+             r(),r(),r(),r(),
+             r(),r(),r(),r()},
+        encode_matrix(M)
+    end, lists:seq(1, N))).
 
 test_data () ->
     random_matrices(4).
@@ -133,12 +133,12 @@ run (Data, DevType) ->
     %% Enqueue the kernel
     Global = Count,
     if Local > Count ->  LocalWork = Count;
-       true ->   	 LocalWork = Local
+       true ->        LocalWork = Local
     end,
     {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
-					     [Global], [LocalWork], [Event1]),
+                         [Global], [LocalWork], [Event1]),
     io:format("nd range [~w, ~w] kernel enqueued\n",
-	      [[Global],[LocalWork]]),
+          [[Global],[LocalWork]]),
 
     %% Enqueue the read from device memory (wait for kernel to finish)
     {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),
@@ -164,9 +164,9 @@ run (Data, DevType) ->
 
     clu:teardown(E),
     case Event3Res of
-	{ok,ResData} ->
-	    dump_data(ResData);
-	_ ->
-	    ok
+    {ok,ResData} ->
+        dump_data(ResData);
+    _ ->
+        ok
     end,
     Event3Res.
