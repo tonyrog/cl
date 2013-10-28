@@ -64,28 +64,28 @@ random_matrices (N) ->
 		encode_matrix(M)
 	end, lists:seq(1, N))).
 
-test_data() ->
+test_data () ->
     random_matrices(4).
 
-dump_data(Bin) ->
+dump_data (Bin) ->
     io:format("data=~p\n", [decode_matrix(Bin)]).
 
-test() ->
+test () ->
     test(all).
 
-test(DevType) ->
+test (DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
     Data = test_data(),
     run(Data, DevType).
 
-examples_dir() ->
+examples_dir () ->
     filename:join(code:lib_dir(cl), "examples").
 
 %%
 %% execute a kernel that squares floating point numbers
 %% now only one device is used (We run on cpu for debugging)
 %%
-run(Data, DevType) ->
+run (Data, DevType) ->
     E = clu:setup(DevType),
     io:format("platform created\n"),
 
