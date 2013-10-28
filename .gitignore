@@ -2,6 +2,7 @@ c_src/*.o
 ebin
 deps
 priv/cl_nif.so
+src/depend.mk
 
 doc/*.md
 doc/*.css
