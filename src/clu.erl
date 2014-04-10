@@ -23,15 +23,18 @@
 
 -export([setup/0, setup/1, teardown/1]).
 -export([context/1, device_list/1, device/1]).
--export([build_source/2]).
--export([build_binary/2]).
--export([build_source_file/2, compile_file/1]).
+-export([build_source/2,build_source/3]).
+-export([build_binary/2,build_binary/3]).
+-export([build_source_file/2, build_source_file/3]).
+-export([compile_file/1,compile_file/2]).
 -export([get_program_binaries/1]).
 -export([apply_kernel_args/2]).
 -export([wait_complete/1]).
 
 -include("../include/cl.hrl").
 -import(lists, [map/2]).
+
+-opaque clu_state()   ::  #cl{} | undefined.
 
 %%
 %% @type clu_state() = any()
@@ -112,10 +115,19 @@ device(E) ->
 %% @spec build_source(E::clu_state(), Source::iodata()) ->
 %%   {'ok',cl_program()} | {'error',{cl_error(), Logs}}
 %%
+-spec build_source(E::clu_state(), Source::iodata()) ->
+			  {'ok',cl_program()} | 
+			  {'error',{cl_error(),Logs::term}}.
 
 build_source(E, Source) ->
+    build_source(E, Source, "").
+
+-spec build_source(E::clu_state(), Source::iodata(), Options::string()) ->
+			  {'ok',cl_program()} | 
+			  {'error',{cl_error(),Logs::term}}.
+build_source(E, Source, Options) ->
     {ok,Program} = cl:create_program_with_source(E#cl.context,Source),
-    case cl:build_program(Program, E#cl.devices, "") of
+    case cl:build_program(Program, E#cl.devices, Options) of
 	ok ->
 	    Status = [cl:get_program_build_info(Program, Dev, status)
 		      || Dev <- E#cl.devices],
@@ -136,18 +148,36 @@ build_source(E, Source) ->
 	    {error,{Error,Logs}}
     end.
 
+-spec build_source_file(E::clu_state(), File::string()) ->
+			       {'ok',cl_program()} | 
+			       {'error',{cl_error(),Logs::term}}.
+build_source_file(E,File) ->
+    build_source_file(E, File,"").
 
-build_source_file(E, File) ->
+-spec build_source_file(E::clu_state(), File::string(), Options::string()) ->
+			       {'ok',cl_program()} | 
+			       {'error',{cl_error(),Logs::term}}.
+build_source_file(E, File,Options) ->
     case file:read_file(File) of
 	{ok,Binary} ->
-	    build_source(E, Binary);
+	    build_source(E,Binary,Options);
 	Error ->
 	    Error
     end.
 
+-spec compile_file(File::string()) ->
+			  {'ok',{[cl_device_id()],[binary()]}} |
+			  {'error',{cl_error(),Logs::term}}.
 compile_file(File) ->
+    compile_file(File,"").
+
+-spec compile_file(File::string(), Options::string()) ->
+			  {'ok',{[cl_device_id()],[binary()]}} |
+			  {'error',{cl_error(),Logs::term}}.
+
+compile_file(File,Options) ->
     E = setup(all),
-    Result = build_source_file(E, File),
+    Result = build_source_file(E,File,Options),
     Res =
 	case Result of
 	    {error,{_,_Logs}} ->
@@ -185,10 +215,12 @@ get_program_logs(Program) ->
 		Log
 	end, DeviceList).
 
-
 build_binary(E, {DeviceList,BinaryList}) ->
+    build_binary(E, {DeviceList,BinaryList},"").
+
+build_binary(E, {DeviceList,BinaryList},Options) ->
     {ok,Program} = cl:create_program_with_binary(E#cl.context, DeviceList, BinaryList),
-    case cl:build_program(Program, DeviceList, "") of
+    case cl:build_program(Program, DeviceList, Options) of
 	ok ->
 	    {ok,Program};
 	Error ->
