@@ -4103,14 +4103,19 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
     if (!get_bool(env, argv[5], &want_event))
 	return enif_make_badarg(env);
 
-    if ((work_dim != temp_dim) || (work_dim == 0))
+    if (work_dim == 0){
 	return enif_make_badarg(env);
+    }
+
+    if( temp_dim > 0 && work_dim != temp_dim ){
+	return enif_make_badarg(env);
+    }
 
     err = clEnqueueNDRangeKernel(o_queue->queue, kernel,
 				 (cl_uint) work_dim,
 				 0, // global_work_offset,
 				 global_work_size,
-				 local_work_size,
+				 temp_dim ? local_work_size : NULL,
 				 num_events, 
 				 num_events ? wait_list : NULL,
 				 want_event ? &event : NULL);
