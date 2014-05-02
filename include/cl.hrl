@@ -397,6 +397,46 @@
 -define(CL_DBL_MIN,          2.2250738585072014e-308).
 -define(CL_DBL_EPSILON,      2.2204460492503131e-16).
 
+-type cl_channel_order() :: 
+	r | a | rg | ra | rgb | rgba | rgba | bgra | argb |
+	intensity | luminance | rx | rgx | rgbx |
+	%% 1.2
+	depth | depth_stencil.
+	
+-type cl_channel_type() :: 
+	snorm_int8 | snorm_int16 | unorm_int8 | unorm_int16 |
+	unorm_short_565 | unorm_short_555 | unorm_int_101010 |
+	signed_int8 | signed_int16 | signed_int32 | unsigned_int8 |
+	unsigned_int16 | unsigned_int32 | half_float | float |
+	%% 1.2 
+	unorm_int24.
+
+-type cl_mem_object_type() ::
+	buffer | image2d | image3d |
+	%% 1.2
+	image2d_array | image1d | image1d_array | image1d_buffer.
+
+-record(cl_image_format,
+	{
+	  cl_channel_order :: cl_channel_order(),
+	  cl_channel_type  :: cl_channel_type()
+	}).
+
+%% 1.2 
+
+-record(cl_image_desc,
+	{
+	  image_type  :: cl_mem_object_type(),
+	  image_width :: non_neg_integer(),
+	  image_height :: non_neg_integer(),
+	  image_depth  :: non_neg_integer(),
+	  image_array_size :: non_neg_integer(),
+	  image_row_pitch ::  non_neg_integer(),
+	  image_slice_pitch = 1 ::  non_neg_integer(),
+	  num_mip_levels  = 0 ::  non_neg_integer(),
+	  num_samples  = 0 ::  non_neg_integer(),
+	  buffer :: cl_mem() %% when CL_MEM_OBJECT_IMAGE1D_BUFFER
+	}).
 
 %% cl platform & default contex
 -record(cl,

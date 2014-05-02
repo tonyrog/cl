@@ -72,6 +72,7 @@
 
 -export([start/0, start/1, stop/0]).
 -export([noop/0]).
+-export([versions/0]).
 %% Platform
 -export([get_platform_ids/0]).
 -export([platform_info/0]).
@@ -79,6 +80,9 @@
 %% Devices
 -export([get_device_ids/0, get_device_ids/2]).
 -export([device_info/0]).
+-export([device_info_10/1]).
+-export([device_info_11/1]).
+-export([device_info_12/1]).
 -export([get_device_info/1,get_device_info/2]).
 %% Context
 -export([create_context/1]).
@@ -103,6 +107,7 @@
 -export([image_info/0]).
 -export([get_image_info/1,get_image_info/2]).
 -export([get_supported_image_formats/3]).
+-export([create_image/5]).
 -export([create_image2d/7]).
 -export([create_image3d/9]).
 
@@ -119,6 +124,7 @@
 -export([retain_program/1]).
 -export([build_program/3, async_build_program/3]).
 -export([unload_compiler/0]).
+-export([unload_platform_compiler/1]).
 -export([program_info/0]).
 -export([get_program_info/1,get_program_info/2]).
 -export([program_build_info/0]).
@@ -142,6 +148,8 @@
 -export([nowait_enqueue_nd_range_kernel/5]).
 -export([enqueue_marker/1]).
 -export([enqueue_barrier/1]).
+-export([enqueue_marker_with_wait_list/2]).
+-export([enqueue_barrier_with_wait_list/2]).
 -export([enqueue_wait_for_events/2]).
 -export([enqueue_read_buffer/5]).
 -export([enqueue_write_buffer/6]).
@@ -182,19 +190,13 @@
 -define(is_event(X), element(1,X) =:= event_t).
 
 -ifdef(debug).
--define(VARIANT, "debug").
 -define(DBG(F,A), io:format((F),(A))).
 -else.
--define(VARIANT, "release").
 -define(DBG(F,A), ok).
 -endif.
 
 init() ->
-    Lib = filename:join([code:lib_dir(cl),"lib",?VARIANT]),
-    Nif = case erlang:system_info(wordsize) of
-	      4 -> filename:join([Lib,"32","cl_nif"]);
-	      8 -> filename:join([Lib,"64","cl_nif"])
-	  end,
+    Nif = filename:join([code:priv_dir(cl), "cl_nif"]),
     ?DBG("Loading: ~s\n", [Nif]),
     erlang:load_nif(Nif, 0).
 
@@ -248,30 +250,41 @@ stop()  ->
 noop() ->
     erlang:error(nif_not_loaded).
 
+%%
+%% @spec versions() -> [{Major::integer(),Minor::integer()}]
+%%
+%% @doc Run a no operation towards the NIF object. This call can be used
+%% to messure the call overhead to the NIF objeect.
+%%
+-spec versions() -> [{Major::integer(),Minor::integer()}].
+
+versions() ->
+    erlang:error(nif_not_loaded).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Platform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%
 %% @type cl_platform_info_key() =
-%%    { 'profile' | 'name' | 'vendor' | 'extensions' }.
+%%    'profile' | 'name' | 'vendor' | 'extensions'.
 
 -type cl_platform_info_key() ::
-    { 'profile' | 'name' | 'vendor' | 'extensions' }.
+	'profile' | 'name' | 'vendor' | 'extensions'.
 %%
 %% @type cl_platform_info() =
-%%    { {'profile',string()} |
+%%      {'profile',string()} |
 %%      {'version', string()} |
 %%      {'name',string()} |
 %%      {'vendor',string()} |
-%%      {'extensions',string()} }.
+%%      {'extensions',string()}.
 
 -type cl_platform_info() ::
-    { {'profile',string()} |
+      {'profile',string()} |
       {'version',string()} |
       {'name',string()} |
       {'vendor',string()} |
-      {'extensions',string()} }.
+      {'extensions',string()}.
 
 %%
 %% @spec get_platform_ids() ->
@@ -385,7 +398,7 @@ get_platform_info(Platform) when ?is_platform(Platform) ->
 %%  'name' | 'vendor' | 'driver_version' | 'profile' | 'version' |
 %%  'extensions' | 'platform' }
 %%
--type cl_device_info_key() :: { 'type' | 'vendor_id' | 'max_compute_units' |
+-type cl_device_info_key() :: 'type' | 'vendor_id' | 'max_compute_units' |
  'max_work_item_dimensions' | 'max_work_group_size' |
  'max_work_item_sizes' |
  'preferred_vector_width_char' | 'preferred_vector_width_short' |
@@ -405,7 +418,7 @@ get_platform_info(Platform) when ?is_platform(Platform) ->
  'profiling_timer_resolution' | 'endian_little' | 'available' |
  'compiler_available' | 'execution_capabilities' | 'queue_properties' |
  'name' | 'vendor' | 'driver_version' | 'profile' | 'version' |
- 'extensions' | 'platform' }.
+ 'extensions' | 'platform'.
 
 %%
 %% @type cl_device_info() = {cl_device_info_key(), term()}
@@ -460,7 +473,17 @@ get_device_ids(_Platform, _Type) ->
 -spec device_info() -> [cl_device_info_key()].
     
 device_info() ->
-    [type, 
+    lists:foldl(
+      fun({1,2},Acc) -> device_info_12(Acc);
+	 ({1,1},Acc) -> device_info_11(Acc);
+	 ({1,0},Acc) -> device_info_10(Acc);
+	 (_, Acc) -> Acc
+      end, [], versions()).
+
+	
+device_info_10(L) ->
+    [
+     type, 
      vendor_id, 
      max_compute_units,
      max_work_item_dimensions,
@@ -509,7 +532,41 @@ device_info() ->
      profile,
      version,
      extensions,
-     platform].
+     platform | L
+    ].
+
+device_info_11(L) ->
+    [
+     preferred_vector_width_half,
+     host_unified_memory,
+     native_vector_width_char,
+     native_vector_width_short,
+     native_vector_width_int,
+     native_vector_width_long,
+     native_vector_width_float,
+     native_vector_width_double,
+     native_vector_width_half,
+     opencl_c_version | L
+    ].
+
+device_info_12(L) ->
+    [
+     double_fp_config,
+     linker_available,
+     built_in_kernels,
+     image_max_buffer_size,
+     image_max_array_size,
+     parent_device,
+     partition_max_sub_devices,
+     partition_properties,
+     partition_affinity_domain,
+     partition_type,
+     reference_count,
+     preferred_interop_user_sync,
+     printf_buffer_size | L
+%%     image_pitch_alignment,
+%%     image_base_address_alignment
+    ].
 
 %%
 %% @spec get_device_info(DevID::cl_device_id(), Info::cl_device_info_key()) ->
@@ -1092,8 +1149,9 @@ retain_mem_object(Mem) when ?is_mem(Mem) ->
     ok.
 
 
--type cl_mem_info_key() :: {'object_type' | 'flags' | 'size' | 'host_ptr' | 'map_count' |
-			    'reference_count' | 'context'}.
+-type cl_mem_info_key() :: 
+	'object_type' | 'flags' | 'size' | 'host_ptr' | 'map_count' |
+	'reference_count' | 'context'.
 
 
 %%
@@ -1485,6 +1543,13 @@ async_build_program(_Program, _DeviceList, _Options) ->
 unload_compiler() ->   
     erlang:error(nif_not_loaded).
 
+%% @spec unload_platform_compiler(Platform :: cl_platform_id()) ->
+%%   'ok' | {'error', cl_error()}
+-spec unload_platform_compiler(Platform::cl_platform_id()) ->
+    'ok' | {'error', cl_error()}.
+unload_platform_compiler(_Platform) ->
+    erlang:error(nif_not_loaded).
+
 program_info() ->
     [
      reference_count,
@@ -1857,6 +1922,27 @@ enqueue_write_buffer(_Queue, _Buffer, _Offset, _Size, _Data, _WaitList,
 enqueue_barrier(_Queue) ->
     erlang:error(nif_not_loaded).
 
+%% @spec enqueue_marker_with_wait_list(Queue::cl_queue(),
+%%                    WaitList::[cl_event()]) ->
+%%    {'ok', cl_event()} | {'error', cl_error()}
+
+-spec enqueue_marker_with_wait_list(Queue::cl_queue(),
+				    WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_marker_with_wait_list(_Queue, _WaitList) ->
+    erlang:error(nif_not_loaded).    
+
+%% @spec enqueue_barrier_with_wait_list(Queue::cl_queue(),
+%%                    WaitList::[cl_event()]) ->
+%%    {'ok', cl_event()} | {'error', cl_error()}
+-spec enqueue_barrier_with_wait_list(Queue::cl_queue(),
+				     WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+enqueue_barrier_with_wait_list(_Queue, _WaitList) ->
+    erlang:error(nif_not_loaded).
+    
+
 
 enqueue_read_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
 		   _WaitList) ->
@@ -1996,6 +2082,12 @@ get_event_info(Event) when ?is_event(Event) ->
 get_supported_image_formats(_Context, _Flags, _ImageType) ->
     erlang:error(nif_not_loaded).
 
+%% 1.2
+create_image(_Context, _MemFlags, _ImageFormat, _ImageDesc, _Data) ->
+    erlang:error(nif_not_implemented).
+
+%% _ImageFormat = {image_channel_order, image_channel_data_type}
+%% fixme make into record!
 create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Picth,
 		_Data) ->
     erlang:error(nif_not_loaded).

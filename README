@@ -1,38 +1,47 @@
 Welcome to the Erlang OpenCL binding
 
-To get started you need erlang, preferably R14. You also need
-GCC and a machine with OpenCL installed. 
+To get started you need erlang, preferably R16B. 
+You also need 'rebar' and a 'C' compiler, i.e. 
+GCC (or CL.EXE) and a machine with OpenCL installed. 
 
-To build: just run make
+To build: just run rebar compile
 
 To build examples: Goto the examples directory and run make.
 
 Make sure erlang finds the cl/ebin directory.
+For example if this file is /home/username/src/cl/README
+set ERL_LIBS=/home/username/src/
 
 Windows Users: 
-I'm assuming you got an mingw environment, otherwise you are on your own.
-
-mkdir -p /opt/local/include/CL
-mkdir -p /opt/local/lib
-
-Download all headers from http://www.khronos.org/registry/cl/
-and put them in /opt/local/include/CL
+The scripts look for the OpenCL files in /opt/local/ by default.
 You can also use the environment variable OPENCL_DIR to point
-out other locations.
+another location.
 
-Find a OpenCL.lib available in Nvidia or ATI developments kits
-cp /c/CUDA/lib/OpenCL.dll /opt/local/lib
+This is an example of howto set up the building env:
+I'm assuming you got an mingw environment.
 
-Also you might need autoconf package available at:
-http://sourceforge.net/projects/mingw/files_beta/MSYS/
+Download a development kit from Nvidia, ATI or Intel:
+e.g. http://software.intel.com/en-us/vcsource/tools/opencl-sdk-2013
+cp -R /c/Intel SDK/lib /opt/local/
+cp -R /c/Intel SDK/include /opt/local/
 
-OpenCL with ATI drivers for CPU usage don't work when erlang
+Example building 64b from CMD:
+------------------------------
+Setup windows build environment
+
+c:\src\cl> "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+
+Setup the paths 
+
+c:\src\cl> set PATH="c:\Program Files\erl5.10.1\bin";%PATH%
+c:\src\cl> set PATH="c:\tools\git\cmd";%PATH%
+c:\src\cl> set OPENCL_DIR="c:\Intel~1\"
+
+And build
+
+c:\src\cl> ..\rebar\rebar.cmd compile
+
+NOTE: OpenCL with ATI drivers for CPU usage don't work when erlang
 is started within a mingw shell but does if you start it from
-a Windows CMD.exe shell.
-
-If you don't like mingws compiler you can use Microsoft compiler by running 
-$ make MCL=true
-This assumes that you have all the environment variables set.
-They can be set by adding first in your 'msys.bat':
-call "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+a Windows CMD.exe shell.  (This may depend on the AMD driver version)
 
