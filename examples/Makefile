@@ -5,6 +5,7 @@ MODULES = \
 	cl_map \
 	cl_binary_test \
 	cl_bandwidth \
+	cl_mul \
 	cl_test
 
 
