@@ -14,8 +14,15 @@
 -define(DATA_SIZE, 1024).
 -define(ITEM_SIZE, (16*4)).
 
-encode_matrix(M) ->
-    cl:encode_argument({float16,M}).
+encode_matrix({float16,M}) -> encode_matrix(M);
+encode_matrix({ X1, X2, X3, X4
+               , X5, X6, X7, X8
+               , X9, X10,X11,X12
+               , X13,X14,X15,X16}) ->
+    <<?cl_float16( X1, X2, X3, X4
+                 , X5, X6, X7, X8
+                 , X9, X10,X11,X12
+                 , X13,X14,X15,X16)>>.
 
 decode_matrix(Data) ->
     case Data of
@@ -116,7 +123,7 @@ run(Data, DevType) ->
     erlang:display_string("enqueu write\n"),
 
     %% Set kernel arguments
-    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
+    clu:apply_kernel_args(Kernel, [Input,Output,encode_matrix(id_matrix()),{uint,Count}]),
     io:format("kernel args set\n"),
 
     Device = hd(E#cl.devices),
