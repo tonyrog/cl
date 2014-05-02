@@ -1,8 +1,8 @@
 Welcome to the Erlang OpenCL binding
 
-To get started you need erlang, preferably R16B. 
-You also need 'rebar' and a 'C' compiler, i.e. 
-GCC (or CL.EXE) and a machine with OpenCL installed. 
+To get started you need erlang, preferably R16B.
+You also need 'rebar' and a 'C' compiler, i.e.
+GCC (or CL.EXE) and a machine with OpenCL installed.
 
 To build: just run rebar compile
 
@@ -12,7 +12,9 @@ Make sure erlang finds the cl/ebin directory.
 For example if this file is /home/username/src/cl/README
 set ERL_LIBS=/home/username/src/
 
-Windows Users: 
+To build the doc: `rebar get-deps compile doc`
+
+Windows Users:
 The scripts look for the OpenCL files in /opt/local/ by default.
 You can also use the environment variable OPENCL_DIR to point
 another location.
@@ -31,7 +33,7 @@ Setup windows build environment
 
 c:\src\cl> "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
 
-Setup the paths 
+Setup the paths
 
 c:\src\cl> set PATH="c:\Program Files\erl5.10.1\bin";%PATH%
 c:\src\cl> set PATH="c:\tools\git\cmd";%PATH%
