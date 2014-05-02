@@ -1636,14 +1636,14 @@ create_kernels_in_program(_Program) ->
 %% @type cl_kernel_arg() = integer() | float() | binary()
 %%
 %% @spec set_kernel_arg(Kernel::cl_kernel(), Index::non_neg_integer(),
-%%                      Argument::cl_kernel_arg()) -> 
+%%                      Argument::cl_kernel_arg()) ->
 %%    'ok' | {'error', cl_error()}
-%% @doc Used to set the argument value for a specific argument of a kernel. 
-%% 
+%% @doc Used to set the argument value for a specific argument of a kernel.
+%%
 %% For now set_kernel_arg handles integer and floats
 %% to set any other type use `<<Foo:Bar/native...>>'
 %% use the macros defined in cl.hrl to get it right (except for padding)
-%% 
+%%
 %% A kernel object does not update the reference count for objects
 %% such as memory, sampler objects specified as argument values by
 %% set_kernel_arg/3, Users may not rely on a kernel object to retain

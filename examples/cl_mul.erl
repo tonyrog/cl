@@ -2,88 +2,91 @@
 %%% Author  : Tony Rogvall <tony@rogvall.se>
 %%% Description : Multiply matrix with list of matrices
 %%% Created : 16 Nov 2009 by Tony Rogvall <tony@rogvall.se>
-
 -module(cl_mul).
 
 -compile(export_all).
-
--import(lists, [map/2]).
 
 -include("../include/cl.hrl").
 
 -define(DATA_SIZE, 1024).
 -define(ITEM_SIZE, (16*4)).
 
-encode_matrix(M) ->
-    cl:encode_argument({float16,M}).
+encode_matrix ({ X1, X2, X3, X4
+               , X5, X6, X7, X8
+               , X9, X10,X11,X12
+               , X13,X14,X15,X16}) ->
+    <<?cl_float16( X1, X2, X3, X4
+                 , X5, X6, X7, X8
+                 , X9, X10,X11,X12
+                 , X13,X14,X15,X16)>>;
+encode_matrix ({float16, M}) ->
+    encode_matrix(M).
 
-decode_matrix(Data) ->
+decode_matrix (Data) ->
     case Data of
-    <<
-     ?cl_float(A11), ?cl_float(A12), ?cl_float(A13), ?cl_float(A14),
-     ?cl_float(A21), ?cl_float(A22), ?cl_float(A23), ?cl_float(A24),
-     ?cl_float(A31), ?cl_float(A32), ?cl_float(A33), ?cl_float(A34),
-     ?cl_float(A41), ?cl_float(A42), ?cl_float(A43), ?cl_float(A44),
-     Rest/binary
-     >> ->
-	    [{A11,A12,A13,A14,
-	      A21,A22,A23,A24,
-	      A31,A32,A33,A34,
-	      A41,A42,A43,A44} | decode_matrix(Rest)];
-	<<>> ->
-	    []
+    << ?cl_float16( A11, A12, A13, A14
+                  , A21, A22, A23, A24
+                  , A31, A32, A33, A34
+                  , A41, A42, A43, A44
+                  ),
+       Rest/binary >> ->
+            [{ A11, A12, A13, A14
+             , A21, A22, A23, A24
+             , A31, A32, A33, A34
+             , A41, A42, A43, A44 } | decode_matrix(Rest)];
+        <<>> ->
+            []
     end.
 
-id_matrix() ->
-    {float16,{1,0,0,0,
-	      0,1,0,0,
-	      0,0,1,0,
-	      0,0,0,1}}.
+id_matrix () ->
+    {float16, { 1, 0, 0, 0
+              , 0, 1, 0, 0
+              , 0, 0, 1, 0
+              , 0, 0, 0, 1}}.
 
-zero_matrix() ->
-    {float16,{0,0,0,0,
-	      0,0,0,0,
-	      0,0,0,0,
-	      0,0,0,0}}.
+zero_matrix () ->
+    {float16, { 0, 0, 0, 0
+              , 0, 0, 0, 0
+              , 0, 0, 0, 0
+              , 0, 0, 0, 0}}.
 
-r() -> random:uniform().
+r () -> random:uniform().
 
-random_matrices(N) ->
+random_matrices (N) ->
     list_to_binary(
-      lists:map(
-	fun(_I) ->
-		M = {r(),r(),r(),r(),
-		     r(),r(),r(),r(),
-		     r(),r(),r(),r(),
-		     r(),r(),r(),r()},
-		encode_matrix(M)
-	end, lists:seq(1, N))).
+      [begin
+           M = { r(), r(), r(), r()
+               , r(), r(), r(), r()
+               , r(), r(), r(), r()
+               , r(), r(), r(), r()},
+           encode_matrix(M)
+       end || _ <- lists:seq(1, N)]).
 
-test_data() ->
+test_data () ->
     random_matrices(4).
 
-dump_data(Bin) ->
+dump_data (Bin) ->
     io:format("data=~p\n", [decode_matrix(Bin)]).
 
-test() ->
+test () ->
     test(all).
-    
-test(DevType) ->
+
+test (DevType) ->
     %% Create binary with floating points 1.0 ... 1024.0
     Data = test_data(),
     run(Data, DevType).
 
-examples_dir() ->
+examples_dir () ->
     filename:join(code:lib_dir(cl), "examples").
 
 %%
 %% execute a kernel that squares floating point numbers
 %% now only one device is used (We run on cpu for debugging)
 %%
-run(Data, DevType) ->
+run (Data, DevType) ->
     E = clu:setup(DevType),
     io:format("platform created\n"),
-    
+
     Filename = filename:join(examples_dir(),"mul4x4.cl"),
     io:format("build: ~s\n", [Filename]),
     {ok,Program} = clu:build_source_file(E, Filename),
@@ -110,13 +113,13 @@ run(Data, DevType) ->
 
     dump_data(Data),
 
-    %% Write data into input array 
+    %% Write data into input array
     {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, Data, []),
     io:format("write data enqueued\n"),
-    erlang:display_string("enqueu write\n"),
+    erlang:display_string("enqueue write\n"),
 
     %% Set kernel arguments
-    clu:apply_kernel_args(Kernel, [Input,Output,id_matrix(),{uint,Count}]),
+    clu:apply_kernel_args(Kernel, [Input,Output,encode_matrix(id_matrix()),{uint,Count}]),
     io:format("kernel args set\n"),
 
     Device = hd(E#cl.devices),
@@ -126,18 +129,18 @@ run(Data, DevType) ->
     %% Enqueue the kernel
     Global = Count,
     if Local > Count ->  LocalWork = Count;
-       true ->   	 LocalWork = Local
+       true ->        LocalWork = Local
     end,
     {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
-					     [Global], [LocalWork], [Event1]),
+                         [Global], [LocalWork], [Event1]),
     io:format("nd range [~w, ~w] kernel enqueued\n",
-	      [[Global],[LocalWork]]),
-    
+          [[Global],[LocalWork]]),
+
     %% Enqueue the read from device memory (wait for kernel to finish)
     {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),
     io:format("read buffer enqueued\n"),
 
-    %% Now flush the queue to make things happend 
+    %% Now flush the queue to make things happend
     ok = cl:flush(Queue),
     io:format("flushed\n"),
 
@@ -157,9 +160,9 @@ run(Data, DevType) ->
 
     clu:teardown(E),
     case Event3Res of
-	{ok,ResData} ->
-	    dump_data(ResData);
-	_ ->
-	    ok
+    {ok,ResData} ->
+        dump_data(ResData);
+    _ ->
+        ok
     end,
     Event3Res.
