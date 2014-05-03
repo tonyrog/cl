@@ -4,12 +4,13 @@
 
 __kernel void mul4x4(__global float* input,
 		     __global float* output,
-		     const float16 a,
+		     const float16 aa,
 		     const unsigned int count)
 {
     size_t ix;
     __global float* b;
     __global float* c;
+    float *a = (float*)&aa;
     
     ix = get_global_id(0);
     if (ix < count) {
@@ -20,7 +21,7 @@ __kernel void mul4x4(__global float* input,
 
 	for (i=0; i<4; i++) {
 	    for (j=0; j<4; j++) {
-	        float s1 = 0.0;
+	        float s1 = 0.0f;
 		for (k=0; k<4; k++) {
 		    float t1 = a[4*i+k];
 		    float t2 = b[4*k+j];
