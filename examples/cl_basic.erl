@@ -47,6 +47,12 @@ __kernel void program1(int n, int m) {
 }
 ",
     {ok,Program} = cl:create_program_with_source(Context,Source1),
+    foreach(
+      fun(Device) ->
+	      {ok,Status} = cl:get_program_build_info(Program,Device,status),
+	      io:format("Status @ ~w: ~p\n", [Device,Status])
+      end, DeviceList),
+
     io:format("Program: ~p\n", [Program]),
     {ok,Info} = cl:get_program_info(Program),
     io:format("ProgramInfo: ~p\n", [Info]),

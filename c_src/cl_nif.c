@@ -3490,7 +3490,7 @@ void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
     // clGetProgramBuildInfo(bp->program->program, CL_PROGRAM_BUILD_STATUS,
 
     // reply = !err ? ATOM(ok) : ecl_make_error(bp->env, err);
-        
+
     if(enif_equal_tids(bp->tid, enif_thread_self()))
        s_env = bp->s_env;
     else
@@ -3603,14 +3603,79 @@ static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc,
     return ATOM(ok);
 }
 
+// Special (workaround) for checking if program may have binaries
+static int program_may_have_binaries(cl_program program)
+{
+    cl_uint num_devices;
+    size_t returned_size;
+    cl_device_id devices[MAX_DEVICES];
+    int i;
+
+    if (clGetProgramInfo(program,
+			 CL_PROGRAM_NUM_DEVICES,
+			 sizeof(num_devices),
+			 &num_devices,
+			 &returned_size) != CL_SUCCESS)
+	return 0;
+
+    if (clGetProgramInfo(program, CL_PROGRAM_DEVICES,
+			 num_devices*sizeof(cl_device_id),
+			 devices, NULL) != CL_SUCCESS)
+	return 0;
+
+    for (i = 0; i < num_devices; i++) {
+	cl_build_status build_status = CL_BUILD_NONE;
+        if (clGetProgramBuildInfo(program, devices[i], CL_PROGRAM_BUILD_STATUS,
+				  sizeof(build_status), 
+				  &build_status, NULL) != CL_SUCCESS)
+	    return 0;
+	if (build_status != CL_BUILD_SUCCESS) return 0;
+    }
+    return 1;
+}
+
+// Special util to extract program binary_sizes
+static ERL_NIF_TERM make_program_binary_sizes(ErlNifEnv* env,
+					      cl_program program)
+{
+    cl_int err;
+    ERL_NIF_TERM list;
+    size_t returned_size;
+    cl_uint num_devices;
+    size_t size[MAX_DEVICES];
+    int i;
+
+    memset(size, 0,     sizeof(size));
+
+    if ((err = clGetProgramInfo(program,
+				CL_PROGRAM_NUM_DEVICES,
+				sizeof(num_devices),
+				&num_devices,
+				&returned_size)))
+	return ecl_make_error(env, err);
+
+    if (program_may_have_binaries(program)) {
+	if ((err = clGetProgramInfo(program,
+				    CL_PROGRAM_BINARY_SIZES,
+				    num_devices*sizeof(size_t),
+				    &size[0],
+				    &returned_size)))
+	    return ecl_make_error(env, err);
+    }
+    list = enif_make_list(env, 0);
+    for (i = num_devices-1; i >= 0; i--) {
+	ERL_NIF_TERM elem = enif_make_long(env, size[i]);
+	list = enif_make_list_cell(env, elem, list);
+    }
+    return enif_make_tuple2(env, ATOM(ok), list);
+}
+
+
 // Special util to extract program binaries
 static ERL_NIF_TERM make_program_binaries(ErlNifEnv* env, cl_program program)
 {
     cl_int err;
     ERL_NIF_TERM list;
-    size_t size[MAX_DEVICES];
-    ErlNifBinary binary[MAX_DEVICES];
-    unsigned char* data[MAX_DEVICES];
     size_t returned_size;
     cl_uint num_devices;
     int i;
@@ -3622,46 +3687,63 @@ static ERL_NIF_TERM make_program_binaries(ErlNifEnv* env, cl_program program)
 				&returned_size)))
 	return ecl_make_error(env, err);
 
-    memset(size, 0,     sizeof(size));
-    memset(binary, 0,   sizeof(binary));
+    if (!program_may_have_binaries(program)) {
+	ErlNifBinary empty;
+	enif_alloc_binary(0, &empty);
 
-    if ((err = clGetProgramInfo(program,
-				CL_PROGRAM_BINARY_SIZES,
-				sizeof(size),
-				size,
-				&returned_size)))
-	return ecl_make_error(env, err);
-    if (returned_size != sizeof(size_t)*num_devices)
-	return ecl_make_error(env, CL_INVALID_VALUE);
-    i = 0;
-    while (i < (int) num_devices) {
-	if (!enif_alloc_binary(size[i], &binary[i])) {
-	    err = CL_OUT_OF_HOST_MEMORY;
-	    goto cleanup;
+	list = enif_make_list(env, 0);
+	for (i = num_devices-1; i >= 0; i--) {
+	    ERL_NIF_TERM elem;
+	    elem = enif_make_binary(env, &empty);
+	    list = enif_make_list_cell(env, elem, list);
 	}
-	data[i] = binary[i].data;
-	i++;
+	enif_release_binary(&empty);
+	return enif_make_tuple2(env, ATOM(ok), list);
     }
-    if ((err = clGetProgramInfo(program,
-				CL_PROGRAM_BINARIES,
-				sizeof(unsigned char*)*num_devices,
-				data,
-				&returned_size)))
-	goto cleanup;
+    else {
+	size_t size[MAX_DEVICES];
+	ErlNifBinary binary[MAX_DEVICES];
+	unsigned char* data[MAX_DEVICES];
 
-    list = enif_make_list(env, 0);
-    for (i = num_devices-1; i >= 0; i--) {
-	ERL_NIF_TERM elem = enif_make_binary(env, &binary[i]);
-	list = enif_make_list_cell(env, elem, list);
-    }
-    return enif_make_tuple2(env, ATOM(ok), list);
+	memset(size, 0,     sizeof(size));
+	memset(binary, 0,   sizeof(binary));
 
-cleanup:
-    while(i > 0) {
-	i--;
-	enif_release_binary(&binary[i]);
+	if ((err = clGetProgramInfo(program,
+				    CL_PROGRAM_BINARY_SIZES,
+				    num_devices*sizeof(size_t),
+				    &size[0],
+				    &returned_size)))
+	    return ecl_make_error(env, err);
+	i = 0;
+	while (i < (int) num_devices) {
+	    if (!enif_alloc_binary(size[i], &binary[i])) {
+		err = CL_OUT_OF_HOST_MEMORY;
+		goto cleanup;
+	    }
+	    data[i] = binary[i].data;
+	    i++;
+	}
+	if ((err = clGetProgramInfo(program,
+				    CL_PROGRAM_BINARIES,
+				    sizeof(unsigned char*)*num_devices,
+				    data,
+				    &returned_size)))
+	    goto cleanup;
+
+	list = enif_make_list(env, 0);
+	for (i = num_devices-1; i >= 0; i--) {
+	    ERL_NIF_TERM elem = enif_make_binary(env, &binary[i]);
+	    list = enif_make_list_cell(env, elem, list);
+	}
+	return enif_make_tuple2(env, ATOM(ok), list);
+
+    cleanup:
+	while(i > 0) {
+	    i--;
+	    enif_release_binary(&binary[i]);
+	}
+	return ecl_make_error(env, err);
     }
-    return ecl_make_error(env, err);
 }
 
 static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc, 
@@ -3675,6 +3757,8 @@ static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc,
 
     if (argv[1] == ATOM(binaries))
 	return make_program_binaries(env, o_program->program);
+    else if (argv[1] == ATOM(binary_sizes))
+	return make_program_binary_sizes(env, o_program->program);
     else
 	return make_object_info(env, argv[1], o_program,
 				(info_fn_t*) clGetProgramInfo,
