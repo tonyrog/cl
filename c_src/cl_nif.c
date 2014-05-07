@@ -3660,7 +3660,7 @@ static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc,
 // Special (workaround) for checking if program may have binaries
 static int program_may_have_binaries(cl_program program)
 {
-    cl_uint num_devices;
+    cl_int num_devices;
     size_t returned_size;
     cl_device_id devices[MAX_DEVICES];
     int i;
@@ -3718,7 +3718,7 @@ static ERL_NIF_TERM make_program_binary_sizes(ErlNifEnv* env,
     }
     list = enif_make_list(env, 0);
     for (i = num_devices-1; i >= 0; i--) {
-	ERL_NIF_TERM elem = enif_make_long(env, size[i]);
+	ERL_NIF_TERM elem = ecl_make_sizet(env, size[i]);
 	list = enif_make_list_cell(env, elem, list);
     }
     return enif_make_tuple2(env, ATOM(ok), list);
