@@ -113,28 +113,20 @@ __kernel void program1(int n, int m) {
       end, DeviceList),
 
     io:format("Program: ~p\n", [Program]),
-    %% {ok,Info} = cl:get_program_info(Program),
-    %% io:format("ProgramInfo: ~p\n", [I, Info])
-    foreach(
-      fun(I) ->
-	      {ok,Info} = cl:get_program_info(Program,I),
-	      io:format("ProgramInfo: ~w ~p\n", [I, Info])
-      end, cl:program_info()--[binary_sizes,binaries]),
+    program_info(Program),
+
     foreach(
       fun(Device) ->
-	      {ok,BuildInfo} = cl:get_program_build_info(Program,Device),
-	      io:format("BuildInfo @ ~w: ~p\n", [Device,BuildInfo])
+	      build_info(Program, Device)
       end, DeviceList),
 
     case cl:build_program(Program, DeviceList, "-Dhello=1 -Dtest") of
 	ok ->
 	    foreach(
 	      fun(Device) ->
-		      {ok,BuildInfo} = cl:get_program_build_info(Program,Device),
-		      io:format("BuildInfo @ ~w: ~p\n", [Device,BuildInfo])
+		      build_info(Program, Device)
 	      end, DeviceList),
-	    {ok,Info1} = cl:get_program_info(Program),
-	    io:format("ProgramInfo1: ~p\n", [Info1]),
+	    program_info(Program),
 	    {ok,Kernels} = cl:create_kernels_in_program(Program),
 	    foreach(
 	      fun(Kernel) ->
@@ -172,7 +164,40 @@ __kernel void program1(int n, int m) {
     end,
     cl:release_program(Program),
     ok.
-    
+
+program_info(Program) ->
+    io:format("ProgramInfo:\n", []),
+    foreach(
+      fun(Attr) ->
+	      case cl:get_program_info(Program,Attr) of
+		  {ok,Value} ->
+		      io:format("  ~s: ~p\n", [Attr,Value]);
+		  {error,Reason} ->
+		      io:format("InfoError: ~s [~p]\n", 
+				[Attr,Reason])
+	      end
+      end, cl:program_info()).
+
+build_info(Program, Device) ->
+    io:format("BuildInfo @ ~w\n", [Device]),
+    {ok,BuildInfo} = cl:get_program_build_info(Program,Device),
+    lists:foreach(
+      fun({Attr,Value}) ->
+	      io:format("  ~s: ~p\n", [Attr,Value])
+      end, BuildInfo),
+    case lists:member({1,2}, cl:versions()) of
+	true ->
+	    %% fixme: version handle program_build_info 
+	    case cl:get_program_build_info(Program,Device,binary_type) of
+		{ok,BinaryInfo} ->
+		    io:format("  ~s: ~p\n", [binary_type,BinaryInfo]);
+		{error,Reason} ->
+		    io:format("InfoError: ~s [~p]\n", 
+			      [binary_type,Reason])
+	    end;
+	false ->
+	    ok
+    end.
 
 test_queue(E, Device) ->
     {ok,Queue} = cl:create_queue(E#cl.context,Device,[]),

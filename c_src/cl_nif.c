@@ -235,6 +235,7 @@ typedef enum {
 #define OCL_SAMPLER_FILTER_MODE          OCL_ENUM
 #define OCL_BUILD_STATUS                 OCL_ENUM
 #define OCL_DEVICE_DOUBLE_FP_CONFIG      OCL_BITFIELD
+#define OCL_PROGRAM_BINARY_TYPE          OCL_ENUM
 
 typedef struct {
     ERL_NIF_TERM*  key;
@@ -715,6 +716,7 @@ DECL_ATOM(binaries);
 DECL_ATOM(status);
 DECL_ATOM(options);
 DECL_ATOM(log);
+DECL_ATOM(binary_type);
 
 // Kernel Info
 DECL_ATOM(function_name);
@@ -857,6 +859,12 @@ DECL_ATOM(success);
 // DECL_ATOM(none);
 // DECL_ATOM(error);
 DECL_ATOM(in_progress);
+
+// program_binary_type
+// DECL_ATOM(none);
+DECL_ATOM(compiled_object);
+DECL_ATOM(library);
+DECL_ATOM(executable);
 
 // command_type
 DECL_ATOM(ndrange_kernel);
@@ -1046,6 +1054,16 @@ ecl_kv_t kv_build_status[] = { // enum
     { &ATOM(in_progress), CL_BUILD_IN_PROGRESS },
     { 0, 0 }
 };
+
+#if CL_VERSION_1_2 == 1
+ecl_kv_t kv_program_binary_type[] = { // enum
+    { &ATOM(none), CL_PROGRAM_BINARY_TYPE_NONE },
+    { &ATOM(compiled_object),  CL_PROGRAM_BINARY_TYPE_COMPILED_OBJECT },
+    { &ATOM(library), CL_PROGRAM_BINARY_TYPE_LIBRARY },
+    { &ATOM(executable), CL_PROGRAM_BINARY_TYPE_EXECUTABLE },
+    { 0, 0 }
+};
+#endif
 
 ecl_kv_t kv_command_type[] = { // enum
     { &ATOM(ndrange_kernel), CL_COMMAND_NDRANGE_KERNEL },
@@ -1534,7 +1552,10 @@ ecl_info_t program_info[] = {
 ecl_info_t build_info[] = {
     { &ATOM(status), CL_PROGRAM_BUILD_STATUS, false, OCL_BUILD_STATUS, kv_build_status },
     { &ATOM(options), CL_PROGRAM_BUILD_OPTIONS, false, OCL_STRING, 0 },
-    { &ATOM(log), CL_PROGRAM_BUILD_LOG, false, OCL_STRING, 0 }
+    { &ATOM(log), CL_PROGRAM_BUILD_LOG, false, OCL_STRING, 0 },
+#if CL_VERSION_1_2 == 1
+    { &ATOM(binary_type), CL_PROGRAM_BINARY_TYPE, false, OCL_PROGRAM_BINARY_TYPE, kv_program_binary_type },
+#endif
 };
 
 ecl_info_t kernel_info[] = {
@@ -5551,6 +5572,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(status);
     LOAD_ATOM(options);
     LOAD_ATOM(log);
+    LOAD_ATOM(binary_type);
 
     // Kernel Info
     LOAD_ATOM(function_name);
@@ -5692,6 +5714,12 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(none);
     LOAD_ATOM(error);
     LOAD_ATOM(in_progress);
+
+    // program_binary_type
+    LOAD_ATOM(none);
+    LOAD_ATOM(compiled_object);
+    LOAD_ATOM(library);
+    LOAD_ATOM(executable);
 
     // command_type
     LOAD_ATOM(ndrange_kernel);

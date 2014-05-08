@@ -79,6 +79,8 @@
 -export([get_platform_info/1,get_platform_info/2]).
 %% Devices
 -export([get_device_ids/0, get_device_ids/2]).
+-export([release_device/1]).
+-export([retain_device/1]).
 -export([device_info/0]).
 -export([device_info_10/1]).
 -export([device_info_11/1]).
@@ -170,6 +172,7 @@
 -export([event_info/0]).
 -export([get_event_info/1, get_event_info/2]).
 -export([wait/1, wait/2]).
+-export([wait_for_events/1]).
 
 -export([async_flush/1, flush/1]).
 -export([async_finish/1, finish/1]).
@@ -465,6 +468,16 @@ get_device_ids() ->
 
 get_device_ids(_Platform, _Type) ->
     erlang:error(nif_not_loaded).
+
+-spec release_device(Device::cl_device_id()) ->
+			    'ok' | {'error', cl_error()}.
+release_device(_Device) ->
+    ok.
+
+-spec retain_device(Device::cl_device_id()) ->
+			   'ok' | {'error', cl_error()}.
+retain_device(_Device) ->
+    ok.
 
 %%
 %% @spec device_info() -> [cl_device_info_key()]
@@ -2095,6 +2108,17 @@ create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Picth,
 create_image3d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Depth,
 	       _RowPicth, _SlicePitch, _Data) ->
     erlang:error(nif_not_loaded).
+
+%% Wait for all events in EventList to complete
+-spec wait_for_events(EventList::[cl_event]) ->
+			     [{'ok','completed'} |
+			      {'ok',binary()} |
+			      {'error',cl_error()}].
+
+wait_for_events([Event|Es]) ->
+    [wait(Event) | wait_for_events(Es)];
+wait_for_events([]) ->
+    [].
     
 %%
 %% @spec wait(Event::cl_event) -> 
