@@ -17,8 +17,20 @@ test(DevType) ->
     foreach(
       fun(Device) ->
 	      io:format("Device: ~p\n", [Device]),
+	      io:format("DeviceInfo:\n", []),
 	      {ok,DeviceInfo} = cl:get_device_info(Device),
-	      io:format("DeviceInfo: ~p\n", [DeviceInfo])
+	      lists:foreach(
+		fun({Attr,Value}) ->
+			io:format("  ~s: ~p\n", [Attr,Value]),
+			case (Attr =:= extensions) andalso
+			    lists:member("cl_nv_device_attribute_query", 
+					 string:tokens(Value," ")) of
+			    true ->
+				nv_device_info(Device);
+			    false ->
+				ok
+			end
+		end, DeviceInfo)
       end, E#cl.devices),
 
     {ok,ContextInfo} = cl:get_context_info(E#cl.context),
@@ -38,6 +50,53 @@ test(DevType) ->
     test_program(E#cl.context, E#cl.devices),
 
     clu:teardown(E).
+
+
+nv_device_info(Device) ->
+    io:format("  cl_nv_device_attribute_query:\n", []),
+    lists:foreach(
+      fun(NvAttr) ->
+	      case cl:get_device_info(Device, NvAttr) of
+		  {ok,NvValue} ->
+		      io:format("    ~s: ~p\n", [NvAttr,NvValue]);
+		  {error,Reason} ->
+		      io:format("InfoError: ~s [~p]\n", [NvAttr,Reason])
+	      end
+      end, [
+	    compute_capability_major_nv,
+	    compute_capability_minor_nv,
+	    registers_per_block_nv,
+	    warp_size_nv,
+	    gpu_overlap_nv,
+	    kernel_exec_timeout_nv,
+	    device_integrated_memory_nv]),
+    case {cl:get_device_info(Device, compute_capability_major_nv),
+	  cl:get_device_info(Device, compute_capability_minor_nv) } of
+	{{ok,Major},{ok,Minor}} ->
+	    io:format("    ~s: ~p\n", [compute_capability_major_nv,Major]),
+	    io:format("    ~s: ~p\n", [compute_capability_mainor_nv,Minor]),
+	    Cores = case {Major,Minor} of
+			{1,1} -> 8;
+			{1,2} -> 8;
+			{1,3} -> 8;
+			{2,0} -> 32;
+			{2,1} -> 48;
+			{3,0} -> 192;
+			{3,5} -> 192;
+			{5,0} -> 128;
+			_ -> 0  %% unknown (to me)
+		    end,
+	    
+	    ComputeUnits = case cl:get_device_info(Device, max_compute_units) of
+			       {ok,U} -> U;
+			       {error,_} -> 0
+			   end,
+	    io:format("    number_of_cores: ~w\n", [Cores]),
+	    io:format("    total_number_of_cores: ~w\n", [ComputeUnits*Cores]);
+	_ ->
+	    ok
+    end.
+	    
 
 test_program(Context, DeviceList) ->
     %% Program1
