@@ -38,6 +38,7 @@
 #include <OpenCL/opencl.h>
 #else
 #include <CL/cl.h>
+#include <CL/cl_ext.h>
 #endif
 
 // Old cl_platform doesn't have the CL_CALLBACK
@@ -732,6 +733,9 @@ DECL_ATOM(execution_status);
 DECL_ATOM(work_group_size);
 DECL_ATOM(compile_work_group_size);
 // DECL_ATOM(local_mem_size);
+DECL_ATOM(preferred_work_group_size_multiple);
+DECL_ATOM(private_mem_size);
+DECL_ATOM(global_work_size);
 
 // Error codes
 DECL_ATOM(device_not_found);
@@ -1300,8 +1304,11 @@ DECL_ATOM(version);
 DECL_ATOM(extensions);
 DECL_ATOM(platform);
 
-// 1.2
+// cl_khr_fp64 extension || CL_VERSION_1_2 == 1
 DECL_ATOM(double_fp_config);
+// cl_khr_fp16 extension || CL_VERSION_1_2 == 1
+DECL_ATOM(half_fp_config);
+// 1.2
 DECL_ATOM(preferred_vector_width_half);
 DECL_ATOM(host_unified_memory);
 DECL_ATOM(native_vector_width_char);
@@ -1326,6 +1333,14 @@ DECL_ATOM(preferred_interop_user_sync);
 DECL_ATOM(printf_buffer_size);
 DECL_ATOM(image_pitch_alignment);
 DECL_ATOM(image_base_address_alignment);
+// cl_nv_device_attribute_query extension
+DECL_ATOM(compute_capability_major_nv);
+DECL_ATOM(compute_capability_minor_nv);
+DECL_ATOM(registers_per_block_nv);
+DECL_ATOM(warp_size_nv);
+DECL_ATOM(gpu_overlap_nv);
+DECL_ATOM(kernel_exec_timeout_nv);
+DECL_ATOM(device_integrated_memory_nv);
 
 // Map device info index 0...N => cl_device_info x Data type
 ecl_info_t device_info[] = 
@@ -1392,8 +1407,15 @@ ecl_info_t device_info[] =
     { &ATOM(native_vector_width_half), CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF,false,OCL_UINT, 0},
     { &ATOM(opencl_c_version), CL_DEVICE_OPENCL_C_VERSION,false,OCL_STRING, 0},
 #endif
-#if CL_VERSION_1_2 == 1
+    // cl_khr_fp64 extension || CL_VERSION_1_2 == 1
+#if CL_DEVICE_DOUBLE_FP_CONFIG
     { &ATOM(double_fp_config), CL_DEVICE_DOUBLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
+#endif
+    // cl_khr_fp16 extension || CL_VERSION_1_2 == 1
+#if CL_DEVICE_HALF_FP_CONFIG
+    { &ATOM(half_fp_config), CL_DEVICE_HALF_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
+#endif
+#if CL_VERSION_1_2 == 1
     { &ATOM(linker_available), CL_DEVICE_LINKER_AVAILABLE,false,OCL_BOOL, 0},
     { &ATOM(built_in_kernels), CL_DEVICE_BUILT_IN_KERNELS,false, OCL_STRING, 0},
     { &ATOM(image_max_buffer_size), CL_DEVICE_IMAGE_MAX_BUFFER_SIZE,false,OCL_SIZE, 0},
@@ -1416,6 +1438,30 @@ ecl_info_t device_info[] =
     { &ATOM(image_base_address_alignment), CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT, false, OCL_SIZE, 0 },
 #endif
 #endif
+
+    /* cl_nv_device_attribute_query extension */
+#ifdef CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV
+    { &ATOM(compute_capability_major_nv), CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV, false, OCL_UINT, 0},
+#endif
+#ifdef CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV
+    { &ATOM(compute_capability_minor_nv), CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV, false, OCL_UINT, 0},
+#endif
+#ifdef CL_DEVICE_REGISTERS_PER_BLOCK_NV
+    { &ATOM(registers_per_block_nv),CL_DEVICE_REGISTERS_PER_BLOCK_NV, false, OCL_UINT, 0},
+#endif
+#ifdef CL_DEVICE_WARP_SIZE_NV
+    { &ATOM(warp_size_nv),CL_DEVICE_WARP_SIZE_NV, false, OCL_UINT, 0},
+#endif
+#ifdef CL_DEVICE_GPU_OVERLAP_NV
+    { &ATOM(gpu_overlap_nv),CL_DEVICE_GPU_OVERLAP_NV, false, OCL_BOOL, 0},
+#endif
+#ifdef CL_DEVICE_KERNEL_EXEC_TIMEOUT_NV
+    { &ATOM(kernel_exec_timeout_nv), CL_DEVICE_KERNEL_EXEC_TIMEOUT_NV, false, OCL_BOOL, 0},
+#endif
+#ifdef CL_DEVICE_INTEGRATED_MEMORY_NV
+    { &ATOM(device_integrated_memory_nv),CL_DEVICE_INTEGRATED_MEMORY_NV, false, OCL_BOOL, 0},
+#endif
+
 };
 
 // Map device info index 0...N => cl_device_info x Data type
@@ -1503,6 +1549,13 @@ ecl_info_t workgroup_info[] = {
     { &ATOM(work_group_size), CL_KERNEL_WORK_GROUP_SIZE, false, OCL_SIZE, 0 },
     { &ATOM(compile_work_group_size), CL_KERNEL_COMPILE_WORK_GROUP_SIZE, true, OCL_SIZE, 0},
     { &ATOM(local_mem_size), CL_KERNEL_LOCAL_MEM_SIZE, false, OCL_ULONG, 0 },
+#if CL_VERSION_1_1 == 1
+    { &ATOM(preferred_work_group_size_multiple), CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE, false,  OCL_SIZE, 0},
+    { &ATOM(private_mem_size), CL_KERNEL_PRIVATE_MEM_SIZE, false, OCL_ULONG, 0 },
+#endif
+#if CL_VERSION_1_2 == 1
+    { &ATOM(global_work_size), CL_KERNEL_GLOBAL_WORK_SIZE, true, OCL_SIZE, 0},
+#endif
 };
 
 ecl_info_t event_info[] = {
@@ -5407,6 +5460,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(platform);
 
     LOAD_ATOM(double_fp_config);
+    LOAD_ATOM(half_fp_config);
     LOAD_ATOM(preferred_vector_width_half);
     LOAD_ATOM(host_unified_memory);
     LOAD_ATOM(native_vector_width_char);
@@ -5431,6 +5485,14 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(printf_buffer_size);
     LOAD_ATOM(image_pitch_alignment);
     LOAD_ATOM(image_base_address_alignment);
+    // cl_nv_device_attribute_query extension
+    LOAD_ATOM(compute_capability_major_nv);
+    LOAD_ATOM(compute_capability_minor_nv);
+    LOAD_ATOM(registers_per_block_nv);
+    LOAD_ATOM(warp_size_nv);
+    LOAD_ATOM(gpu_overlap_nv);
+    LOAD_ATOM(kernel_exec_timeout_nv);
+    LOAD_ATOM(device_integrated_memory_nv);
 
      // Platform info
     LOAD_ATOM(profile);
@@ -5507,6 +5569,9 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(work_group_size);
     LOAD_ATOM(compile_work_group_size);
     LOAD_ATOM(local_mem_size);
+    LOAD_ATOM(preferred_work_group_size_multiple);
+    LOAD_ATOM(private_mem_size);
+    LOAD_ATOM(global_work_size);
 
     // Error codes
     LOAD_ATOM(device_not_found);
