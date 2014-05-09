@@ -6,7 +6,8 @@ MODULES = \
 	cl_binary_test \
 	cl_bandwidth \
 	cl_mul \
-	cl_test
+	cl_test \
+	cl_buffer
 
 
 

@@ -102,6 +102,7 @@
 -export([get_queue_info/1,get_queue_info/2]).
 %% Memory object
 -export([create_buffer/3, create_buffer/4]).
+-export([create_sub_buffer/4]).
 -export([release_mem_object/1]).
 -export([retain_mem_object/1]).
 -export([mem_object_info/0]).
@@ -154,13 +155,17 @@
 -export([enqueue_barrier_with_wait_list/2]).
 -export([enqueue_wait_for_events/2]).
 -export([enqueue_read_buffer/5]).
+-export([enqueue_read_buffer_rect/10]).
 -export([enqueue_write_buffer/6]).
 -export([enqueue_write_buffer/7]).
 -export([nowait_enqueue_write_buffer/6]).
+-export([enqueue_write_buffer_rect/11]).
 -export([enqueue_read_image/7]).
 -export([enqueue_write_image/8]).
 -export([enqueue_write_image/9]).
 -export([nowait_enqueue_write_image/8]).
+-export([enqueue_copy_buffer/7]).
+-export([enqueue_copy_buffer_rect/11]).
 -export([enqueue_copy_image/6]).
 -export([enqueue_copy_image_to_buffer/7]).
 -export([enqueue_copy_buffer_to_image/7]).
@@ -1138,6 +1143,17 @@ create_buffer(_Context,_Flags,_Size,_Data) ->
     erlang:error(nif_not_loaded).
 
 %%
+%% @doc Creates a buffer object
+%%
+-spec create_sub_buffer(Buffer::cl_mem(),Flags::[cl_mem_flag()],
+                         Type::'region', Info::[non_neg_integer()]) ->
+    {'ok', cl_mem()} | {'error', cl_error()}.
+
+%%
+create_sub_buffer(_Buffer, _Flags, _Type, _Info) ->
+    erlang:error(nif_not_loaded).
+
+%%
 %% @spec release_mem_object(Mem::cl_mem()) ->
 %%    'ok' | {'error', cl_error()}
 %% @doc  Decrements the memory object reference count. 
@@ -1838,12 +1854,7 @@ enqueue_marker(_Queue) ->
 enqueue_wait_for_events(_Queue, _WaitList) ->
     erlang:error(nif_not_loaded).
 
-%%
-%% @spec enqueue_read_buffer(Queue::cl_queue(), Buffer::cl_mem(),
-%%                           Offset::non_neg_integer(), 
-%%                           Size::non_neg_integer(), 
-%%                           WaitList::[cl_event()]) ->
-%%    {'ok', cl_event()} | {'error', cl_error()}
+
 %%
 %% @doc Enqueue commands to read from a buffer object to host memory. 
 %% 
@@ -1868,7 +1879,28 @@ enqueue_wait_for_events(_Queue, _WaitList) ->
 			  WaitList::[cl_event()]) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
+
 enqueue_read_buffer(_Queue, _Buffer, _Offset, _Size, _WaitList) ->
+    erlang:error(nif_not_loaded).
+
+%%
+%% Read rectangular section from buffer memory into host memory
+%%
+-spec enqueue_read_buffer_rect(Queue::cl_queue(), Buffer::cl_mem(),
+			       BufferOrigin::[non_neg_integer()],
+			       HostOrigin::[non_neg_integer()],
+			       Region::[non_neg_integer()],
+			       BufferRowPicth::non_neg_integer(),
+			       BufferSlicePicth::non_neg_integer(),
+			       HostRowPicth::non_neg_integer(),
+			       HostSlicePicth::non_neg_integer(),
+			       WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_read_buffer_rect(_Queue, _Buffer, _BufferOrigin, _HostOrigin,
+			 _Region, _BufferRowPitch, _BufferSlicePitch,
+			 _HostRowPitch, _HostSlicePitch,
+			 _WaitList) ->
     erlang:error(nif_not_loaded).
 
 %%
@@ -1879,8 +1911,8 @@ enqueue_read_buffer(_Queue, _Buffer, _Offset, _Size, _WaitList) ->
 %%                            WaitList::[cl_event()]) ->
 %%    {'ok', cl_event()} | {'error', cl_error()}
 %%
-%% @doc Enqueue commands to write to a buffer object from host memory. 
-%% 
+%% @doc Enqueue commands to write to a buffer object from host memory.
+%%
 %% Calling <code>enqueue_write_buffer</code> to update the latest bits
 %% in a region of the buffer object with the <code>Buffer</code>
 %% argument value set to <code>host_ptr</code> + <code >offset</code>,
@@ -1918,6 +1950,30 @@ nowait_enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList) ->
 
 enqueue_write_buffer(_Queue, _Buffer, _Offset, _Size, _Data, _WaitList,
 		     _WantEvent) ->
+    erlang:error(nif_not_loaded).
+
+
+
+%%
+%% Write rectangular section from  host memory into buffer memory
+%%
+-spec enqueue_write_buffer_rect(Queue::cl_queue(), Buffer::cl_mem(),
+				BufferOrigin::[non_neg_integer()],
+				HostOrigin::[non_neg_integer()],
+				Region::[non_neg_integer()],
+				BufferRowPicth::non_neg_integer(),
+				BufferSlicePicth::non_neg_integer(),
+				HostRowPicth::non_neg_integer(),
+				HostSlicePicth::non_neg_integer(),
+				Data::binary(),
+				WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_write_buffer_rect(_Queue, _Buffer, _BufferOrigin, _HostOrigin,
+			  _Region, _BufferRowPitch, _BufferSlicePitch,
+			  _HostRowPitch, _HostSlicePitch,
+			  _Data,
+			  _WaitList) ->
     erlang:error(nif_not_loaded).
 
 %% 
@@ -1976,6 +2032,16 @@ enqueue_write_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
 		    _Data, _WaitList, _WantEvent) ->
     erlang:error(nif_not_loaded).
 
+enqueue_copy_buffer(_Queue, _SrcBuffer, _DstBuffer, _SrcOffset, _DstOffset,
+			     _Cb, _WaitList) ->
+    erlang:error(nif_not_loaded).
+
+enqueue_copy_buffer_rect(_Queue, _SrcBuffer, _DstBuffer,
+			 _SrcOrigin, _DstOrigin, _Region,
+			 _SrcRowPitch, _SrcSlicePitch,
+			 _DstRowPitch, _DstSlicePitch,
+			 _WaitList) ->
+    erlang:error(nif_not_loaded).
 
 enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _Origin, _Region, _WaitList) ->
     erlang:error(nif_not_loaded).
