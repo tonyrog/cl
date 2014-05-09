@@ -116,6 +116,25 @@ sub() ->
     Data2 =:= <<1,2,3,4,0,0,0,0,5,6,7,8>>.
 
 
-
-    
-    
+%% fill buffer, require version 1.2
+fill() ->
+    C = clu:setup(gpu),
+    true = lists:member({1,2},cl:versions()),
+    {ok,Q} = cl:create_queue(clu:context(C),clu:device(C),[]),
+    {ok,Buf1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
+    {ok,E1} = cl:enqueue_fill_buffer(Q, Buf1, <<9>>, 0, 64, []),
+    {ok,E2} = cl:enqueue_fill_buffer(Q, Buf1, <<1,2,3,4>>, 12, 4, [E1]),
+    {ok,E3} = cl:enqueue_fill_buffer(Q, Buf1, <<5,6,7,8>>, 20, 4, [E2]),
+    {ok,E4} = cl:enqueue_read_buffer(Q, Buf1, 0, 64, [E3]),
+    cl:flush(Q),
+    cl:wait_for_events([E1,E2,E3]),
+    {ok,Data1} = cl:wait(E4),
+    clu:teardown(C),
+    Data1 =:= <<9,9,9,9,9,9,9,9,
+		9,9,9,9,1,2,3,4,
+		9,9,9,9,5,6,7,8,
+		9,9,9,9,9,9,9,9,
+		9,9,9,9,9,9,9,9,
+		9,9,9,9,9,9,9,9,
+		9,9,9,9,9,9,9,9,
+		9,9,9,9,9,9,9,9>>.

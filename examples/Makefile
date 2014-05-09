@@ -7,8 +7,8 @@ MODULES = \
 	cl_bandwidth \
 	cl_mul \
 	cl_test \
-	cl_buffer
-
+	cl_buffer \
+	cl_image
 
 
 EBIN = .

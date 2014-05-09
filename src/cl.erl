@@ -159,6 +159,7 @@
 -export([enqueue_write_buffer/6]).
 -export([enqueue_write_buffer/7]).
 -export([nowait_enqueue_write_buffer/6]).
+-export([enqueue_fill_buffer/6]).
 -export([enqueue_write_buffer_rect/11]).
 -export([enqueue_read_image/7]).
 -export([enqueue_write_image/8]).
@@ -167,6 +168,7 @@
 -export([enqueue_copy_buffer/7]).
 -export([enqueue_copy_buffer_rect/11]).
 -export([enqueue_copy_image/6]).
+-export([enqueue_fill_image/6]).
 -export([enqueue_copy_image_to_buffer/7]).
 -export([enqueue_copy_buffer_to_image/7]).
 -export([enqueue_map_buffer/6]).
@@ -1976,6 +1978,22 @@ enqueue_write_buffer_rect(_Queue, _Buffer, _BufferOrigin, _HostOrigin,
 			  _WaitList) ->
     erlang:error(nif_not_loaded).
 
+
+%%
+%% Fill buffer memory from pattern,
+%% Size and Offset must be multiple of Pattern size
+%% Pattern size must be onle of 1,2,4,8,16,32,64 or 128
+%%
+-spec enqueue_fill_buffer(Queue::cl_queue(), Buffer::cl_mem(),
+			  Pattern::binary(),
+			  Offset::non_neg_integer(),
+			  Size::non_neg_integer(),
+			  WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_fill_buffer(_Queue, _Buffer, _Pattern, _Offset, _Size, _WaitList) ->
+    erlang:error(nif_not_loaded).
+
 %% 
 %% @spec enqueue_barrier(Queue::cl_queue()) ->
 %%    'ok' | {'error', cl_error()}
@@ -2044,6 +2062,21 @@ enqueue_copy_buffer_rect(_Queue, _SrcBuffer, _DstBuffer,
     erlang:error(nif_not_loaded).
 
 enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _Origin, _Region, _WaitList) ->
+    erlang:error(nif_not_loaded).
+
+%%  FillColor = <<R:32/unsigned,G:32/unsigned,B:32/unsigned,A:32/unsigned>>
+%%            | <<R:32/signed,G:32/signed,B:32/signed,A:32/signed>>
+%%            | <<R:32/float,G:32/float,B:32/float,A:32/float>>
+%%            Use device endian! check device_info(D, endian_little)
+-spec enqueue_fill_image(Queue::cl_queue(),
+			 Image::cl_mem(),
+			 FillColor::binary(),
+			 Origin::[non_neg_integer()],
+			 Region::[non_neg_integer()],
+			 WaitList::[cl_event()]) ->
+				{'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_fill_image(_Queue, _Image, _FillColor, _Origin, _Region, _WaitList) ->
     erlang:error(nif_not_loaded).
 
 enqueue_copy_image_to_buffer(_Queue, _SrcImage, _DstBuffer, _Origin, _Region,
@@ -2161,18 +2194,39 @@ get_event_info(Event) when ?is_event(Event) ->
 get_supported_image_formats(_Context, _Flags, _ImageType) ->
     erlang:error(nif_not_loaded).
 
-%% 1.2
-create_image(_Context, _MemFlags, _ImageFormat, _ImageDesc, _Data) ->
-    erlang:error(nif_not_implemented).
+-spec create_image2d(Conext::cl_context(), Flags::[cl_mem_flag()],
+		     ImageFormat::#cl_image_format{},
+		     Width::non_neg_integer(),
+		     Height::non_neg_integer(),
+		     Pitch::non_neg_integer(),
+		     Data::binary()) ->
+    {'ok', cl_mem()} | {'error', cl_error()}.
 
-%% _ImageFormat = {image_channel_order, image_channel_data_type}
-%% fixme make into record!
-create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Picth,
+create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Pitch,
 		_Data) ->
     erlang:error(nif_not_loaded).
 
+-spec create_image3d(Conext::cl_context(), Flags::[cl_mem_flag()],
+		     ImageFormat::#cl_image_format{},
+		     Width::non_neg_integer(),
+		     Height::non_neg_integer(),
+		     Depth::non_neg_integer(),
+		     RowPitch::non_neg_integer(),
+		     SlicePitch::non_neg_integer(),
+		     Data::binary()) ->
+    {'ok', cl_mem()} | {'error', cl_error()}.
+
 create_image3d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Depth,
 	       _RowPicth, _SlicePitch, _Data) ->
+    erlang:error(nif_not_loaded).
+
+-spec create_image(Conext::cl_context(), Flags::[cl_mem_flag()],
+		   ImageFormat::#cl_image_format{},
+		   ImageDesc::#cl_image_desc{},
+		   Data::binary()) ->
+    {'ok', cl_mem()} | {'error', cl_error()}.
+
+create_image(_Context, _MemFlags, _ImageFormat, _ImageDesc, _Data) ->
     erlang:error(nif_not_loaded).
 
 %% Wait for all events in EventList to complete

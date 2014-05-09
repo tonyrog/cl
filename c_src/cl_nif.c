@@ -358,6 +358,11 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[]);
 
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_create_image(ErlNifEnv* env, int argc,
+				     const ERL_NIF_TERM argv[]);
+#endif
+
 typedef cl_mem (* ECL_CREATE_IMAGE)(cl_context,cl_mem_flags,
 				    const cl_image_format * ,
 				    const cl_image_desc *,
@@ -459,6 +464,11 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer_rect(ErlNifEnv* env, int argc,
 						  const ERL_NIF_TERM argv[]);
 #endif
 
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_enqueue_fill_buffer(ErlNifEnv* env, int argc,
+					    const ERL_NIF_TERM argv[]);
+#endif
+
 static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc, 
 					   const ERL_NIF_TERM argv[]);
 
@@ -475,6 +485,11 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_rect(ErlNifEnv* env, int argc,
 
 static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc, 
 					   const ERL_NIF_TERM argv[]);
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_enqueue_fill_image(ErlNifEnv* env, int argc,
+					   const ERL_NIF_TERM argv[]);
+#endif
+
 
 static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc, 
 						     const ERL_NIF_TERM argv[]);
@@ -537,6 +552,9 @@ ErlNifFunc ecl_funcs[] =
 
     { "create_image2d",            7, ecl_create_image2d },
     { "create_image3d",            9, ecl_create_image3d },
+#if CL_VERSION_1_2 == 1
+    { "create_image",              5, ecl_create_image },
+#endif
     { "get_supported_image_formats",3, ecl_get_supported_image_formats },
 
     // Sampler 
@@ -580,6 +598,9 @@ ErlNifFunc ecl_funcs[] =
 #if CL_VERSION_1_1 == 1
     { "enqueue_write_buffer_rect",  11, ecl_enqueue_write_buffer_rect },
 #endif
+#if CL_VERSION_1_2 == 1
+    { "enqueue_fill_buffer",         6, ecl_enqueue_fill_buffer },
+#endif
     { "enqueue_read_image",         7, ecl_enqueue_read_image },
     { "enqueue_write_image",        9, ecl_enqueue_write_image },
     { "enqueue_copy_buffer",        7, ecl_enqueue_copy_buffer },
@@ -587,6 +608,9 @@ ErlNifFunc ecl_funcs[] =
     { "enqueue_copy_buffer_rect",  11, ecl_enqueue_copy_buffer_rect },
 #endif
     { "enqueue_copy_image",         6, ecl_enqueue_copy_image },
+#if CL_VERSION_1_2 == 1
+    { "enqueue_fill_image",         6, ecl_enqueue_fill_image },
+#endif
     { "enqueue_copy_image_to_buffer", 7, ecl_enqueue_copy_image_to_buffer },
     { "enqueue_copy_buffer_to_image", 7, ecl_enqueue_copy_buffer_to_image },
     { "enqueue_map_buffer",           6, ecl_enqueue_map_buffer },
@@ -694,6 +718,9 @@ DECL_ATOM(double4);
 DECL_ATOM(double8);
 DECL_ATOM(double16);
 
+// records for image creation
+DECL_ATOM(cl_image_desc);
+DECL_ATOM(cl_image_format);
 
 // Platform info
 // DECL_ATOM(profile);
@@ -3287,6 +3314,76 @@ static ERL_NIF_TERM ecl_create_sub_buffer(ErlNifEnv* env, int argc,
     return ecl_make_error(env, err);
 }
 #endif
+//
+// format {channel_order, channel_data_type} (old) |
+// {'cl_image_format', order, data_type }
+//
+static int get_image_format(ErlNifEnv* env, ERL_NIF_TERM arg,
+				cl_image_format* format)
+{
+    const ERL_NIF_TERM* rec;
+    int i, arity;
+
+    if (!enif_get_tuple(env, arg, &arity, &rec))
+	return 0;
+    if (arity == 2)
+	i = 0;
+    else if (arity == 3) {
+	i = 1;
+	if (!enif_is_atom(env, rec[0]) || (rec[0] != ATOM(cl_image_format)))
+	    return 0;
+    }
+    else
+	return 0;
+
+    if (!get_enum(env, rec[i], &format->image_channel_order,
+		  kv_channel_order))
+	return 0;
+    if (!get_enum(env, rec[i+1], &format->image_channel_data_type,
+		  kv_channel_type))
+	return 0;
+    return 1;
+}
+
+#if CL_VERSION_1_2 == 1
+//
+// format {'cl_image_desc',image_type,image_width,image_height,image_depth,
+//             image_array_size,image_row_pitch,image_slice_pitch,
+//             num_mip_levels,num_samples,buffer}
+//
+static int get_image_desc(ErlNifEnv* env, ERL_NIF_TERM arg,
+			  cl_image_desc* desc)
+{
+    const ERL_NIF_TERM* rec;
+    int arity;
+
+    if (!enif_get_tuple(env, arg, &arity, &rec) || (arity != 11))
+	return 0;
+
+    if (!enif_is_atom(env, rec[0]) || (rec[0] != ATOM(cl_image_desc)))
+	return 0;
+
+    if (!get_enum(env, rec[1], &desc->image_type, kv_mem_object_type))
+	return 0;
+    if (!ecl_get_sizet(env, rec[2], &desc->image_width))
+	return 0;
+    if (!ecl_get_sizet(env, rec[3], &desc->image_height))
+	return 0;
+    if (!ecl_get_sizet(env, rec[4], &desc->image_depth))
+	return 0;
+    if (!ecl_get_sizet(env, rec[5], &desc->image_array_size))
+	return 0;
+    if (!ecl_get_sizet(env, rec[6], &desc->image_row_pitch))
+	return 0;
+    if (!ecl_get_sizet(env, rec[7], &desc->image_slice_pitch))
+	return 0;
+    desc->num_mip_levels = 0;  // rec[8] according to spec
+    desc->num_samples = 0;     // rec[9] according to spec
+    if (!get_object(env, rec[10], &mem_r, true, (void**)&desc->buffer))
+	return 0;
+    return 1;
+}
+#endif
 
 static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
@@ -3300,8 +3397,6 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
     cl_mem mem;
     ErlNifBinary bin;
     void* host_ptr = 0;
-    const ERL_NIF_TERM* array;
-    int arity;
     cl_int err;
     UNUSED(argc);
 
@@ -3310,13 +3405,8 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
     if (!get_bitfields(env, argv[1], &mem_flags, kv_mem_flags))
 	return enif_make_badarg(env);
 
-    if (!enif_get_tuple(env, argv[2], &arity, &array) || (arity != 2))
+    if (!get_image_format(env, argv[2], &format))
 	return enif_make_badarg(env);
-    if (!get_enum(env, array[0], &format.image_channel_order, kv_channel_order))
-	return enif_make_badarg(env);	
-    if (!get_enum(env, array[1], &format.image_channel_data_type,
-		  kv_channel_type))
-	return enif_make_badarg(env);	
 
     if (!ecl_get_sizet(env, argv[3], &width))
 	return enif_make_badarg(env);
@@ -3382,8 +3472,6 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
     cl_mem mem;
     ErlNifBinary bin;
     void* host_ptr = 0;
-    const ERL_NIF_TERM* array;
-    int arity;
     cl_int err;
     UNUSED(argc);
 
@@ -3392,13 +3480,8 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
     if (!get_bitfields(env, argv[1], &mem_flags, kv_mem_flags))
 	return enif_make_badarg(env);
 
-    if (!enif_get_tuple(env, argv[2], &arity, &array) || (arity != 2))
+    if (!get_image_format(env, argv[2], &format))
 	return enif_make_badarg(env);
-    if (!get_enum(env, array[0], &format.image_channel_order, kv_channel_order))
-	return enif_make_badarg(env);	
-    if (!get_enum(env, array[1], &format.image_channel_data_type,
-		  kv_channel_type))
-	return enif_make_badarg(env);	
 
     if (!ecl_get_sizet(env, argv[3], &width))
 	return enif_make_badarg(env);
@@ -3453,6 +3536,61 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
     }
     return ecl_make_error(env, err);
 }
+
+//
+// cl:create_image(Context, MemFlags, ImageFormat, ImageDesc, Data) ->
+//
+//
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_create_image(ErlNifEnv* env, int argc,
+				     const ERL_NIF_TERM argv[])
+{
+    ecl_object_t* o_context;
+    cl_image_format format;
+    cl_image_desc   desc;
+    cl_mem_flags mem_flags;
+    cl_mem mem;
+    ErlNifBinary bin;
+    void* host_ptr = 0;
+    cl_int err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
+	return enif_make_badarg(env);
+    if (!get_bitfields(env, argv[1], &mem_flags, kv_mem_flags))
+	return enif_make_badarg(env);
+
+    if (!get_image_format(env, argv[2], &format))
+	return enif_make_badarg(env);
+
+    if (!get_image_desc(env, argv[3], &desc))
+	return enif_make_badarg(env);
+
+    if (!enif_inspect_iolist_as_binary(env, argv[4], &bin))
+	return enif_make_badarg(env);
+
+    if (bin.size > 0) {
+	host_ptr = bin.data;
+	mem_flags |= CL_MEM_COPY_HOST_PTR;
+    }
+    else if (desc.image_width && desc.image_height && desc.image_depth)
+	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
+
+    // use clCreateImage here ?
+    mem = eclCreateImage(o_context->context,
+			 mem_flags,
+			 &format,
+			 &desc,
+			 host_ptr,
+			 &err);
+    if (mem) {
+	ERL_NIF_TERM t;
+	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
 
 static ERL_NIF_TERM ecl_get_supported_image_formats(ErlNifEnv* env, int argc, 
 						    const ERL_NIF_TERM argv[])
@@ -4886,6 +5024,59 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer_rect(ErlNifEnv* env, int argc,
 #endif
 
 //
+// cl:enqueue_fill_buffer(Queue, Buffer, Pattern, Offset, Size, WaitList) ->
+//   {ok,Event} | {error,Reason}
+//
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_enqueue_fill_buffer(ErlNifEnv* env, int argc,
+					    const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_queue;
+    cl_mem           buffer;
+    ErlNifBinary     pattern;
+    size_t           offset;
+    size_t           size;
+    cl_event         wait_list[MAX_WAIT_LIST];
+    cl_uint          num_events = MAX_WAIT_LIST;
+    cl_event         event;
+    cl_int           err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
+	return enif_make_badarg(env);
+    if (!get_object(env, argv[1], &mem_r, false, (void**)&buffer))
+	return enif_make_badarg(env);
+    if (!enif_inspect_binary(env, argv[2], &pattern))
+	return enif_make_badarg(env);
+    if (!ecl_get_sizet(env, argv[3], &offset))
+	return enif_make_badarg(env);
+    if (!ecl_get_sizet(env, argv[4], &size))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[5], &event_r, false,
+			 (void**) wait_list, &num_events))
+	return enif_make_badarg(env);
+
+    // Note: pattern must not be retained, it can be freed after this call
+    // according to spec.
+    err = clEnqueueFillBuffer(o_queue->queue, buffer,
+			      pattern.data,
+			      pattern.size,
+			      offset,
+			      size,
+			      num_events,
+			      num_events ? wait_list : 0,
+			      &event);
+    if (!err) {
+	ERL_NIF_TERM t;
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
+
+
+//
 // enqueue_write_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
 //		    _Data, _WaitList, _WantEvent) ->
 //
@@ -5158,6 +5349,66 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
     }
     return ecl_make_error(env, err);    
 }
+
+//
+//  cl:enqueue_fill_image(Queue,Image,FillColor,Origin,Region,WaitList) ->
+//  FillColor = <<R:32/unsigned,G:32/unsigned,B:32/unsigned,A:32/unsigned>>
+//            | <<R:32/signed,G:32/signed,B:32/signed,A:32/signed>>
+//            | <<R:32/float,G:32/float,B:32/float,A:32/float>>
+//            Use device endian! check device_info(D, endian_little)
+//
+//
+#if CL_VERSION_1_2 == 1
+
+static ERL_NIF_TERM ecl_enqueue_fill_image(ErlNifEnv* env, int argc,
+					   const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_queue;
+    cl_mem           image;
+    ErlNifBinary     fill_color;
+    size_t           origin[3];
+    size_t           region[3];
+    cl_event         wait_list[MAX_WAIT_LIST];
+    cl_uint          num_events = MAX_WAIT_LIST;
+    size_t           num_origin = 3;
+    size_t           num_region = 3;
+    cl_event         event;
+    cl_int           err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
+	return enif_make_badarg(env);
+    if (!get_object(env, argv[1], &mem_r, false, (void**)&image))
+	return enif_make_badarg(env);
+    if (!enif_inspect_binary(env, argv[2], &fill_color))
+	return enif_make_badarg(env);
+    if (fill_color.size != 4*4)
+	return enif_make_badarg(env);
+    origin[0] = origin[1] = origin[2] = 0;
+    if (!get_sizet_list(env, argv[3], origin, &num_origin))
+	return enif_make_badarg(env);
+    region[0] = region[1] = region[2] = 1;
+    if (!get_sizet_list(env, argv[4], region, &num_region))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[5], &event_r, false,
+			 (void**) wait_list, &num_events))
+	return enif_make_badarg(env);
+
+    err = clEnqueueFillImage(o_queue->queue, image,
+			     fill_color.data, // validate size etc!
+			     origin,
+			     region,
+			     num_events,
+			     num_events ? wait_list : 0,
+			     &event);
+    if (!err) {
+	ERL_NIF_TERM t;
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
 
 // cl:enqueue_copy_image_to_buffer(_Queue, _SrcImage, _DstBuffer, 
 //                                 _Origin, _Region,
@@ -5790,6 +6041,10 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(double4);
     LOAD_ATOM(double8);
     LOAD_ATOM(double16);
+
+    // records
+    LOAD_ATOM(cl_image_desc);
+    LOAD_ATOM(cl_image_format);
 
     // channel type
     LOAD_ATOM(snorm_int8);
