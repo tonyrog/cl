@@ -79,6 +79,7 @@
 -export([get_platform_info/1,get_platform_info/2]).
 %% Devices
 -export([get_device_ids/0, get_device_ids/2]).
+-export([create_sub_devices/2]).
 -export([release_device/1]).
 -export([retain_device/1]).
 -export([device_info/0]).
@@ -476,6 +477,18 @@ get_device_ids() ->
     {'ok',[cl_device_id()]} | {'error',cl_error()}.
 
 get_device_ids(_Platform, _Type) ->
+    erlang:error(nif_not_loaded).
+
+-spec create_sub_devices(Device::cl_device_id(),
+			 Property::
+			   {equally|non_neg_integer()} |
+			   {by_counts,[non_neg_integer()]} |
+			   {by_affinity_domain,
+			    numa|l4_cache|l3_cache|l2_cache|l1_cache|
+			    next_partitionable}) ->
+    {'ok',[cl_device_id()]} | {'error',cl_error()}.
+
+create_sub_devices(_Device, _Properties) ->
     erlang:error(nif_not_loaded).
 
 -spec release_device(Device::cl_device_id()) ->

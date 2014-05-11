@@ -218,7 +218,11 @@ typedef enum {
     OCL_CONTEXT,       // void*
     OCL_PROGRAM,       // void*
     OCL_COMMAND_QUEUE, // void*
-    OCL_IMAGE_FORMAT   // cl_image_format
+    OCL_IMAGE_FORMAT,   // cl_image_format
+#if CL_VERSION_1_2 == 1
+    OCL_DEVICE_PARTITION, // cl_device_partition_property
+#endif
+    OCL_NUM_TYPES
 } ocl_type_t;
 
 #define OCL_DEVICE_TYPE                  OCL_BITFIELD
@@ -328,6 +332,11 @@ static ERL_NIF_TERM ecl_get_platform_info(ErlNifEnv* env, int argc,
 
 static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[]);
+
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_create_sub_devices(ErlNifEnv* env, int argc,
+					   const ERL_NIF_TERM argv[]);
+#endif
 
 static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[]);
@@ -535,6 +544,9 @@ ErlNifFunc ecl_funcs[] =
 
     // Devices
     { "get_device_ids",             2, ecl_get_device_ids },
+#if CL_VERSION_1_2 == 1
+    { "create_sub_devices",         2, ecl_create_sub_devices },
+#endif
     { "get_device_info",            2, ecl_get_device_info },
 
     // Context
@@ -1338,8 +1350,8 @@ DECL_ATOM(by_affinity_domain);
 ecl_kv_t kv_device_partition_property[] = {
     { &ATOM(equally), CL_DEVICE_PARTITION_EQUALLY },
     { &ATOM(by_counts), CL_DEVICE_PARTITION_BY_COUNTS },
-    { &ATOM(by_counts_list_end), CL_DEVICE_PARTITION_BY_COUNTS_LIST_END },
     { &ATOM(by_affinity_domain), CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN },
+    { &ATOM(undefined), 0 },
     { 0, 0}
 };
 #endif
@@ -1359,6 +1371,7 @@ ecl_kv_t kv_device_affinity_domain[] = {
     { &ATOM(l2_cache), CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE },
     { &ATOM(l1_cache), CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE },
     { &ATOM(next_partitionable), CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE },
+    { &ATOM(undefined), 0 },
     { 0, 0}
 };
 #endif
@@ -1537,8 +1550,8 @@ ecl_info_t device_info[] =
       OCL_ENUM, kv_device_partition_property },
 
     { &ATOM(partition_affinity_domain), CL_DEVICE_PARTITION_AFFINITY_DOMAIN,false,OCL_ENUM, kv_device_affinity_domain },
-    // Property list / array , verify this!
-    { &ATOM(partition_type), CL_DEVICE_PARTITION_TYPE, true, OCL_ENUM, kv_device_partition_property },
+
+    { &ATOM(partition_type), CL_DEVICE_PARTITION_TYPE, false, OCL_DEVICE_PARTITION, 0},
     { &ATOM(reference_count), CL_DEVICE_REFERENCE_COUNT, false, OCL_UINT, 0 },
     { &ATOM(preferred_interop_user_sync), CL_DEVICE_PREFERRED_INTEROP_USER_SYNC,false, OCL_BOOL, 0},
     { &ATOM(printf_buffer_size), CL_DEVICE_PRINTF_BUFFER_SIZE,false, OCL_SIZE, 0 },
@@ -2733,6 +2746,9 @@ static size_t ecl_sizeof(ocl_type_t type)
     case OCL_PROGRAM: return sizeof(void*);
     case OCL_COMMAND_QUEUE: return sizeof(void*);
     case OCL_IMAGE_FORMAT: return sizeof(cl_image_format);
+#if CL_VERSION_1_2 == 1
+    case OCL_DEVICE_PARTITION: return sizeof(cl_device_partition_property);
+#endif
     default:
 	DBG("info_size: unknown type %d detected", type);
 	return sizeof(cl_int);
@@ -2796,7 +2812,54 @@ static ERL_NIF_TERM make_info_element(ErlNifEnv* env, ocl_type_t type, void* ptr
 				 kv_channel_type);
 	return enif_make_tuple2(env, channel_order, channel_type);
     }
+#if CL_VERSION_1_2 == 1
+    case OCL_DEVICE_PARTITION: { // cl_device_partition_property
+	cl_device_partition_property* prop = (cl_device_partition_property*)ptr;
+	ERL_NIF_TERM term = ATOM(undefined);
 
+	switch(*prop++) {
+	case CL_DEVICE_PARTITION_EQUALLY:
+	    term = enif_make_uint(env, *prop);
+	    return enif_make_tuple2(env, ATOM(equally), term);
+	case CL_DEVICE_PARTITION_BY_COUNTS: {
+	    cl_device_partition_property* pp = prop;
+	    term = enif_make_list(env, 0);
+	    while(*pp != CL_DEVICE_PARTITION_BY_COUNTS_LIST_END)
+		pp++;
+	    if (pp > prop) {  // build list backwards
+		pp--;
+		while(pp >= prop) {
+		    ERL_NIF_TERM ui = enif_make_uint(env, *pp);
+		    term = enif_make_list_cell(env, ui, term);
+		    pp--;
+		}
+	    }
+	    return enif_make_tuple2(env, ATOM(by_counts), term);
+	}
+	case CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN:
+	    switch(*prop) {
+	    case CL_DEVICE_AFFINITY_DOMAIN_NUMA:
+		term = ATOM(numa); break;
+	    case CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE:
+		term = ATOM(l4_cache); break;
+	    case CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE:
+		term = ATOM(l3_cache); break;
+	    case CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE:
+		term = ATOM(l2_cache); break;
+	    case CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE:
+		term = ATOM(l1_cache); break;
+	    case CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE:
+		term = ATOM(next_partitionable); break;
+	    default: return ATOM(undefined);
+	    }
+	    return enif_make_tuple2(env, ATOM(by_affinity_domain), term);
+
+	default:
+	    return ATOM(undefined);
+	}
+	break;
+    }
+#endif
     default:
 	return ATOM(undefined);
     }
@@ -3137,6 +3200,117 @@ static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc,
     device_list = enif_make_list_from_array(env, idv, num_devices);
     return enif_make_tuple2(env, ATOM(ok), device_list);
 }
+
+#if CL_VERSION_1_2 == 1
+
+// parse:
+//    {equally,<unsigned int>} |
+//    {by_counts, [<unsigned_int>]}
+//    {by_affinity_domain, num|l4_cache|l3_cache|l2_cache|l1_cache|
+//                         next_partiionable}
+// 
+static int get_partition_properties(ErlNifEnv* env, const ERL_NIF_TERM term,
+				    cl_device_partition_property* rvec,
+				    size_t* rlen)
+{
+    const ERL_NIF_TERM* elem;
+    int arity;
+    size_t maxlen = *rlen;
+    size_t n = 0;
+
+    if (!enif_get_tuple(env, term, &arity, &elem))
+	return 0;
+    if (arity != 2)
+	return 0;
+    if (!enif_is_atom(env, elem[0]))
+	return 0;
+
+    if (elem[0] == ATOM(equally)) {
+	unsigned long v;
+	*rvec++ = CL_DEVICE_PARTITION_EQUALLY;
+	if (!enif_get_ulong(env, elem[1], &v))
+	    return 0;
+	*rvec++ = v;
+	n=2;
+    }
+    else if (elem[0] == ATOM(by_counts)) {
+	ERL_NIF_TERM head, tail;
+	ERL_NIF_TERM list = elem[1];
+	unsigned long v;
+	*rvec++ = CL_DEVICE_PARTITION_BY_COUNTS;
+	n++;
+	while((n < maxlen-1) &&
+	      enif_get_list_cell(env, list, &head, &tail)) {
+	    if (!enif_get_ulong(env, head, &v))
+		return 0;
+	    *rvec++=v;
+	    n++;
+	    list = tail;
+	}
+	if (!enif_is_empty_list(env, list))
+	    return 0;
+	*rvec++ = CL_DEVICE_PARTITION_BY_COUNTS_LIST_END;
+	n++;
+    }
+    else if (elem[0] == ATOM(by_affinity_domain)) {
+	*rvec++ = CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN;
+	if (elem[1] == ATOM(numa))
+	    *rvec++ = CL_DEVICE_AFFINITY_DOMAIN_NUMA;
+	else if (elem[1] == ATOM(l4_cache))
+	    *rvec++ = CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE;
+	else if (elem[1] == ATOM(l3_cache))
+	    *rvec++ = CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE;
+	else if (elem[1] == ATOM(l2_cache))
+	    *rvec++ = CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE;
+	else if (elem[1] == ATOM(l1_cache))
+	    *rvec++ = CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE;
+	else if (elem[1] == ATOM(next_partitionable))
+	    *rvec++ = CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE;
+	else
+	    return 0;
+	n = 2;
+    }
+    else
+	return 0;
+    *rlen = n;
+    return 1;
+}
+
+static ERL_NIF_TERM ecl_create_sub_devices(ErlNifEnv* env, int argc,
+					   const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    d;
+    cl_device_id     out_devices[MAX_DEVICES];
+    ERL_NIF_TERM     idv[MAX_DEVICES];
+    ERL_NIF_TERM     device_list;
+    cl_uint          num_devices;
+    cl_uint          i;
+    cl_device_partition_property properties[128];
+    size_t num_property =  128-1;
+    cl_int err;
+
+    // fixme calc length of properties !
+    if (!get_ecl_object(env, argv[0], &device_r, false, &d))
+	return enif_make_badarg(env);
+    if (!get_partition_properties(env, argv[1], properties, &num_property))
+	return enif_make_badarg(env);
+    properties[num_property] = 0;
+
+    err = clCreateSubDevices(d->device, properties, MAX_DEVICES,
+			     out_devices, &num_devices);
+    if (err)
+	return ecl_make_error(env, err);
+    for (i = 0; i < num_devices; i++) {
+	ecl_object_t* obj;
+	if ((obj = ecl_lookup(env, out_devices[i])) == NULL)
+	    obj = ecl_new(env, &device_r, out_devices[i], 0, d->version);
+	idv[i] = make_object(env, device_r.type, obj);
+    }
+    device_list = enif_make_list_from_array(env, idv, num_devices);
+    return enif_make_tuple2(env, ATOM(ok), device_list);
+}
+#endif
+
 
 static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
