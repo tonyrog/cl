@@ -397,6 +397,10 @@ static ERL_NIF_TERM ecl_create_program_with_source(ErlNifEnv* env, int argc,
 						   const ERL_NIF_TERM argv[]);
 static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc, 
 						   const ERL_NIF_TERM argv[]);
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_create_program_with_builtin_kernels(
+    ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
+#endif
 static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc, 
 					    const ERL_NIF_TERM argv[]);
 
@@ -580,6 +584,10 @@ ErlNifFunc ecl_funcs[] =
     // Program
     { "create_program_with_source", 2, ecl_create_program_with_source },
     { "create_program_with_binary", 3, ecl_create_program_with_binary },
+#if CL_VERSION_1_2 == 1
+    { "create_program_with_builtin_kernels", 3, 
+      ecl_create_program_with_builtin_kernels },
+#endif
     { "async_build_program",        3, ecl_async_build_program },
 #if CL_VERSION_1_2 == 1
     { "unload_platform_compiler",   1, ecl_unload_platform_compiler },
@@ -4039,6 +4047,50 @@ static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc,
     // In cases of error we can then detect which binary was corrupt...
     return ecl_make_error(env, err);
 }
+
+
+//
+//  cl:create_program_with_builtin_kernels(Context::cl_context(),
+//                                  DeviceList::[cl_device_id()],
+//                                  KernelNames::string()) ->
+//    {'ok', cl_program()} | {'error', cl_error()}
+//
+#if CL_VERSION_1_2 == 1
+
+static ERL_NIF_TERM ecl_create_program_with_builtin_kernels(
+    ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    ecl_object_t* o_context;
+    cl_program     program;
+    cl_device_id   device_list[MAX_DEVICES];
+    cl_uint        num_devices = MAX_DEVICES;
+    char kernel_names[MAX_KERNEL_NAME];
+    cl_int         err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[1], &device_r, false,
+			 (void**) device_list, &num_devices))
+	return enif_make_badarg(env);
+    if (!enif_get_string(env, argv[2], kernel_names, sizeof(kernel_names),
+			 ERL_NIF_LATIN1))
+	return enif_make_badarg(env);
+
+    program = clCreateProgramWithBuiltInKernels(
+	o_context->context,
+	num_devices,
+	(const cl_device_id*) device_list,
+	kernel_names,
+	&err);
+    if (!err) {
+	ERL_NIF_TERM t;
+	t = ecl_make_object(env, &program_r,(void*) program, o_context);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
 
 //
 // @spec async_build_program(Program::cl_program(),

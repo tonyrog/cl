@@ -124,6 +124,7 @@
 %% Program
 -export([create_program_with_source/2]).
 -export([create_program_with_binary/3]).
+-export([create_program_with_builtin_kernels/3]).
 -export([release_program/1]).
 -export([retain_program/1]).
 -export([build_program/3, async_build_program/3]).
@@ -1417,6 +1418,14 @@ create_program_with_source(_Context, _Source) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
 create_program_with_binary(_Context, _DeviceList, _BinaryList) ->
+    erlang:error(nif_not_loaded).
+
+-spec create_program_with_builtin_kernels(Context::cl_context(),
+					  DeviceList::[cl_device_id()],
+					  KernelNames::string()) ->
+    {'ok', cl_program()} | {'error', cl_error()}.
+
+create_program_with_builtin_kernels(_Context, _DeviceList, _KernelNames) ->
     erlang:error(nif_not_loaded).
 
 %%
