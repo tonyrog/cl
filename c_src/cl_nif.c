@@ -417,6 +417,10 @@ static ERL_NIF_TERM ecl_get_kernel_info(ErlNifEnv* env, int argc,
 					const ERL_NIF_TERM argv[]);
 static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc, 
 						  const ERL_NIF_TERM argv[]);
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_get_kernel_arg_info(ErlNifEnv* env, int argc,
+					    const ERL_NIF_TERM argv[]);
+#endif
 
 static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc, 
 				     const ERL_NIF_TERM argv[]);
@@ -579,7 +583,9 @@ ErlNifFunc ecl_funcs[] =
     { "set_kernel_arg_size",        3, ecl_set_kernel_arg_size },
     { "get_kernel_info",            2, ecl_get_kernel_info },
     { "get_kernel_workgroup_info",  3, ecl_get_kernel_workgroup_info },
-
+#if CL_VERSION_1_2 == 1
+    { "get_kernel_arg_info",        3, ecl_get_kernel_arg_info },
+#endif
     // Events
     { "enqueue_task",               4, ecl_enqueue_task },
     { "enqueue_nd_range_kernel",    6, ecl_enqueue_nd_range_kernel },
@@ -956,6 +962,27 @@ DECL_ATOM(queued);
 
 // arguments
 DECL_ATOM(region);
+
+// DECL_ATOM(global);
+// DECL_ATOM(local);
+DECL_ATOM(constant);
+DECL_ATOM(private);
+
+// DECL_ATOM(read_only);
+// DECL_ATOM(write_only);
+// DECL_ATOM(read_write);
+// DECL_ATOM(none);
+
+// DECL_ATOM(none);
+DECL_ATOM(const);
+DECL_ATOM(restrict);
+DECL_ATOM(volatile);
+
+DECL_ATOM(address_qualifier);
+DECL_ATOM(access_qualifier);
+DECL_ATOM(type_name);
+DECL_ATOM(type_qualifier);
+// DECL_ATOM(name);
 
 #define SIZE_1   0x010000
 #define SIZE_2   0x020000
@@ -1652,6 +1679,41 @@ ecl_info_t event_info[] = {
     { &ATOM(execution_status), CL_EVENT_COMMAND_EXECUTION_STATUS, false, OCL_ENUM, kv_execution_status }
 };
 
+// clGetKernelArgInfo 1.2
+#if CL_VERSION_1_2 == 1
+
+ecl_kv_t kv_address_qualifier[] = {
+    { &ATOM(global), CL_KERNEL_ARG_ADDRESS_GLOBAL },
+    { &ATOM(local),  CL_KERNEL_ARG_ADDRESS_LOCAL },
+    { &ATOM(constant), CL_KERNEL_ARG_ADDRESS_CONSTANT },
+    { &ATOM(private), CL_KERNEL_ARG_ADDRESS_PRIVATE },
+    { 0, 0 }
+};
+
+ecl_kv_t kv_access_qualifier[] = {
+    { &ATOM(read_only), CL_KERNEL_ARG_ACCESS_READ_ONLY },
+    { &ATOM(write_only), CL_KERNEL_ARG_ACCESS_WRITE_ONLY },
+    { &ATOM(read_write), CL_KERNEL_ARG_ACCESS_READ_WRITE },
+    { &ATOM(none), CL_KERNEL_ARG_ACCESS_NONE },
+    { 0, 0 }
+};
+
+ecl_kv_t kv_type_qualifier[] = {
+    { &ATOM(none), CL_KERNEL_ARG_TYPE_NONE },
+    { &ATOM(const), CL_KERNEL_ARG_TYPE_CONST },
+    { &ATOM(restrict), CL_KERNEL_ARG_TYPE_RESTRICT },
+    { &ATOM(volatile), CL_KERNEL_ARG_TYPE_VOLATILE },
+    { 0, 0 }
+};
+
+ecl_info_t arg_info[] = {
+    { &ATOM(address_qualifier), CL_KERNEL_ARG_ADDRESS_QUALIFIER, false, OCL_ENUM, kv_address_qualifier },
+    { &ATOM(access_qualifier), CL_KERNEL_ARG_ACCESS_QUALIFIER, false, OCL_ENUM, kv_access_qualifier },
+    { &ATOM(type_name), CL_KERNEL_ARG_TYPE_NAME, false, OCL_STRING, 0 },
+    { &ATOM(type_qualifier), CL_KERNEL_ARG_TYPE_QUALIFIER, false, OCL_ENUM, kv_type_qualifier },
+    { &ATOM(name),  CL_KERNEL_ARG_NAME, false, OCL_STRING, 0 },
+};
+#endif
 
 // Error reasons
 ERL_NIF_TERM ecl_error(cl_int err)
@@ -2810,7 +2872,7 @@ ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* o
 }
 
 
-ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* obj1, ecl_object_t* obj2,
+ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* obj1, void* obj2,
 				   info2_fn_t* func, ecl_info_t* info, size_t num_info)
 {
     size_t returned_size = 0;
@@ -2826,11 +2888,11 @@ ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* 
 	i++;
     if (i == num_info)
 	return enif_make_badarg(env);  // or error ?
-    if (!(err = (*func)(obj1->opaque, obj2->opaque, info[i].info_id, 
+    if (!(err = (*func)(obj1->opaque, obj2, info[i].info_id,
 			0, NULL, &returned_size))) {
 	if (!(buf = enif_alloc(returned_size)))
 	    return ecl_make_error(env, CL_OUT_OF_RESOURCES);
-	if (!(err = (*func)(obj1->opaque, obj2->opaque, info[i].info_id, 
+	if (!(err = (*func)(obj1->opaque, obj2, info[i].info_id,
 			    returned_size, buf, &returned_size))) {
 	    result = enif_make_tuple2(env, ATOM(ok), make_info_value(env, &info[i], buf, returned_size));
 	    enif_free(buf);
@@ -4130,7 +4192,7 @@ static ERL_NIF_TERM ecl_get_program_build_info(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_ecl_object(env, argv[1], &device_r, false, &o_device))
 	return enif_make_badarg(env);
-    return make_object_info2(env, argv[2], o_program, o_device, 
+    return make_object_info2(env, argv[2], o_program, o_device->opaque,
 			     (info2_fn_t*) clGetProgramBuildInfo,
 			     build_info,
 			     sizeof_array(build_info));
@@ -4456,11 +4518,31 @@ static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_ecl_object(env, argv[1], &device_r, false, &o_device))
 	return enif_make_badarg(env);
-    return make_object_info2(env, argv[2], o_kernel, o_device, 
+    return make_object_info2(env, argv[2], o_kernel, o_device->opaque,
 			     (info2_fn_t*) clGetKernelWorkGroupInfo,
 			     workgroup_info,
 			     sizeof_array(workgroup_info));
 }
+
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_get_kernel_arg_info(ErlNifEnv* env, int argc,
+					    const ERL_NIF_TERM argv[])
+{
+    ecl_object_t* o_kernel;
+    cl_uint arg_index;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &kernel_r, false, &o_kernel))
+	return enif_make_badarg(env);
+    if (!enif_get_uint(env, argv[1], &arg_index))
+	return enif_make_badarg(env);
+    return make_object_info2(env, argv[2], o_kernel,
+			     (void*) (unsigned long) arg_index,
+			     (info2_fn_t*) clGetKernelArgInfo,
+			     arg_info,
+			     sizeof_array(arg_info));
+}
+#endif
 
 //
 // cl:enqueue_task(Queue::cl_queue(), Kernel::cl_kernel(),
@@ -6416,6 +6498,27 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 
     // arguments
     LOAD_ATOM(region);
+
+    LOAD_ATOM(global);
+    LOAD_ATOM(local);
+    LOAD_ATOM(constant);
+    LOAD_ATOM(private);
+
+    LOAD_ATOM(read_only);
+    LOAD_ATOM(write_only);
+    LOAD_ATOM(read_write);
+    LOAD_ATOM(none);
+
+    LOAD_ATOM(none);
+    LOAD_ATOM(const);
+    LOAD_ATOM(restrict);
+    LOAD_ATOM(volatile);
+
+    LOAD_ATOM(address_qualifier);
+    LOAD_ATOM(access_qualifier);
+    LOAD_ATOM(type_name);
+    LOAD_ATOM(type_qualifier);
+    LOAD_ATOM(name);
 
     // Create resource types
     ecl_resource_init(env, &platform_r, "platform_t", 

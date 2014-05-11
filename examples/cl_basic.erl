@@ -136,7 +136,14 @@ __kernel void program1(int n, int m) {
 			fun(Device) ->
 				{ok,I}=cl:get_kernel_workgroup_info(Kernel,Device),
 				io:format("KernelWorkGroupInfo: ~p\n", [I])
-			end, DeviceList)
+			end, DeviceList),
+		      case lists:member({1,2}, cl:versions()) of
+			  true ->
+			      {ok,ArgInfo} = cl:get_kernel_arg_info(Kernel),
+			      io:format("arg_info: ~p\n", [ArgInfo]);
+			  false ->
+			      ok
+		      end
 	      end, Kernels),
 	    foreach(
 	      fun(Device) ->

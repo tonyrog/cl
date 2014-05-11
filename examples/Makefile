@@ -8,7 +8,8 @@ MODULES = \
 	cl_mul \
 	cl_test \
 	cl_buffer \
-	cl_image
+	cl_image \
+	cl_compile
 
 
 EBIN = .

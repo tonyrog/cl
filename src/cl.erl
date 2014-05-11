@@ -143,6 +143,8 @@
 -export([get_kernel_info/1,get_kernel_info/2]).
 -export([kernel_workgroup_info/0]).
 -export([get_kernel_workgroup_info/2,get_kernel_workgroup_info/3]).
+-export([kernel_arg_info/0]).
+-export([get_kernel_arg_info/1, get_kernel_arg_info/2,get_kernel_arg_info/3]).
 %% Events
 -export([enqueue_task/3, enqueue_task/4]).
 -export([nowait_enqueue_task/3]).
@@ -1745,6 +1747,7 @@ kernel_workgroup_info() ->
 get_kernel_workgroup_info(_Kernel, _Device, _Info) ->
     erlang:error(nif_not_loaded).
 
+
 %% @doc Returns all information about the kernel object that may be
 %% specific to a device.
 get_kernel_workgroup_info(Kernel, Device) ->
@@ -1752,6 +1755,35 @@ get_kernel_workgroup_info(Kernel, Device) ->
 		  fun(K,I) ->
 			  get_kernel_workgroup_info(K,Device,I)
 		  end).
+
+%% @doc Returns specific information about the kernel argument
+get_kernel_arg_info(_Kernel, _ArgIndex, _Info) ->
+    erlang:error(nif_not_loaded).
+
+get_kernel_arg_info(Kernel, ArgIndex) ->
+    get_info_list(Kernel, kernel_arg_info(),
+		       fun(K,I) ->
+			       get_kernel_arg_info(K,ArgIndex,I)
+		       end).
+
+get_kernel_arg_info(Kernel) ->
+    case get_kernel_info(Kernel, num_args) of
+	{ok, N} ->
+	    {ok,
+	     lists:map(fun(I) ->
+			       {ok,Info} = get_kernel_arg_info(Kernel, I),
+			       {I,Info}
+		       end, lists:seq(0, N-1))};
+	Error ->
+	    Error
+    end.
+
+kernel_arg_info() ->
+    [address_qualifier,
+     access_qualifier,
+     type_name,
+     type_qualifier,
+     name].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Events
