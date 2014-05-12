@@ -82,3 +82,118 @@ build_info(Program, Device) ->
 	false ->
 	    ok
     end.
+
+%% compile & link with openCL version 1.2
+
+inc1() -> "
+#define FOO 5
+".
+
+inc2() -> "
+#define BAR 7
+".
+
+prog1() -> "
+#include \"inc1.h\"\n
+#include \"inc2.h\"\n
+
+__kernel void sum(int x, int y, __global int* z)
+{
+  int i = get_global_id(0);
+  z[i] = x + y + FOO + BAR + BAZ;
+}
+".
+
+prog2() -> "
+#define FOO 5
+#define BAR 7
+
+__kernel void prod(int x, int y, __global int* z)
+{
+  int i = get_global_id(0);
+  z[i] = x*y*FOO*BAR + BAZ;
+}
+".
+
+make_prog(Clu,prog1) ->
+    {ok,Program} = cl:create_program_with_source(clu:context(Clu), prog1()),
+    {ok,Inc1} = cl:create_program_with_source(clu:context(Clu), inc1()),
+    {ok,Inc2} = cl:create_program_with_source(clu:context(Clu), inc2()),
+    {Program, [Inc1,Inc2], ["inc1.h", "inc2.h"]};
+make_prog(Clu,prog2) ->
+    {ok,Program} = cl:create_program_with_source(clu:context(Clu), prog2()),
+    {Program, [], []}.
+
+%% MackBookPro, mac os x 10.9 with GEForce 9400M test_12(gpu,prog1)
+%% fail with an error saying that the compiler can not find include
+%% files 'inc1.h'
+test_12() ->
+    test_12(prog1, cpu).
+
+test_12(Prog, Type) ->
+    true = lists:member({1,2}, cl:versions()),
+    Clu = clu:setup(Type),
+    compile_12(Clu, Prog).
+
+compile_12(Clu, Prog) ->
+    {Program,Includes,IncludeNames} = make_prog(Clu,Prog),
+    Ds = clu:device_list(Clu),
+    case cl:compile_program(Program,Ds,"-DBAZ=11",
+			    Includes, IncludeNames) of
+	ok ->
+	    Status = [get_build_status(Program, Dev) || Dev <- Ds],
+	    case lists:any(fun(success) -> true;
+			      (_) -> false end, Status) of
+		true ->
+		    {ok,Program};
+		false ->
+		    Logs = get_program_logs(Program),
+		    io:format("Logs: ~s\n", [Logs]),
+		    {error,{Status,Logs}}
+	    end;
+	Error ->
+	    Logs = get_program_logs(Program),
+	    io:format("Logs: ~s\n", [Logs]),
+	    cl:release_program(Program),
+	    {error,{Error,Logs}}
+    end.
+
+link_12(Type) ->
+    link_12(prog1,Type).
+
+link_12(Prog,Type) ->
+    true = lists:member({1,2}, cl:versions()),
+    Clu = clu:setup(Type),
+    {ok,Prog1} = compile_12(Clu, Prog),
+    io:format("Prog1 = ~p\n", [Prog1]),
+%%    {ok,Prog2} = compile_12(Clu, prog2),
+%%    io:format("Prog2 = ~p\n", [Prog2]),
+    case cl:link_program(clu:context(Clu),
+			 clu:device_list(Clu),
+			 "",
+			 [Prog1]) of
+	{ok, Program} ->
+	    %% check status & logs
+	    get_program_binaries(Program);
+	Error ->
+	    Error
+    end.
+
+get_build_status(Program, Device) ->
+    {ok,Status} = cl:get_program_build_info(Program, Device, status),
+    {ok,BinaryType} = cl:get_program_build_info(Program, Device, binary_type),
+    io:format("status: ~p, binary_type=~p\n", [Status, BinaryType]),
+    Status.
+
+get_program_logs(Program) ->
+    {ok,DeviceList} = cl:get_program_info(Program, devices),
+    lists:map(
+      fun(Device) ->
+	      {ok,Log} = cl:get_program_build_info(Program,Device,log),
+	      Log
+      end, DeviceList).
+
+get_program_binaries(Program) ->
+    {ok,DeviceList} = cl:get_program_info(Program, devices),
+    {ok,BinaryList} = cl:get_program_info(Program, binaries),
+    {ok,{DeviceList, BinaryList}}.

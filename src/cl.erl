@@ -130,6 +130,8 @@
 -export([build_program/3, async_build_program/3]).
 -export([unload_compiler/0]).
 -export([unload_platform_compiler/1]).
+-export([compile_program/5, async_compile_program/5]).
+-export([link_program/4, async_link_program/4]).
 -export([program_info/0]).
 -export([get_program_info/1,get_program_info/2]).
 -export([program_build_info/0]).
@@ -1604,6 +1606,51 @@ unload_compiler() ->
     'ok' | {'error', cl_error()}.
 unload_platform_compiler(_Platform) ->
     erlang:error(nif_not_loaded).
+
+-spec compile_program(Program::cl_program(),
+		      DeviceList::[cl_device_id()],
+		      Options::string(),
+		      Headers::[cl_program()],
+		      Names::[string()]) ->
+    'ok' | {'error', cl_error()}.
+
+compile_program(Program, Devices, Options, Headers, Names) ->
+    case async_compile_program(Program, Devices, Options, Headers, Names) of
+	{ok,Ref} ->
+	    receive
+		{cl_async,Ref,Reply} ->
+		    Reply
+	    end;
+	Error ->
+	    Error
+    end.
+
+async_compile_program(_Program, _Devices, _Options, _Headers, _Names) ->
+    erlang:error(nif_not_loaded).
+
+
+-spec link_program(Context::cl_context(),
+		   DeviceList::[cl_device_id()],
+		   Options::string(),
+		   Programs::[cl_program()]) ->
+    {'ok',cl_program()} | {'error', cl_error()}.
+
+link_program(Context, DeviceList, Options, Programs) ->
+    case async_link_program(Context, DeviceList, Options, Programs) of
+	{ok,{Ref,Program}} ->
+	    receive
+		{cl_async,Ref,ok} ->
+		    {ok,Program};
+		{cl_async,Ref,Error} ->
+		    Error
+	    end;
+	Error ->
+	    Error
+    end.
+
+async_link_program(_Context, _DeviceList, _Options, _Programs) ->
+    erlang:error(nif_not_loaded).
+
 
 program_info() ->
     [

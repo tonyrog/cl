@@ -69,6 +69,8 @@ typedef cl_bool bool;
 
 #define sizeof_array(a) (sizeof(a) / sizeof(a[0]))
 
+// #define DEBUG
+
 #ifdef DEBUG
 #include <stdarg.h>
 static void ecl_emit_error(char* file, int line, ...);
@@ -81,8 +83,8 @@ static void ecl_emit_error(char* file, int line, ...);
 
 // soft limits
 #define MAX_INFO_SIZE   1024
-#define MAX_DEVICES     128   
-#define MAX_PLATFORMS   128   
+#define MAX_DEVICES     128
+#define MAX_PLATFORMS   128
 #define MAX_OPTION_LIST 1024
 #define MAX_KERNEL_NAME 1024
 #define MAX_KERNELS     1024
@@ -407,6 +409,10 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
 #if CL_VERSION_1_2 == 1
 static ERL_NIF_TERM ecl_unload_platform_compiler(ErlNifEnv* env, int argc, 
 						 const ERL_NIF_TERM argv[]);
+static ERL_NIF_TERM ecl_async_compile_program(ErlNifEnv* env, int argc,
+					      const ERL_NIF_TERM argv[]);
+static ERL_NIF_TERM ecl_async_link_program(ErlNifEnv* env, int argc,
+					   const ERL_NIF_TERM argv[]);
 #endif
 typedef cl_int (* ECL_UNLOAD_PLATFORM_COMPILER)(cl_platform_id);
 ECL_UNLOAD_PLATFORM_COMPILER eclUnloadPlatformCompiler;
@@ -591,6 +597,12 @@ ErlNifFunc ecl_funcs[] =
     { "async_build_program",        3, ecl_async_build_program },
 #if CL_VERSION_1_2 == 1
     { "unload_platform_compiler",   1, ecl_unload_platform_compiler },
+#endif
+#if CL_VERSION_1_2 == 1
+    { "async_compile_program",      5,   ecl_async_compile_program },
+#endif
+#if CL_VERSION_1_2 == 1
+    { "async_link_program",         4,   ecl_async_link_program },
 #endif
     { "unload_compiler",            0, ecl_unload_compiler },
     { "get_program_info",           2, ecl_get_program_info },
@@ -2553,6 +2565,51 @@ static int get_binary_list(ErlNifEnv* env, const ERL_NIF_TERM term,
     return 0;
 }
 
+#if CL_VERSION_1_2 == 1
+// avoid warning
+// currently onlt used my compile_program which is a 1.2 function
+
+// free an array of strings
+static void free_string_list(char** rvec, size_t n)
+{
+    int i;
+    for (i = 0; i < (int)n; i++)
+	enif_free(rvec[i]);
+}
+
+// get a list of, max *rlen, dynamically allocated, strings.
+static int get_string_list(ErlNifEnv* env, const ERL_NIF_TERM term,
+			   char** rvec, size_t* rlen)
+{
+    char** rvec0 = rvec;
+    size_t maxlen = *rlen;
+    size_t n = 0;
+    ERL_NIF_TERM list = term;
+    ERL_NIF_TERM head, tail;
+    while((n < maxlen) &&
+	  enif_get_list_cell(env, list, &head, &tail)) {
+	char* str;
+	unsigned int len;
+	if (!enif_get_list_length(env, head, &len))
+	    goto error;
+	if (!(str = enif_alloc(len+1)))
+	    goto error;
+	if (!enif_get_string(env, head, str, len+1, ERL_NIF_LATIN1))
+	    goto error;
+	*rvec++ = str;
+	n++;
+	list = tail;
+    }
+    if (enif_is_empty_list(env, list)) {
+	*rlen = n;
+	return 1;
+    }
+error:
+    free_string_list(rvec0, rvec-rvec0);
+    return 0;
+}
+#endif
+
 // Copy a "local" binary to a new process independent environment
 // fill the binary structure with the new data and return it.
 //
@@ -4121,7 +4178,8 @@ void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
     UNUSED(program);
     UNUSED(res);
 
-    DBG("ecl_build_notify: done user_data=%p", user_data);
+    DBG("ecl_build_notify: done program=%p, user_data=%p",
+	program, user_data);
 
     // FIXME: check all devices for build_status!
     // clGetProgramBuildInfo(bp->program->program, CL_PROGRAM_BUILD_STATUS,
@@ -4135,13 +4193,14 @@ void CL_CALLBACK ecl_build_notify(cl_program program, void* user_data)
 
     reply = ATOM(ok);
     res = enif_send(s_env, &bp->sender, bp->r_env, 
-		    enif_make_tuple3(bp->r_env, 
+		    enif_make_tuple3(bp->r_env,
 				     ATOM(cl_async),
 				     bp->ref,
 				     reply));
     DBG("ecl_build_notify: send r=%d", res);
     enif_free_env(bp->r_env);
-    enif_release_resource(bp->program);
+    if (bp->program)
+	enif_release_resource(bp->program);
     enif_free(bp);
 }
 
@@ -4218,6 +4277,174 @@ static ERL_NIF_TERM ecl_unload_platform_compiler(ErlNifEnv* env, int argc,
 	return ecl_make_error(env, err);
     return ATOM(ok);    
 }
+#endif
+
+#if CL_VERSION_1_2 == 1
+// -spec compile_program(Program::cl_program(),
+//		      DeviceList::[cl_device_id()],
+//		      Options::string(),
+//		      Headers::[cl_program()],
+//		      Names::[string()]) ->
+//    'ok' | {'error', cl_error()}.
+
+#define MAX_HEADERS 128
+
+static ERL_NIF_TERM ecl_async_compile_program(ErlNifEnv* env, int argc,
+					      const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_program;
+    cl_device_id     device_list[MAX_DEVICES];
+    cl_uint          num_devices = MAX_DEVICES;
+    char             options[MAX_OPTION_LIST];
+    cl_uint          num_input_headers = MAX_HEADERS;
+    cl_program       input_headers[MAX_HEADERS];
+    size_t           num_header_include_names = MAX_HEADERS;
+    char*            header_include_names[MAX_HEADERS];
+    ERL_NIF_TERM     ref;
+    ecl_build_data_t* bp = NULL;
+    cl_int           err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[1], &device_r, false,
+			 (void**) device_list, &num_devices))
+	return enif_make_badarg(env);
+    if (!enif_get_string(env, argv[2], options, sizeof(options),ERL_NIF_LATIN1))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[3], &program_r, false,
+			 (void**) input_headers, &num_input_headers))
+	return enif_make_badarg(env);
+    num_header_include_names = num_input_headers;
+    if (!get_string_list(env, argv[4], header_include_names,
+			 &num_header_include_names))
+	return enif_make_badarg(env);
+
+    if (!(bp = enif_alloc(sizeof(ecl_build_data_t)))) {
+	err =  CL_OUT_OF_RESOURCES;
+	goto error;
+    }
+    if (!(bp->r_env = enif_alloc_env())) {
+	err =  CL_OUT_OF_RESOURCES;
+	goto error;
+    }
+
+    ref = enif_make_ref(env);
+    (void) enif_self(env, &bp->sender);
+    bp->ref    = enif_make_copy(bp->r_env, ref);
+    bp->program = o_program;
+    bp->s_env = env;
+    bp->tid = enif_thread_self();
+    enif_keep_resource(o_program);    // keep while operation is running
+
+    DBG("ecl_async_compile_program: program: %p, num_input_headers: %d, bp=%p",
+	o_program->program, num_input_headers, bp);
+
+    err = clCompileProgram(o_program->program,
+			   num_devices,
+			   device_list,
+			   (const char*) options,
+			   num_input_headers,
+			   num_input_headers ? input_headers : NULL,
+			   num_input_headers ?
+			   (const char**)header_include_names : NULL,
+			   ecl_build_notify,
+			   bp);
+    DBG("ecl_async_compile_program: err=%d user_data=%p", err, bp);
+
+    if ((err==CL_SUCCESS) || (err==CL_BUILD_PROGRAM_FAILURE)) {
+	// check if we need to save this until complete!
+	free_string_list(header_include_names, num_header_include_names);
+	return enif_make_tuple2(env, ATOM(ok), ref);
+    }
+
+error:
+    free_string_list(header_include_names, num_header_include_names);
+    if (bp) {
+	if (bp->program) enif_release_resource(bp->program);
+	if (bp->r_env) enif_free_env(bp->r_env);
+	enif_free(bp);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
+
+#if CL_VERSION_1_2 == 1
+// -spec link_program(Context::cl_context(),
+//		   DeviceList::[cl_device_id()],
+//		   Options::string(),
+//		   Programs::[cl_program()]) ->
+//    {'ok',cl_program()} | {'error', cl_error()}.
+
+#define MAX_INPUT_PROGRAMS 128
+
+static ERL_NIF_TERM ecl_async_link_program(ErlNifEnv* env, int argc,
+					   const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_context;
+    cl_program       program;
+    cl_device_id     device_list[MAX_DEVICES];
+    cl_uint          num_devices = MAX_DEVICES;
+    char             options[MAX_OPTION_LIST];
+    cl_uint          num_input_programs = MAX_INPUT_PROGRAMS;
+    cl_program       input_programs[MAX_INPUT_PROGRAMS];
+    ERL_NIF_TERM     ref;
+    ERL_NIF_TERM     prog;
+    ecl_build_data_t* bp;
+    cl_int           err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[1], &device_r, false,
+			 (void**) device_list, &num_devices))
+	return enif_make_badarg(env);
+    if (!enif_get_string(env, argv[2], options, sizeof(options),ERL_NIF_LATIN1))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[3], &program_r, false,
+			 (void**) input_programs, &num_input_programs))
+	return enif_make_badarg(env);
+
+    if (!(bp = enif_alloc(sizeof(ecl_build_data_t))))
+	return ecl_make_error(env, CL_OUT_OF_RESOURCES);
+    if (!(bp->r_env = enif_alloc_env())) {
+	enif_free(bp);
+	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
+    }
+
+    ref = enif_make_ref(env);
+    (void) enif_self(env, &bp->sender);
+    bp->ref    = enif_make_copy(bp->r_env, ref);
+    bp->program = NULL;
+    bp->s_env = env;
+    bp->tid = enif_thread_self();
+
+    DBG("ecl_async_link_program: context: %p, num_input_programs %d, bp=%p",
+	o_context->context, num_input_programs, bp);
+
+    // lock callback inorder avoid race?
+    program = clLinkProgram(o_context->context,
+			    num_devices,
+			    num_devices ? device_list : NULL,
+			    (const char*) options,
+			    num_input_programs,
+			    input_programs,
+			    ecl_build_notify,
+			    bp,
+			    &err);
+    DBG("ecl_async_link_program: err=%d program %p, user_data=%p",
+	err, program, bp);
+
+    if (program == NULL) {
+	enif_free_env(bp->r_env);
+	enif_free(bp);
+	return ecl_make_error(env, err);
+    }
+    prog = ecl_make_object(env, &program_r,(void*) program, o_context);
+    return enif_make_tuple2(env, ATOM(ok),
+			    enif_make_tuple2(env, ref, prog));
+}
+
 #endif
 
 static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc, 
