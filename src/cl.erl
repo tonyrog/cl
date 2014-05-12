@@ -180,6 +180,7 @@
 -export([enqueue_map_buffer/6]).
 -export([enqueue_map_image/6]).
 -export([enqueue_unmap_mem_object/3]).
+-export([enqueue_migrate_mem_objects/4]).
 -export([release_event/1]).
 -export([retain_event/1]).
 -export([event_info/0]).
@@ -2195,6 +2196,15 @@ enqueue_map_image(_Queue, _Image, _MapFlags, _Origin, _Region, _WaitList) ->
     erlang:error(nif_not_loaded).
 
 enqueue_unmap_mem_object(_Queue, _Mem, _WaitList) ->    
+    erlang:error(nif_not_loaded).
+
+-spec enqueue_migrate_mem_objects(Queue::cl_queue(),
+				  MemObjects::[cl_mem()],
+				  Flags::[host|content_undefined],
+				  WaitList::[cl_event()]) ->
+    {'ok', cl_event()} | {'error', cl_error()}.
+
+enqueue_migrate_mem_objects(_Queue, _MemObjects, _Flags, _WaitList) ->
     erlang:error(nif_not_loaded).
 
 %%

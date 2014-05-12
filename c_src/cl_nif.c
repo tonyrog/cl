@@ -92,6 +92,7 @@ static void ecl_emit_error(char* file, int line, ...);
 #define MAX_WAIT_LIST   128
 #define MAX_WORK_SIZE   3
 #define MAX_IMAGE_FORMATS 128
+#define MAX_MEM_OBJECTS 128
 
 // Atom macros
 #define ATOM(name) atm_##name
@@ -529,6 +530,11 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc, 
 						 const ERL_NIF_TERM argv[]);
 
+#if CL_VERSION_1_2 == 1
+static ERL_NIF_TERM ecl_enqueue_migrate_mem_objects(ErlNifEnv* env, int argc,
+						    const ERL_NIF_TERM argv[]);
+#endif
+
 static ERL_NIF_TERM ecl_async_flush(ErlNifEnv* env, int argc, 
 				    const ERL_NIF_TERM argv[]);
 
@@ -654,6 +660,9 @@ ErlNifFunc ecl_funcs[] =
     { "enqueue_map_buffer",           6, ecl_enqueue_map_buffer },
     { "enqueue_map_image",            6, ecl_enqueue_map_image },
     { "enqueue_unmap_mem_object",     3, ecl_enqueue_unmap_mem_object },
+#if CL_VERSION_1_2 == 1
+    { "enqueue_migrate_mem_objects",  4, ecl_enqueue_migrate_mem_objects },
+#endif
     { "async_flush",                  1, ecl_async_flush },
     { "async_finish",                 1, ecl_async_finish },
     { "async_wait_for_event",         1, ecl_async_wait_for_event },
@@ -931,6 +940,10 @@ DECL_ATOM(use_host_ptr);
 DECL_ATOM(alloc_host_ptr);
 DECL_ATOM(copy_host_ptr);
 
+// migration flags
+DECL_ATOM(host);
+DECL_ATOM(content_undefined);
+
 // mem_object_type
 DECL_ATOM(buffer);
 DECL_ATOM(image2d);
@@ -985,6 +998,9 @@ DECL_ATOM(unmap_mem_object);
 DECL_ATOM(marker);
 DECL_ATOM(aquire_gl_objects);
 DECL_ATOM(release_gl_objects);
+DECL_ATOM(migreate_mem_objects);
+DECL_ATOM(fill_buffer);
+DECL_ATOM(fill_image);
 
 // execution_status
 DECL_ATOM(complete);
@@ -1139,6 +1155,14 @@ ecl_kv_t kv_mem_flags[] = { // bit field
     { 0, 0 }
 };
 
+#if CL_VERSION_1_2 == 1
+ecl_kv_t kv_migration_flags[] = { // bit field
+    { &ATOM(host), CL_MIGRATE_MEM_OBJECT_HOST },
+    { &ATOM(content_undefined), CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED},
+    { 0, 0 }
+};
+#endif
+
 ecl_kv_t kv_mem_object_type[] = { // enum
     { &ATOM(buffer), CL_MEM_OBJECT_BUFFER },
     { &ATOM(image2d), CL_MEM_OBJECT_IMAGE2D },
@@ -1208,6 +1232,11 @@ ecl_kv_t kv_command_type[] = { // enum
     { &ATOM(marker), CL_COMMAND_MARKER  },
     { &ATOM(aquire_gl_objects), CL_COMMAND_ACQUIRE_GL_OBJECTS },
     { &ATOM(release_gl_objects), CL_COMMAND_RELEASE_GL_OBJECTS },
+#if CL_VERSION_12 == 1
+    { &ATOM(migreate_mem_objects), CL_COMMAND_MIGRATE_MEM_OBJECTS },
+    { &ATOM(fill_buffer), CL_COMMAND_FILL_BUFFER },
+    { &ATOM(fill_image), CL_COMMAND_FILL_IMAGE },
+#endif
     { 0, 0}
 };
 
@@ -6201,6 +6230,49 @@ static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc,
     return ecl_make_error(env, err);    
 }
 
+#if CL_VERSION_1_2 == 1
+//
+static ERL_NIF_TERM ecl_enqueue_migrate_mem_objects(ErlNifEnv* env, int argc,
+						    const ERL_NIF_TERM argv[])
+{
+    ecl_object_t*    o_queue;
+    cl_uint          num_mem_objects = MAX_MEM_OBJECTS;
+    cl_mem           mem_objects[MAX_MEM_OBJECTS];
+    cl_mem_migration_flags flags = 0;
+    cl_event         wait_list[MAX_WAIT_LIST];
+    cl_uint          num_events = MAX_WAIT_LIST;
+    cl_event         event;
+    cl_int err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
+	return enif_make_badarg(env);
+    if (!get_object_list(env, argv[1], &mem_r, false,
+			 (void**) mem_objects, &num_mem_objects))
+	return enif_make_badarg(env);
+    if (!get_bitfields(env, argv[2], &flags, kv_migration_flags))
+	return enif_make_badarg(env);
+
+    if (!get_object_list(env, argv[3], &event_r, false,
+			 (void**) wait_list, &num_events))
+	return enif_make_badarg(env);
+
+    err = clEnqueueMigrateMemObjects(o_queue->queue,
+				     num_mem_objects,
+				     num_mem_objects ? mem_objects : NULL,
+				     flags,
+				     num_events,
+				     num_events ? wait_list : 0,
+				     &event);
+    if (!err) {
+	ERL_NIF_TERM t;
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
+
 static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
@@ -6889,6 +6961,10 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(alloc_host_ptr);
     LOAD_ATOM(copy_host_ptr);
 
+    // migration_flags
+    LOAD_ATOM(host);
+    LOAD_ATOM(content_undefined);
+
     // mem_object_type
     LOAD_ATOM(buffer);
     LOAD_ATOM(image2d);
@@ -6942,6 +7018,9 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(marker);
     LOAD_ATOM(aquire_gl_objects);
     LOAD_ATOM(release_gl_objects);
+    LOAD_ATOM(migreate_mem_objects);
+    LOAD_ATOM(fill_buffer);
+    LOAD_ATOM(fill_image);
 
     // execution_status
     LOAD_ATOM(complete);

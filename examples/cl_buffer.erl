@@ -138,3 +138,18 @@ fill() ->
 		9,9,9,9,9,9,9,9,
 		9,9,9,9,9,9,9,9,
 		9,9,9,9,9,9,9,9>>.
+
+migrate() ->
+    C = clu:setup(all),
+    true = lists:member({1,2},cl:versions()),
+    [D1,D2|_] = clu:device_list(C),
+    {ok,Q1} = cl:create_queue(clu:context(C),D1,[]),
+    {ok,Q2} = cl:create_queue(clu:context(C),D2,[]),
+    {ok,B1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
+    {ok,E1} = cl:enqueue_fill_buffer(Q1, B1, <<9>>, 0, 64, []),
+    cl:flush(Q1),
+    {ok,completed} = cl:wait(E1),
+    {ok,E2} = cl:enqueue_migrate_mem_objects(Q2, [B1], [], []),
+    cl:flush(Q2),
+    %% fixme: add a kernel to check that the data was migrated
+    cl:wait(E2).
