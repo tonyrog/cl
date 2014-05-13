@@ -135,3 +135,50 @@ create_image3d_data(W,H,D,BytesPerPixel) ->
 	_ <- lists:seq(1,H),
 	_ <- lists:seq(1,W)
     >>.
+
+%% test image pixel operations
+
+pixop() ->
+    Clu = clu:setup(cpu),
+    {ok,A} =
+	cl:create_image2d(clu:context(Clu),[read_write],
+			  #cl_image_format { cl_channel_order = rgba,
+					     cl_channel_type  = unorm_int8 },
+			  2,
+			  2,
+			  2*4,
+			  <<100,200,50,127, 25,255,50,100,
+			    30,64,10,20,    3,2,1,220>> ),
+    %% {ok,E1} = cl:enqueue_write_image(Q, A, [0,0], [2,2], 2*4, 0, Data, []),
+    {ok,B} =
+	cl:create_image2d(clu:context(Clu),[read_write],
+			  #cl_image_format { cl_channel_order = rgba,
+					     cl_channel_type  = unorm_int8 },
+			  2,
+			  2,
+			  2*4,
+			  <<50,100,25,255,  100,100,100,127,
+			    100,200,50,127, 1,2,3,20>>),
+    {ok,C} =
+	cl:create_image2d(clu:context(Clu),[read_write],
+			  #cl_image_format { cl_channel_order = rgba,
+					     cl_channel_type  = unorm_int8 },
+			  2,
+			  2,
+			  0,
+			  <<>>),
+
+    {ok,Q} = cl:create_queue(clu:context(Clu),clu:device(Clu),[]),
+    {ok,Program} = clu:build_source_file(Clu, "pixop.cl", ""),
+    {ok,Kernel} = cl:create_kernel(Program, "pixmap_blend"),
+    clu:apply_kernel_args(Kernel, [A,B,C,2,2]),
+    {ok,E1} = cl:enqueue_nd_range_kernel(Q, Kernel,
+					 [2,2], [],
+					 []),
+    cl:flush(Q),
+    {ok,completed} = cl:wait(E1),
+
+    {ok,E2}  = cl:enqueue_read_image(Q, C, [0,0], [2,2], 2*4, 0, []),
+    cl:flush(Q),
+    {ok,Data} = cl:wait(E2),
+    Data.
