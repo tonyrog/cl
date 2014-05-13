@@ -12,7 +12,13 @@
 %% compile File into binary,
 
 file(File) ->  file(File,all).
-file(File,Type) -> file(File,Type,"").
+file(File,Type) ->
+    case lists:member({1,2}, cl:versions()) of
+	true ->
+	    file(File,Type,"-cl-kernel-arg-info");
+	false ->
+	    file(File,Type,"")
+    end.
 
 file(File,Type,Options) ->
     Clu = clu:setup(Type),
