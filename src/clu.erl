@@ -30,6 +30,8 @@
 -export([get_program_binaries/1]).
 -export([apply_kernel_args/2]).
 -export([wait_complete/1]).
+-export([device_has_extension/2]).
+-export([devices_has_extension/2]).
 
 -include("../include/cl.hrl").
 -import(lists, [map/2]).
@@ -273,4 +275,20 @@ wait_complete(Event) ->
 	    timer:sleep(100),
 	    wait_complete(Event)
     end.
+%%
+%% utility function to test if an extension is present in a device
+%%
+device_has_extension(Device, Extension) when is_atom(Extension) ->
+    device_has_extension(Device, atom_to_list(Extension));
+device_has_extension(Device, Extension) when is_list(Extension) ->
+    {ok,Extensions} = cl:get_device_info(Device,extensions),
+    lists:member(Extension, string:tokens(Extensions, " ")).
 
+devices_has_extension(Clu, Extension) ->
+    lists:all(
+      fun(D) -> device_has_extension(D, Extension) end,
+      device_list(Clu)).
+
+	      
+    
+    
