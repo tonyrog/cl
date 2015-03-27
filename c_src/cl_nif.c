@@ -69,7 +69,7 @@ typedef cl_bool bool;
 
 #define sizeof_array(a) (sizeof(a) / sizeof(a[0]))
 
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #include <stdarg.h>
@@ -139,17 +139,11 @@ typedef struct _ecl_platform_t {
     struct _ecl_object_t** o_device;
 } ecl_platform_t;
 
-typedef struct _ecl_env_t {
-    lhash_t     ref;        // cl -> ecl
-    ErlNifRWLock* ref_lock; // lhash operation lock
-    cl_uint nplatforms;
-    ecl_platform_t* platform;
-    cl_int icd_version;
-} ecl_env_t;
+struct _ecl_env_t;
 
 typedef struct _ecl_object_t {
     lhash_bucket_t        hbucket;   // inheritance: map: cl->ecl
-    ecl_env_t*            env;
+    struct _ecl_env_t*    env;
     cl_int                version;
     struct _ecl_object_t* parent;     // parent resource object
     union {
@@ -259,6 +253,9 @@ typedef struct {
 
 typedef enum {
     ECL_MESSAGE_STOP,           // time to die
+    ECL_MESSAGE_UPGRADE,        // time to upgrade
+    ECL_MESSAGE_SYNC,           // synk
+    ECL_MESSAGE_SYNC_ACK,       // synk return message
     ECL_MESSAGE_FLUSH,          // call clFlush
     ECL_MESSAGE_FINISH,         // call clFinish
     ECL_MESSAGE_WAIT_FOR_EVENT  // call clWaitForEvents (only one event!)
@@ -275,6 +272,7 @@ typedef struct ecl_message_t
     union {
 	ecl_object_t* queue;  // ECL_MESSAGE_FLUSH/ECL_MESSAGE_FINISH
 	ecl_event_t* event;   // ECL_MESSAGE_WAIT_FOR_EVENT
+	void* (*upgrade)(void*); // ECL_MESSAGE_UPGRADE
     };
 } ecl_message_t;
 
@@ -303,16 +301,30 @@ typedef struct _ecl_thread_t {
 
 // "inherits" ecl_object_t and add keep track of the context thread
 typedef struct _ecl_context_t {
-    ecl_object_t obj;     // FIXED place for inhertiance
-    ecl_thread_t* thr;    // The context thread
+    ecl_object_t obj;             // FIXED place for inhertiance
+    struct _ecl_context_t* next;  // next context in list
+    ecl_thread_t* thr;            // The context thread
+    int upgrade_count;            // upgrade tick
 } ecl_context_t;
+
+typedef struct _ecl_env_t {
+    int         ref_count;  // ref count the load/upgrade/unload
+    lhash_t     ref;        // cl -> ecl
+    ErlNifRWLock* ref_lock; // lhash operation lock
+    ecl_queue_t q;          // sync queue
+    cl_uint nplatforms;
+    ecl_platform_t* platform;
+    ErlNifRWLock* context_list_lock;
+    ecl_context_t*  context_list;
+    cl_int icd_version;
+} ecl_env_t;
+
+
 
 static void* ecl_context_main(void* arg);
 
 
 static int ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info);
-
-static int ecl_reload(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info);
 
 static int ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, 
 			 ERL_NIF_TERM load_info);
@@ -2406,14 +2418,24 @@ static void ecl_context_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
     void* exit_value;
     ecl_context_t* ctx = (ecl_context_t*) obj;
-    UNUSED(env);
+    ecl_context_t** pp;
+    ecl_env_t* ecl = enif_priv_data(env);
+    ecl_thread_t* thr = ctx->thr;
 
     DBG("ecl_context_dtor: %p", ctx);
+
+    enif_rwlock_rwlock(ecl->context_list_lock);
+    pp = &ecl->context_list;
+    while(*pp != ctx)
+	pp = &(*pp)->next;
+    *pp = ctx->next;
+    enif_rwlock_rwunlock(ecl->context_list_lock);
+
     clReleaseContext(ctx->obj.context);
     object_erase(obj);
     // parent is always = 0
     // kill the event thread
-    ecl_thread_stop(ctx->thr, &exit_value);
+    ecl_thread_stop(thr, &exit_value);
 }
 
 
@@ -2795,10 +2817,18 @@ static ERL_NIF_TERM ecl_make_event(ErlNifEnv* env, cl_event event,
 static ERL_NIF_TERM ecl_make_context(ErlNifEnv* env, cl_context context, cl_int version)
 {
     ERL_NIF_TERM  res;
+    ecl_env_t* ecl;
     ecl_context_t* ctx = (ecl_context_t*) ecl_new(env,&context_r,
 						  (void*)context,0,version);
+    ecl = ctx->obj.env;
+    ctx->upgrade_count = 0;  // first incarnation
     ctx->thr = ecl_thread_start(ecl_context_main, ctx, 8); // 8K stack!
     res = make_object(env, context_r.type, (ecl_object_t*) ctx);
+    enif_rwlock_rwlock(ecl->context_list_lock);
+    // link contexts for upgrade
+    ctx->next = ecl->context_list;
+    ecl->context_list = ctx;
+    enif_rwlock_rwunlock(ecl->context_list_lock);
 
     if (ctx)
 	enif_release_resource(ctx);
@@ -3069,17 +3099,30 @@ ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* 
 static void* ecl_context_main(void* arg)
 {
     ecl_thread_t* self = arg;
-    // ecl_context_t* ctx = self->arg;
+    ecl_context_t* ctx = self->arg;
 
-    DBG("ecl_context_main: started (%p)", self);
+    ctx->upgrade_count++;     // signal that we have started/upgraded
+	    
+    DBG("ecl_context_main: started (addr=%p,tid=%p,count=%d)",
+	&self, self->tid, ctx->upgrade_count);
 
     while(1) {
 	ecl_message_t m;
-	int res;
 	ecl_message_recv(self, &m);
-	UNUSED(res);
 
 	switch(m.type) {
+	case ECL_MESSAGE_UPGRADE:
+	    DBG("ecl_context_main: %p got upgrade func=%p", 
+		self, m.upgrade);
+	    // upgrade must never return and SHOULD be tail recursive!
+	    return (m.upgrade)(arg);
+
+	case ECL_MESSAGE_SYNC:
+	    DBG("ecl_context_main: %p got sync", self);
+	    m.type = ECL_MESSAGE_SYNC_ACK;
+	    ecl_queue_put(&ctx->obj.env->q, &m);
+	    break;
+
 	case ECL_MESSAGE_STOP: {
 	    DBG("ecl_context_main: stopped by command");
 	    if (m.env) {
@@ -3101,7 +3144,7 @@ static void* ecl_context_main(void* arg)
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
 		ERL_NIF_TERM reply;
-
+		int res;
 		reply = !err ? ATOM(ok) : ecl_make_error(m.env, err);
 		res = enif_send(0, &m.sender, m.env, 
 				enif_make_tuple3(m.env, 
@@ -3121,6 +3164,7 @@ static void* ecl_context_main(void* arg)
 	    err = clFlush(m.queue->queue);
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
+		int res;
 		ERL_NIF_TERM reply;
 
 		reply = !err ? ATOM(ok) : ecl_make_error(m.env, err);
@@ -3146,7 +3190,8 @@ static void* ecl_context_main(void* arg)
 	    // reply to caller pid !
 	    if (m.env) {
 		ERL_NIF_TERM reply;
-		
+		int res;
+
 		if (!err) {
 		    cl_int status;
 		    // read status COMPLETE | ERROR
@@ -6393,7 +6438,8 @@ static ERL_NIF_TERM ecl_async_flush(ErlNifEnv* env, int argc,
     (void) enif_self(env, &m.sender);
     m.ref    = enif_make_copy(m.env, ref);
     m.queue  = o_queue;
-    enif_keep_resource(o_queue);    // keep while operation is running
+    // keep while operation is running, release after operation in the thread
+    enif_keep_resource(o_queue);
     ecl_message_send(o_context->thr, &m);
     return enif_make_tuple2(env, ATOM(ok), ref);
 }
@@ -6422,7 +6468,8 @@ static ERL_NIF_TERM ecl_async_finish(ErlNifEnv* env, int argc,
     (void) enif_self(env, &m.sender);
     m.ref    = enif_make_copy(m.env, ref);
     m.queue  = o_queue;
-    enif_keep_resource(o_queue);   // keep while operation is running
+    // keep while operation is running, release after operation in the thread
+    enif_keep_resource(o_queue);   
     ecl_message_send(o_context->thr, &m);
     return enif_make_tuple2(env, ATOM(ok), ref);
 }
@@ -6454,7 +6501,8 @@ static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc,
     (void) enif_self(env, &m.sender);
     m.ref    = enif_make_copy(m.env, ref);
     m.event  = o_event;
-    enif_keep_resource(o_event);   // keep while operation is running
+    // keep while operation is running, release after operation in the thread
+    enif_keep_resource(o_event);
     ecl_message_send(o_context->thr, &m);
     return enif_make_tuple2(env, ATOM(ok), ref);
 }
@@ -6558,9 +6606,19 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 
     if (!(ecl = enif_alloc(sizeof(ecl_env_t))))
 	return -1;
+    ecl->ref_count = 1;
+    ecl->context_list = NULL;
+
     if (!(ecl->ref_lock = enif_rwlock_create("ref_lock")))
 	return -1;
+    if (!(ecl->context_list_lock = enif_rwlock_create("context_list_lock")))
+	return -1;
+    if (ecl_queue_init(&ecl->q) < 0)
+	return -1;
     lhash_init(&ecl->ref, "ref", 2, &func);
+
+    DBG("ecl_load: ecl=%p", ecl);
+    DBG("ecl_load: ecl->context_list_lock=%p", ecl->context_list_lock);
 
     // Load atoms
 
@@ -7136,23 +7194,90 @@ static void ecl_load_dynfunctions(ecl_env_t* ecl)
     ecl->icd_version = 11;
 }
 
-static int  ecl_reload(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
-{
-    UNUSED(env);
-    UNUSED(load_info);
-    UNUSED(priv_data);
-    DBG("ecl_reload");
-    // FIXME
-    return 0;
-}
-
-static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, 
+static int ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 			ERL_NIF_TERM load_info)
 {
-    UNUSED(env);
+    ErlNifResourceFlags tried;
+    ecl_context_t* ctx;
+    ecl_env_t* ecl = (ecl_env_t*) *old_priv_data;
+    int sync_count;
     UNUSED(load_info);
-    DBG("ecl_upgrade");
-    // FIXME
+
+    ecl->ref_count++;
+    DBG("ecl_upgrade: ecl=%p", ecl, ecl->ref_count);
+
+    // upgrade resource types
+    ecl_resource_init(env, &platform_r, "platform_t", 
+		      sizeof(ecl_object_t),
+		      ecl_platform_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+    ecl_resource_init(env, &device_r, "device_t",
+		      sizeof(ecl_object_t),
+		      ecl_device_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+
+    ecl_resource_init(env, &command_queue_r, "command_queue_t",
+		      sizeof(ecl_object_t),
+		      ecl_queue_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+    ecl_resource_init(env, &mem_r, "mem_t", 
+		      sizeof(ecl_object_t),
+		      ecl_mem_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+    ecl_resource_init(env, &sampler_r, "sampler_t",
+		      sizeof(ecl_object_t),
+		      ecl_sampler_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+    ecl_resource_init(env, &program_r, "program_t",
+		      sizeof(ecl_object_t),
+		      ecl_program_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+    ecl_resource_init(env, &kernel_r, "kernel_t",
+		      sizeof(ecl_kernel_t),   // NOTE! specialized!
+		      ecl_kernel_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+    ecl_resource_init(env, &event_r, "event_t",
+		      sizeof(ecl_event_t),    // NOTE! specialized!
+		      ecl_event_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+
+    ecl_resource_init(env, &context_r, "context_t",
+		      sizeof(ecl_context_t),     // NOTE! specialized!
+		      ecl_context_dtor,
+		      ERL_NIF_RT_CREATE|ERL_NIF_RT_TAKEOVER, &tried);
+
+    // Scan through all contexts and initiate upgrade & sync of the threads
+    DBG("ecl_upgrade: upgrade and sync ecl=%p", ecl);
+    DBG("ecl_upgrade: upgrade and sync ecl->context_list_lock=%p",
+	ecl->context_list_lock);
+    sync_count = 0;
+    enif_rwlock_rwlock(ecl->context_list_lock);
+    for (ctx = ecl->context_list; ctx != NULL; ctx = ctx->next) {
+	ecl_message_t m;
+	DBG("ecl_upgrade: ctx=%p", ctx);
+	m.type   = ECL_MESSAGE_UPGRADE;
+	m.upgrade = ecl_context_main;
+	DBG("ecl_upgrade: send upgrade func=%p to %p", 
+	    ecl_context_main, ctx->thr);
+	ecl_message_send(ctx->thr, &m);
+
+	m.type   = ECL_MESSAGE_SYNC;
+	DBG("ecl_upgrade: send sync to %p", ctx->thr);
+	ecl_message_send(ctx->thr, &m);
+	sync_count++;
+    }
+    enif_rwlock_rwunlock(ecl->context_list_lock);
+    
+    while(sync_count) {
+	ecl_message_t m;
+	int r;
+	if ((r = ecl_queue_get(&ecl->q, &m)) < 0)
+	    return -1;
+	if (m.type != ECL_MESSAGE_SYNC_ACK)
+	    return -1;
+	sync_count--;
+    }
+
     *priv_data = *old_priv_data;
     return 0;
 }
@@ -7160,30 +7285,42 @@ static int  ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 static void ecl_unload(ErlNifEnv* env, void* priv_data)
 {
     ecl_env_t* ecl = priv_data;
-    cl_uint i;
-    cl_uint j;
     UNUSED(env);
-    DBG("ecl_unload");
-    for (i = 0; i < ecl->nplatforms; i++) {
-	ecl_object_t* obj;
 
-	for (j = 0; j < ecl->platform[i].ndevices; j++) {
-	    obj = ecl->platform[i].o_device[j];
+    ecl->ref_count--;
+    DBG("ecl_unload: ecl=%p ref_count=%d", ecl, ecl->ref_count);
+    if (ecl->ref_count == 0) {
+	cl_uint i;
+	cl_uint j;
+
+	for (i = 0; i < ecl->nplatforms; i++) {
+	    ecl_object_t* obj;
+
+	    for (j = 0; j < ecl->platform[i].ndevices; j++) {
+		obj = ecl->platform[i].o_device[j];
+		enif_release_resource(obj);
+	    }
+	    enif_free(ecl->platform[i].o_device);
+	    
+	    obj = ecl->platform[i].o_platform;
 	    enif_release_resource(obj);
 	}
-	enif_free(ecl->platform[i].o_device);
+	enif_free(ecl->platform);
 
-	obj = ecl->platform[i].o_platform;
-	enif_release_resource(obj);
+	enif_rwlock_rwlock(ecl->ref_lock);
+	lhash_delete(&ecl->ref);
+	enif_rwlock_rwunlock(ecl->ref_lock);
+
+	enif_rwlock_destroy(ecl->ref_lock);
+
+	enif_rwlock_rwlock(ecl->context_list_lock);
+	DBG("ecl->context_list = %p", ecl->context_list);
+	enif_rwlock_rwunlock(ecl->context_list_lock);
+
+	enif_rwlock_destroy(ecl->context_list_lock);
+
+	enif_free(ecl);
     }
-    enif_free(ecl->platform);
-
-    enif_rwlock_rwlock(ecl->ref_lock);
-    lhash_delete(&ecl->ref);
-    enif_rwlock_rwunlock(ecl->ref_lock);
-
-    enif_rwlock_destroy(ecl->ref_lock);
-    enif_free(ecl);
 }
 
 /*
@@ -7193,5 +7330,5 @@ static void ecl_unload(ErlNifEnv* env, void* priv_data)
 */
 
 ERL_NIF_INIT(cl, ecl_funcs, 
-	     ecl_load, ecl_reload, 
+	     ecl_load, NULL,
 	     ecl_upgrade, ecl_unload)

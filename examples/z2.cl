@@ -10,7 +10,7 @@ __kernel void z2(const float x, const float y,
 		 __global unsigned int* out)
 {
     int i = get_global_id(0);
-    int j = get_global_id(0);
+    int j = get_global_id(1);
     if ((i < n) && (j < n)) {
 	int k = 0;
 	float cx = x + i*xs;
