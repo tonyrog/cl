@@ -5005,7 +5005,7 @@ static ERL_NIF_TERM ecl_set_kernel_arg_size(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!enif_get_uint(env, argv[1], &arg_index))
 	return enif_make_badarg(env);
-    if (!ecl_get_sizet(env, argv[1], &arg_size))
+    if (!ecl_get_sizet(env, argv[2], &arg_size))
 	return enif_make_badarg(env);
 
     err = clSetKernelArg(o_kernel->obj.kernel,
