@@ -212,6 +212,10 @@
 -define(DBG(F,A), ok).
 -endif.
 
+-define(nif_stub,nif_stub_error(?LINE)).
+nif_stub_error(Line) ->
+    erlang:nif_error({nif_not_loaded,module,?MODULE,line,Line}).
+
 init() ->
     Nif = filename:join([code:priv_dir(cl), "cl_nif"]),
     ?DBG("Loading: ~s\n", [Nif]),
@@ -220,7 +224,7 @@ init() ->
 %%
 %% @type start_arg() = { {'debug',boolean()} }
 %%
--type start_arg() :: { {'debug',boolean()} }.
+-type start_arg() ::  {'debug',boolean()} .
 
 %%
 %% @spec start([start_arg()]) -> 'ok' | {'error', term()}
@@ -265,7 +269,7 @@ stop()  ->
 -spec noop() -> 'ok' | {'error', cl_error()}.
 
 noop() ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec versions() -> [{Major::integer(),Minor::integer()}]
@@ -276,7 +280,7 @@ noop() ->
 -spec versions() -> [{Major::integer(),Minor::integer()}].
 
 versions() ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Platform
@@ -297,11 +301,11 @@ versions() ->
 %%      {'extensions',string()}.
 
 -type cl_platform_info() ::
-      {'profile',string()} |
-      {'version',string()} |
-      {'name',string()} |
-      {'vendor',string()} |
-      {'extensions',string()}.
+	{'profile',string()} |
+	{'version',string()} |
+	{'name',string()} |
+	{'vendor',string()} |
+	{'extensions',string()}.
 
 %%
 %% @spec get_platform_ids() ->
@@ -311,7 +315,7 @@ versions() ->
     {'ok',[cl_platform_id()]} | {'error', cl_error()}.
     
 get_platform_ids() ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 %%
 %% @spec platform_info() ->
 %%    [cl_platform_info_keys()]
@@ -363,7 +367,7 @@ platform_info() ->
     {'ok',term()} | {'error', cl_error()}.
 
 get_platform_info(_Platform, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec get_platform_info(Platform::cl_platform_id()) ->
@@ -384,12 +388,12 @@ get_platform_info(Platform) when ?is_platform(Platform) ->
 %% @type cl_device_type() =
 %%   {'gpu' | 'cpu' | 'accelerator' | 'all' | 'default' }
 %%
--type cl_device_type() :: {'gpu' | 'cpu' | 'accelerator' | 'all' | 'default' }.
+-type cl_device_type() :: 'gpu' | 'cpu' | 'accelerator' | 'all' | 'default'.
 %%
 %%
 %% @type cl_device_types() = {cl_device_type() | [cl_device_type()]}
 %%
--type cl_device_types() :: {cl_device_type() | [cl_device_type()]}.
+-type cl_device_types() :: cl_device_type() | [cl_device_type()].
 
 %%
 %%
@@ -477,11 +481,11 @@ get_device_ids() ->
 %% device(s) returned by get_device_ids/2. This can be used by the
 %% application to determine which device(s) to use.
 %%
--spec get_device_ids(Platform::cl_platform_id(),Type::cl_device_types()) ->
+-spec get_device_ids(undefined|cl_platform_id(),Type::cl_device_types()) ->
     {'ok',[cl_device_id()]} | {'error',cl_error()}.
 
 get_device_ids(_Platform, _Type) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec create_sub_devices(Device::cl_device_id(),
 			 Property::
@@ -493,7 +497,7 @@ get_device_ids(_Platform, _Type) ->
     {'ok',[cl_device_id()]} | {'error',cl_error()}.
 
 create_sub_devices(_Device, _Properties) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec release_device(Device::cl_device_id()) ->
 			    'ok' | {'error', cl_error()}.
@@ -819,7 +823,7 @@ device_info_12(L) ->
     {'ok', term()} | {'error', cl_error()}.
 
 get_device_info(_Device, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec get_device_info(Device) ->
@@ -837,16 +841,16 @@ get_device_info(Device) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @type cl_context_info_key() = {'reference_count' | 'devices' | 'properties'}
--type cl_context_info_key() :: {'reference_count' | 'devices' | 'properties'}.
+-type cl_context_info_key() :: 'reference_count' | 'devices' | 'properties'.
 
 %% @type cl_context_info() = 
 %%  { {'reference_count', cl_uint()},
 %%    {'devices', [cl_device()]},
 %%    {'properties', [cl_int()]} }
 -type cl_context_info() ::
-  { {'reference_count', cl_uint()} |
-    {'devices', [cl_device_id()]} |
-    {'properties', [cl_int()]} }.
+	{'reference_count', cl_uint()} |
+	{'devices', [cl_device_id()]} |
+	{'properties', [cl_int()]}.
 
 %%
 %% @spec create_context(DeviceList::[cl_device_id()]) ->
@@ -871,7 +875,7 @@ get_device_info(Device) ->
     {'ok', cl_context()} | {'error', cl_error()}.
 
 create_context(_DeviceList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec create_context_from_type(Type::cl_device_types())->
@@ -957,7 +961,7 @@ context_info() ->
     {'ok', term()} | {'error', cl_error()}.
 
 get_context_info(_Context, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %% @spec get_context_info(Context::cl_context()) ->
@@ -975,8 +979,7 @@ get_context_info(Context) when ?is_context(Context) ->
 %% @type cl_queue_property() = { 'out_of_order_exec_mode_enable' | 
 %%			         'profiling_enabled' }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--type cl_queue_property() :: { 'out_of_order_exec_mode_enable' | 
-			       'profiling_enabled' }.
+-type cl_queue_property() :: 'out_of_order_exec_mode_enable' | 'profiling_enabled'.
 %%
 %% @spec create_queue(Context::cl_context(),Device::cl_device_id(),
 %%                    Properties::[cl_queue_property()]) ->
@@ -1057,7 +1060,7 @@ get_context_info(Context) when ?is_context(Context) ->
     {'ok', cl_queue()} | {'error', cl_error()}.
 
 create_queue(_Context, _Device, _Properties) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec set_queue_property(Queue::cl_queue(),
@@ -1115,7 +1118,7 @@ queue_info() ->
 %% @spec get_queue_info(Queue, Info) -> {ok, term()}
 %% @doc Return the specified queue info
 get_queue_info(_Queue, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @spec get_queue_info(Queue) -> [queue_info_keys()]
 %% @doc Returns all queue info.
@@ -1132,9 +1135,9 @@ get_queue_info(Queue) when ?is_queue(Queue) ->
 %%                         'use_host_ptr' | 'alloc_host_ptr' |
 %%                         'copy_host_ptr'}
 %%
--type cl_mem_flag() :: { 'read_write' | 'write_only' | 'read_only' |
-			 'use_host_ptr' | 'alloc_host_ptr' |
-			 'copy_host_ptr'}.
+-type cl_mem_flag() :: 'read_write' | 'write_only' | 'read_only' |
+		       'use_host_ptr' | 'alloc_host_ptr' |
+		       'copy_host_ptr'.
 
 %%
 %% @spec create_buffer(Context::cl_context(),Flags::cl_mem_flags(),
@@ -1152,16 +1155,16 @@ create_buffer(Context,Flags,Size) ->
 
 %%
 %% @spec create_buffer(Context::cl_context(),Flags::[cl_mem_flag()],
-%%                      Size::non_neg_integer(), Data::binary()) ->
+%%                      Size::non_neg_integer(), Data::iolist()) ->
 %%    {'ok', cl_mem()} | {'error', cl_error()}
 %% @doc  Creates a buffer object. 
 %% 
 -spec create_buffer(Context::cl_context(),Flags::[cl_mem_flag()],
-		    Size::non_neg_integer(),Data::binary()) ->
+		    Size::non_neg_integer(),Data::iodata()) ->
     {'ok', cl_mem()} | {'error', cl_error()}.
 
 create_buffer(_Context,_Flags,_Size,_Data) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @doc Creates a buffer object
@@ -1172,7 +1175,7 @@ create_buffer(_Context,_Flags,_Size,_Data) ->
 
 %%
 create_sub_buffer(_Buffer, _Flags, _Type, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec release_mem_object(Mem::cl_mem()) ->
@@ -1232,7 +1235,7 @@ mem_object_info() ->
     {'ok', term()} | {'error', cl_error()}.
 
 get_mem_object_info(_Mem, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec get_mem_object_info(Mem::cl_mem()) ->
@@ -1255,7 +1258,7 @@ image_info() ->
     ].
 
 get_image_info(_Mem, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 get_image_info(Mem) when ?is_mem(Mem) ->
     get_info_list(Mem, image_info(), fun get_image_info/2).
@@ -1266,10 +1269,10 @@ get_image_info(Mem) when ?is_mem(Mem) ->
 
 %% @type cl_addressing_mode() = {'none'|'clamp_to_edge'|'clamp'|'repeat'}
 %%
--type cl_addressing_mode() :: {'none'|'clamp_to_edge'|'clamp'|'repeat'}.
+-type cl_addressing_mode() :: 'none'|'clamp_to_edge'|'clamp'|'repeat'.
 
 %% @type cl_filter_mode() = {'nearest' | 'linear' }
--type cl_filter_mode() :: {'nearest' | 'linear' }.
+-type cl_filter_mode() :: 'nearest' | 'linear'.
 
 %%
 %% @spec create_sampler(Context::cl_context(),Normalized::boolean(),
@@ -1292,7 +1295,7 @@ get_image_info(Mem) when ?is_mem(Mem) ->
     {'ok', cl_sampler()} | {'error', cl_error()}.
 
 create_sampler(_Context, _Normalized, _AddressingMode, _FilterMode) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec release_sampler(Sampler::cl_sampler()) ->
@@ -1331,7 +1334,7 @@ sampler_info() ->
 %%    {'ok', term()} | {'error', cl_error()}
 %% @doc Returns <c>InfoType</c> information about the sampler object. 
 get_sampler_info(_Sampler, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %% @spec get_sampler_info(Sampler::cl_sampler()) -> {'ok', term()} | {'error', cl_error()}
@@ -1383,7 +1386,7 @@ get_sampler_info(Sampler) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
 create_program_with_source(_Context, _Source) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec create_program_with_binary(Context::cl_context(),
@@ -1421,7 +1424,7 @@ create_program_with_source(_Context, _Source) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
 create_program_with_binary(_Context, _DeviceList, _BinaryList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec create_program_with_builtin_kernels(Context::cl_context(),
 					  DeviceList::[cl_device_id()],
@@ -1429,7 +1432,7 @@ create_program_with_binary(_Context, _DeviceList, _BinaryList) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
 create_program_with_builtin_kernels(_Context, _DeviceList, _KernelNames) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec retain_program(Program::cl_program()) ->
@@ -1586,7 +1589,7 @@ build_program(Program, DeviceList, Options) ->
     end.
 
 async_build_program(_Program, _DeviceList, _Options) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %%
@@ -1599,14 +1602,14 @@ async_build_program(_Program, _DeviceList, _Options) ->
 %% after unload_compiler/0 will reload the compiler, if necessary, to
 %% build the appropriate program executable.
 unload_compiler() ->   
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @spec unload_platform_compiler(Platform :: cl_platform_id()) ->
 %%   'ok' | {'error', cl_error()}
 -spec unload_platform_compiler(Platform::cl_platform_id()) ->
     'ok' | {'error', cl_error()}.
 unload_platform_compiler(_Platform) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec compile_program(Program::cl_program(),
 		      DeviceList::[cl_device_id()],
@@ -1627,7 +1630,7 @@ compile_program(Program, Devices, Options, Headers, Names) ->
     end.
 
 async_compile_program(_Program, _Devices, _Options, _Headers, _Names) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 -spec link_program(Context::cl_context(),
@@ -1650,7 +1653,7 @@ link_program(Context, DeviceList, Options, Programs) ->
     end.
 
 async_link_program(_Context, _DeviceList, _Options, _Programs) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 program_info() ->
@@ -1666,7 +1669,7 @@ program_info() ->
 
 %% @doc  Returns specific information about the program object. 
 get_program_info(_Program, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @doc  Returns all information about the program object. 
 get_program_info(Program) when ?is_program(Program) ->
@@ -1681,7 +1684,7 @@ program_build_info() ->
 
 %% @doc Returns specific build information for each device in the program object. 
 get_program_build_info(_Program, _Device, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @doc Returns all build information for each device in the program object. 
 get_program_build_info(Program, Device) ->
@@ -1706,7 +1709,7 @@ get_program_build_info(Program, Device) ->
 %%  function declared in a program and the argument values to be used
 %%  when executing this __kernel function.
 create_kernel(_Program, _Name) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec create_kernels_in_program(Program::cl_program()) ->
@@ -1733,7 +1736,7 @@ create_kernel(_Program, _Name) ->
 %% program executable has been built can be used to execute kernels
 %% declared in the program object.
 create_kernels_in_program(_Program) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @type cl_kernel_arg() = integer() | float() | binary()
@@ -1761,7 +1764,7 @@ create_kernels_in_program(_Program) ->
 %% such as the cl_mem backing store used with CL_MEM_USE_HOST_PTR.
 
 set_kernel_arg(_Kernel,_Index,_Argument) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec set_kernel_arg_size(Kernel::cl_kernel(), Index::non_neg_integer(),
@@ -1771,7 +1774,7 @@ set_kernel_arg(_Kernel,_Index,_Argument) ->
 %% @doc clErlang special to set kernel arg with size only (local mem etc)
 %%
 set_kernel_arg_size(_Kernel,_Index,_Size) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %%
@@ -1799,7 +1802,7 @@ kernel_info() ->
 
 %% @doc Returns specific information about the kernel object. 
 get_kernel_info(_Kernel, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @doc Returns all information about the kernel object. 
 get_kernel_info(Kernel) when ?is_kernel(Kernel) ->
@@ -1815,7 +1818,7 @@ kernel_workgroup_info() ->
 %% @doc Returns specific information about the kernel object that may
 %% be specific to a device.
 get_kernel_workgroup_info(_Kernel, _Device, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %% @doc Returns all information about the kernel object that may be
@@ -1828,7 +1831,7 @@ get_kernel_workgroup_info(Kernel, Device) ->
 
 %% @doc Returns specific information about the kernel argument
 get_kernel_arg_info(_Kernel, _ArgIndex, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 get_kernel_arg_info(Kernel, ArgIndex) ->
     get_info_list(Kernel, kernel_arg_info(),
@@ -1882,7 +1885,7 @@ nowait_enqueue_task(Queue, Kernel, WaitList) ->
     enqueue_task(Queue, Kernel, WaitList, false).
 
 enqueue_task(_Queue, _Kernel, _WaitList, _WantEvent) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec enqueue_nd_range_kernel(Queue::cl_queue(), Kernel::cl_kernel(),
@@ -1926,7 +1929,7 @@ nowait_enqueue_nd_range_kernel(Queue, Kernel, Global, Local, WaitList) ->
 
 enqueue_nd_range_kernel(_Queue, _Kernel, _Global, _Local, _WaitList, 
 			_WantEvent) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @spec enqueue_marker(Queue::cl_queue()) ->
 %%    {'ok', cl_event()} | {'error', cl_error()}
@@ -1941,7 +1944,7 @@ enqueue_nd_range_kernel(_Queue, _Kernel, _Global, _Local, _WaitList,
     {'ok', cl_event()} | {'error', cl_error()}.
 
 enqueue_marker(_Queue) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec enqueue_wait_for_events(Queue::cl_queue(), WaitList::[cl_event()]) ->
@@ -1956,7 +1959,7 @@ enqueue_marker(_Queue) ->
     'ok' | {'error', cl_error()}.
 
 enqueue_wait_for_events(_Queue, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %%
@@ -1985,7 +1988,7 @@ enqueue_wait_for_events(_Queue, _WaitList) ->
 
 
 enqueue_read_buffer(_Queue, _Buffer, _Offset, _Size, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% Read rectangular section from buffer memory into host memory
@@ -2005,7 +2008,7 @@ enqueue_read_buffer_rect(_Queue, _Buffer, _BufferOrigin, _HostOrigin,
 			 _Region, _BufferRowPitch, _BufferSlicePitch,
 			 _HostRowPitch, _HostSlicePitch,
 			 _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec enqueue_write_buffer(Queue::cl_queue(), Buffer::cl_mem(),
@@ -2054,7 +2057,7 @@ nowait_enqueue_write_buffer(Queue, Buffer, Offset, Size, Data, WaitList) ->
 
 enqueue_write_buffer(_Queue, _Buffer, _Offset, _Size, _Data, _WaitList,
 		     _WantEvent) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 
@@ -2078,7 +2081,7 @@ enqueue_write_buffer_rect(_Queue, _Buffer, _BufferOrigin, _HostOrigin,
 			  _HostRowPitch, _HostSlicePitch,
 			  _Data,
 			  _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %%
@@ -2094,7 +2097,7 @@ enqueue_write_buffer_rect(_Queue, _Buffer, _BufferOrigin, _HostOrigin,
     {'ok', cl_event()} | {'error', cl_error()}.
 
 enqueue_fill_buffer(_Queue, _Buffer, _Pattern, _Offset, _Size, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% 
 %% @spec enqueue_barrier(Queue::cl_queue()) ->
@@ -2109,7 +2112,7 @@ enqueue_fill_buffer(_Queue, _Buffer, _Pattern, _Offset, _Size, _WaitList) ->
     'ok' | {'error', cl_error()}.
 
 enqueue_barrier(_Queue) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @spec enqueue_marker_with_wait_list(Queue::cl_queue(),
 %%                    WaitList::[cl_event()]) ->
@@ -2120,7 +2123,7 @@ enqueue_barrier(_Queue) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
 enqueue_marker_with_wait_list(_Queue, _WaitList) ->
-    erlang:error(nif_not_loaded).    
+    ?nif_stub.    
 
 %% @spec enqueue_barrier_with_wait_list(Queue::cl_queue(),
 %%                    WaitList::[cl_event()]) ->
@@ -2129,13 +2132,13 @@ enqueue_marker_with_wait_list(_Queue, _WaitList) ->
 				     WaitList::[cl_event()]) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 enqueue_barrier_with_wait_list(_Queue, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
     
 
 
 enqueue_read_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
 		   _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_write_image(Queue, Image, Origin, Region, RowPitch, SlicePitch,
 		    Data, WaitList) ->
@@ -2150,21 +2153,21 @@ nowait_enqueue_write_image(Queue, Image, Origin, Region, RowPitch, SlicePitch,
 
 enqueue_write_image(_Queue, _Image, _Origin, _Region, _RowPitch, _SlicePitch,
 		    _Data, _WaitList, _WantEvent) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_copy_buffer(_Queue, _SrcBuffer, _DstBuffer, _SrcOffset, _DstOffset,
 			     _Cb, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_copy_buffer_rect(_Queue, _SrcBuffer, _DstBuffer,
 			 _SrcOrigin, _DstOrigin, _Region,
 			 _SrcRowPitch, _SrcSlicePitch,
 			 _DstRowPitch, _DstSlicePitch,
 			 _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _Origin, _Region, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%  FillColor = <<R:32/unsigned,G:32/unsigned,B:32/unsigned,A:32/unsigned>>
 %%            | <<R:32/signed,G:32/signed,B:32/signed,A:32/signed>>
@@ -2179,24 +2182,24 @@ enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _Origin, _Region, _WaitList) ->
 				{'ok', cl_event()} | {'error', cl_error()}.
 
 enqueue_fill_image(_Queue, _Image, _FillColor, _Origin, _Region, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_copy_image_to_buffer(_Queue, _SrcImage, _DstBuffer, _Origin, _Region,
 			     _DstOffset, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_copy_buffer_to_image(_Queue, _SrcBuffer, _DstImage, _SrcOffset,
 			     _DstOrigin, _Region, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_map_buffer(_Queue, _Buffer, _MapFlags, _Offset, _Size, _WaitList) ->    
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_map_image(_Queue, _Image, _MapFlags, _Origin, _Region, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 enqueue_unmap_mem_object(_Queue, _Mem, _WaitList) ->    
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec enqueue_migrate_mem_objects(Queue::cl_queue(),
 				  MemObjects::[cl_mem()],
@@ -2205,7 +2208,7 @@ enqueue_unmap_mem_object(_Queue, _Mem, _WaitList) ->
     {'ok', cl_event()} | {'error', cl_error()}.
 
 enqueue_migrate_mem_objects(_Queue, _MemObjects, _Flags, _WaitList) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec flush(Queue::cl_queue()) ->
@@ -2231,7 +2234,7 @@ flush(Queue) ->
     end.
 
 async_flush(_Queue) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec finish(Queue::cl_queue()) ->
@@ -2258,7 +2261,7 @@ finish(Queue) ->
     end.
 
 async_finish(_Queue) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %%
 %% @spec retain_event(Event::cl_event()) ->
@@ -2292,7 +2295,7 @@ event_info() ->
 
 %% @doc Returns specific information about the event object. 
 get_event_info(_Event, _Info) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 
 %% @doc Returns all specific information about the event object. 
@@ -2303,7 +2306,7 @@ get_event_info(Event) when ?is_event(Event) ->
 %% @doc return a list of image formats [{Order,Type}]
 
 get_supported_image_formats(_Context, _Flags, _ImageType) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec create_image2d(Conext::cl_context(), Flags::[cl_mem_flag()],
 		     ImageFormat::#cl_image_format{},
@@ -2315,7 +2318,7 @@ get_supported_image_formats(_Context, _Flags, _ImageType) ->
 
 create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Pitch,
 		_Data) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec create_image3d(Conext::cl_context(), Flags::[cl_mem_flag()],
 		     ImageFormat::#cl_image_format{},
@@ -2329,7 +2332,7 @@ create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Pitch,
 
 create_image3d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Depth,
 	       _RowPicth, _SlicePitch, _Data) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 -spec create_image(Conext::cl_context(), Flags::[cl_mem_flag()],
 		   ImageFormat::#cl_image_format{},
@@ -2338,7 +2341,7 @@ create_image3d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Depth,
     {'ok', cl_mem()} | {'error', cl_error()}.
 
 create_image(_Context, _MemFlags, _ImageFormat, _ImageDesc, _Data) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% Wait for all events in EventList to complete
 -spec wait_for_events(EventList::[cl_event]) ->
@@ -2350,7 +2353,7 @@ wait_for_events([Event|Es]) ->
     [wait(Event) | wait_for_events(Es)];
 wait_for_events([]) ->
     [].
-    
+
 %%
 %% @spec wait(Event::cl_event) -> 
 %%    {'ok','completed'} | {'ok',Binary} | {'error',cl_error()}
@@ -2419,7 +2422,7 @@ wait1(Ref, Event, Timeout) when ?is_event(Event) ->
     {'ok',reference()} | {'error',cl_error()}.
 
 async_wait_for_event(_Event) ->
-    erlang:error(nif_not_loaded).
+    ?nif_stub.
 
 %% @hidden
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

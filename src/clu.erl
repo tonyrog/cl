@@ -36,7 +36,7 @@
 -include("../include/cl.hrl").
 -import(lists, [map/2]).
 
--opaque clu_state()   ::  #cl{} | undefined.
+-type clu_state()   ::  #cl{} | undefined.
 
 %%
 %% @type clu_state() = any()
