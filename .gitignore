@@ -7,16 +7,15 @@
 .DS_Store
 
 *.beam
-
 # Emacs Tag files
 TAGS
 
-
 # c_src
-/c_src/autom4te.cache
-#/c_src/config.*   config.build.in
-/c_src/configure
+/c_src/*.o
 
 # Derivates
 /obj/*
 /lib/*
+/_build/*
+/priv/*
+rebar.lock

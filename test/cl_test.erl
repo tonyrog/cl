@@ -12,11 +12,18 @@
 
 -define(BUFFER_SIZE, 1024*256).
 
-test0() ->
-    test0(?BUFFER_SIZE).
+init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
 
-test0(Size) ->
-    {ok,[D]} = cl:get_device_ids(undefined, cpu),
+all() -> [ct_test0, ct_test1].
+
+test0() ->
+    test0(cpu, ?BUFFER_SIZE).
+
+ct_test0(Config) ->
+    test0(proplists:get_value(type, Config, gpu), ?BUFFER_SIZE).
+
+test0(Type, Size) ->
+    {ok,[D]} = cl:get_device_ids(undefined, Type),
     {ok,C} = cl:create_context([D]),
     {ok,Q} = cl:create_queue(C, D, []),
     {ok,Buf} = cl:create_buffer(C, [read_only], Size),
@@ -47,7 +54,9 @@ __kernel void program1(int n, int m) {
     int result = n + k;
 }
 ".
-    
+
+ct_test1(Config) ->
+    test1(proplists:get_value(type, Config, gpu), ok).
 
 test1() ->
     test1(cpu, ok).
