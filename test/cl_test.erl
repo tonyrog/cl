@@ -23,7 +23,8 @@ ct_test0(Config) ->
     test0(proplists:get_value(type, Config, gpu), ?BUFFER_SIZE).
 
 test0(Type, Size) ->
-    {ok,[D]} = cl:get_device_ids(undefined, Type),
+    {ok,[PI|_]} = cl:get_platform_ids(),
+    {ok,[D]} = cl:get_device_ids(PI, Type),
     {ok,C} = cl:create_context([D]),
     {ok,Q} = cl:create_queue(C, D, []),
     {ok,Buf} = cl:create_buffer(C, [read_only], Size),
@@ -62,7 +63,8 @@ test1() ->
     test1(cpu, ok).
 
 test1(Type, Prog) ->
-    {ok,DeviceList} = cl:get_device_ids(undefined, Type),
+    {ok,[PI|_]} = cl:get_platform_ids(),
+    {ok,DeviceList} = cl:get_device_ids(PI, Type),
     {ok,C} = cl:create_context(DeviceList),
     {ok,P} = cl:create_program_with_source(C, program(Prog)),
     io:format("Program: ~p\n", [P]),

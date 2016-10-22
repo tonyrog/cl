@@ -12,10 +12,10 @@ TAGS
 
 # c_src
 /c_src/*.o
-
+/c_src/*.exp
+/c_src/*.lib
+/c_src/*.pdb
 # Derivates
-/obj/*
-/lib/*
 /_build/*
 /priv/*
 rebar.lock
