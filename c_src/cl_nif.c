@@ -69,7 +69,7 @@ typedef cl_bool bool;
 
 #define sizeof_array(a) (sizeof(a) / sizeof(a[0]))
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #include <stdarg.h>
