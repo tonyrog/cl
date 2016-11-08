@@ -8,11 +8,16 @@
 -module(cl_buffer).
 -compile(export_all).
 
+init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
+all() ->
+    [copy, read_rect, write_rect, sub, fill, migrate].
+
 %% test write/copy/read
 
 %% test of copy buffer, require version 1.0
-copy() ->
-    C = clu:setup(gpu),
+copy(Config) ->
+    C = clu:setup(proplists:get_value(type, Config, gpu)),
     {ok,Q} = cl:create_queue(clu:context(C),clu:device(C),[]),
     {ok,Buf1} = cl:create_buffer(clu:context(C),[read_write], 1024),
     {ok,Buf2} = cl:create_buffer(clu:context(C),[read_write], 1024),
@@ -27,8 +32,8 @@ copy() ->
     Data1 =:= Data2.
 
 %% read rectangluar area, require version 1.1
-read_rect() ->
-    C = clu:setup(gpu),
+read_rect(Config) ->
+    C = clu:setup(proplists:get_value(type, Config, gpu)),
     true = lists:member({1,1},cl:versions()),
     {ok,Q} = cl:create_queue(clu:context(C),clu:device(C),[]),
     {ok,Buf1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
@@ -54,8 +59,8 @@ read_rect() ->
     Data2 =:= <<1,2,3,4,5,6,7,8>>.
 
 %% write rectangluar area, require version 1.1
-write_rect() ->
-    C = clu:setup(gpu),
+write_rect(Config) ->
+    C = clu:setup(proplists:get_value(type, Config, gpu)),
     true = lists:member({1,1},cl:versions()),
     {ok,Q} = cl:create_queue(clu:context(C),clu:device(C),[]),
     {ok,Buf1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
@@ -93,8 +98,8 @@ write_rect() ->
 		9,9,9,9,9,9,9,9>>.
 
 %% cerate sub buffer, require version 1.1
-sub() ->
-    C = clu:setup(gpu),
+sub(Config) ->
+    C = clu:setup(proplists:get_value(type, Config, gpu)),
     true = lists:member({1,1},cl:versions()),
     {ok,Q} = cl:create_queue(clu:context(C),clu:device(C),[]),
     {ok,Buf1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
@@ -117,8 +122,8 @@ sub() ->
 
 
 %% fill buffer, require version 1.2
-fill() ->
-    C = clu:setup(gpu),
+fill(Config) ->
+    C = clu:setup(proplists:get_value(type, Config, gpu)),
     true = lists:member({1,2},cl:versions()),
     {ok,Q} = cl:create_queue(clu:context(C),clu:device(C),[]),
     {ok,Buf1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
@@ -139,17 +144,20 @@ fill() ->
 		9,9,9,9,9,9,9,9,
 		9,9,9,9,9,9,9,9>>.
 
-migrate() ->
+migrate(_) ->
     C = clu:setup(all),
     true = lists:member({1,2},cl:versions()),
-    [D1,D2|_] = clu:device_list(C),
-    {ok,Q1} = cl:create_queue(clu:context(C),D1,[]),
-    {ok,Q2} = cl:create_queue(clu:context(C),D2,[]),
-    {ok,B1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
-    {ok,E1} = cl:enqueue_fill_buffer(Q1, B1, <<9>>, 0, 64, []),
-    cl:flush(Q1),
-    {ok,completed} = cl:wait(E1),
-    {ok,E2} = cl:enqueue_migrate_mem_objects(Q2, [B1], [], []),
-    cl:flush(Q2),
-    %% fixme: add a kernel to check that the data was migrated
-    cl:wait(E2).
+    case clu:device_list(C) of
+	[D1,D2|_] ->
+	    {ok,Q1} = cl:create_queue(clu:context(C),D1,[]),
+	    {ok,Q2} = cl:create_queue(clu:context(C),D2,[]),
+	    {ok,B1} = cl:create_buffer(clu:context(C),[read_write], 8*8),
+	    {ok,E1} = cl:enqueue_fill_buffer(Q1, B1, <<9>>, 0, 64, []),
+	    cl:flush(Q1),
+	    {ok,completed} = cl:wait(E1),
+	    {ok,E2} = cl:enqueue_migrate_mem_objects(Q2, [B1], [], []),
+	    cl:flush(Q2),
+	    %% fixme: add a kernel to check that the data was migrated
+	    cl:wait(E2);
+	_ -> ignore
+    end.

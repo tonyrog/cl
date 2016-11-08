@@ -6,7 +6,12 @@
 
 -include("../include/cl.hrl").
 
+init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
 test() ->
+    test(all).
+
+ct_test(Config) when is_list(Config) ->
     test(all).
 
 test(DevType) ->
@@ -139,7 +144,7 @@ __kernel void program1(int n, int m) {
 			end, DeviceList),
 		      case lists:member({1,2}, cl:versions()) of
 			  true ->
-			      {ok,ArgInfo} = cl:get_kernel_arg_info(Kernel),
+			      ArgInfo = (catch cl:get_kernel_arg_info(Kernel)),
 			      io:format("arg_info: ~p\n", [ArgInfo]);
 			  false ->
 			      ok

@@ -7,12 +7,12 @@ float4 pixel_blend(float4 a, float4 b);
 
 float4 pixel_blend(float4 a, float4 b)
 {
-    return a[3]*a + (1-a[3])*b;
+    return a.w*a + (1-a.w)*b;
 }
 
 float4 pixel_over(float4 a, float4 b)
 {
-    return a[3]*a + (1-a[3])*b[3]*b;
+    return a.w*a + (1-a.w)*b.w*b;
 }
 
 kernel void pixmap_over(read_write image2d_t a,

@@ -1,7 +1,15 @@
 {application, cl,
  [{description, "OpenCL binding for Erlang"},
-  {vsn, git},
-  {modules, [cl,cl10,cl11,cl12,clu]},
+  {vsn, "1.2.3"},
+  {modules, [cl,cl10,cl11,cl12,cl13,clu]},
   {env, []},
-  {applications,[kernel,stdlib]}
+  {applications,[kernel,stdlib]},
+  {maintainers, ["Tony Rogvall", "Dan Gudmundsson"]},
+  {licenses, ["BSD"]},
+  {links, [{"Github", "https://github.com/tonyrog/cl"}]},
+  %% Arrg hex auto pick up derivates, specify files instead
+  {files, ["rebar.config", "README", "COPYRIGHT",
+	   "src", "include",
+	   "c_src/*.[ch]", "c_src/Makefile"
+	  ]}
   ]}.
