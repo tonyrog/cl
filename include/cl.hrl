@@ -209,15 +209,15 @@
 %% @type cl_kernel()      = { {'object', 8, non_neg_integer() } }
 %% @type cl_event()       = { {'object', 9, non_neg_integer() } }
 
--type cl_platform_id() :: { {'object', 1, non_neg_integer() } }.
--type cl_device_id()   :: { {'object', 2, non_neg_integer() } }.
--type cl_context()     :: { {'object', 3, non_neg_integer() } }.
--type cl_queue()       :: { {'object', 4, non_neg_integer() } }.
--type cl_mem()         :: { {'object', 5, non_neg_integer() } }.
--type cl_sampler()     :: { {'object', 6, non_neg_integer() } }.
--type cl_program()     :: { {'object', 7, non_neg_integer() } }.
--type cl_kernel()      :: { {'object', 8, non_neg_integer() } }.
--type cl_event()       :: { {'object', 9, non_neg_integer() } }.
+-type cl_platform_id() ::  {Type::atom(), 1, non_neg_integer() } .
+-type cl_device_id()   ::  {Type::atom(), 2, non_neg_integer() } .
+-type cl_context()     ::  {Type::atom(), 3, non_neg_integer() } .
+-type cl_queue()       ::  {Type::atom(), 4, non_neg_integer() } .
+-type cl_mem()         ::  {Type::atom(), 5, non_neg_integer() } .
+-type cl_sampler()     ::  {Type::atom(), 6, non_neg_integer() } .
+-type cl_program()     ::  {Type::atom(), 7, non_neg_integer() } .
+-type cl_kernel()      ::  {Type::atom(), 8, non_neg_integer() } .
+-type cl_event()       ::  {Type::atom(), 9, non_neg_integer() } .
 
 %% @type cl_error()  =  {
 %%     'device_not_found' |
@@ -267,7 +267,7 @@
 %%     'invalid_mip_level' |
 %%     'unknown' }.
 
--type cl_error()  ::  {
+-type cl_error()  ::  
     'device_not_found' |
     'device_not_available' |
     'compiler_not_available' |
@@ -313,7 +313,7 @@
     'invalid_gl_object' |
     'invalid_buffer_size' |
     'invalid_mip_level' |
-    'unknown' }.
+    'unknown' .
 
 -define(cl_platform_id(X),   ?cl_pointer(X)).
 -define(cl_device_id(X),     ?cl_pointer(X)).
