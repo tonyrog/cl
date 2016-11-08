@@ -136,6 +136,7 @@ context_info() -> cl:context_info().
 get_context_info(A1) -> cl:get_context_info(A1).
 get_context_info(A1,A2) -> cl:get_context_info(A1,A2).
 create_queue(A1,A2,A3) -> cl:create_queue(A1,A2,A3).
+-spec set_queue_property(_, _, _) -> no_return().
 set_queue_property(A1,A2,A3) -> cl:set_queue_property(A1,A2,A3).
 release_queue(A1) -> cl:release_queue(A1).
 retain_queue(A1) -> cl:retain_queue(A1).

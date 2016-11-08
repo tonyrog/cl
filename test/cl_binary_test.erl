@@ -5,7 +5,12 @@
 
 -module(cl_binary_test).
 
--export([test/0]).
+-export([test/0, ct_test/1, init_per_suite/1]).
+
+init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
+ct_test(_) ->
+    test().
 
 test() ->
     E = clu:setup(),

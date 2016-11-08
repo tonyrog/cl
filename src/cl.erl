@@ -63,9 +63,9 @@
 %% subject to the condition that this copyright notice and permission
 %% notice shall be included in all copies or substantial portions of
 %% the Materials.
-%% 
+%%
 %% @headerfile "../include/cl.hrl"
-%% 
+%%
 -module(cl).
 
 -on_load(init/0).
@@ -1068,7 +1068,7 @@ create_queue(_Context, _Device, _Properties) ->
 %%                          Enable::bool()) ->
 %%    'ok' | {'error', cl_error()}
 %% @doc Function is deprecated and have been removed.
-
+-spec set_queue_property(_, _, _) -> no_return().
 set_queue_property(_Queue, _Properties, _Enable) ->
     erlang:error(deprecated).
 
