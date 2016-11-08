@@ -107,22 +107,6 @@ static void ecl_emit_error(char* file, int line, ...);
 #define LOAD_ATOM_STRING(name,string)			\
     atm_##name = enif_make_atom(env,string)
 
-#ifndef CL_VERSION_1_2
-typedef struct _cl_image_desc {
-    cl_mem_object_type      image_type;
-    size_t                  image_width;
-    size_t                  image_height;
-    size_t                  image_depth;
-    size_t                  image_array_size;
-    size_t                  image_row_pitch;
-    size_t                  image_slice_pitch;
-    cl_uint                 num_mip_levels;
-    cl_uint                 num_samples;
-    cl_mem                  buffer;
-} cl_image_desc;
-#endif
-
-
 // Wrapper to handle reource atom name etc.
 typedef struct {
     char* name;
@@ -319,10 +303,140 @@ typedef struct _ecl_env_t {
     cl_int icd_version;
 } ecl_env_t;
 
+typedef struct _ecl_func_t {
+    char* name;
+    void* func;
+    int   version;  // 10,11,12,20...
+} ecl_func_t;
 
+//
+// ECL_FUNC function list is used multiple times by
+// updating the meaning of ECL_FUNC
+//
+#define ECL_FUNC_LIST		     \
+    ECL_FUNC(clGetPlatformIDs,10),		\
+	ECL_FUNC(clGetPlatformInfo,10),	\
+	ECL_FUNC(clGetDeviceIDs,10),		\
+	ECL_FUNC(clGetDeviceInfo,10),		\
+	ECL_FUNC(clCreateSubDevices,12),	\
+	ECL_FUNC(clRetainDevice,12),		\
+	ECL_FUNC(clReleaseDevice,12),		\
+	ECL_FUNC(clCreateContext,10),		\
+	ECL_FUNC(clCreateContextFromType,10),	\
+	ECL_FUNC(clRetainContext,10),		\
+	ECL_FUNC(clReleaseContext,10),		\
+	ECL_FUNC(clGetContextInfo,10),		\
+	ECL_FUNC(clCreateCommandQueue,10),	\
+	ECL_FUNC(clRetainCommandQueue,10),	\
+	ECL_FUNC(clReleaseCommandQueue,10),	\
+	ECL_FUNC(clGetCommandQueueInfo,10),	\
+	ECL_FUNC(clCreateBuffer,10),		\
+	ECL_FUNC(clCreateSubBuffer,11),	\
+	ECL_FUNC(clCreateImage,12),		\
+	ECL_FUNC(clCreatePipe,20),		\
+	ECL_FUNC(clRetainMemObject,10),	\
+	ECL_FUNC(clReleaseMemObject,10),     \
+	ECL_FUNC(clGetSupportedImageFormats,10),	\
+	ECL_FUNC(clGetMemObjectInfo,10),		\
+	ECL_FUNC(clGetImageInfo,10),			\
+	ECL_FUNC(clGetPipeInfo,20),			\
+	ECL_FUNC(clSetMemObjectDestructorCallback,11),	\
+	ECL_FUNC(clSVMAlloc,20),		   \
+	ECL_FUNC(clSVMFree,20),			   \
+	ECL_FUNC(clCreateSampler,10),		   \
+	ECL_FUNC(clCreateSamplerWithProperties,20),	\
+	ECL_FUNC(clRetainSampler,10),			\
+	ECL_FUNC(clReleaseSampler,10),			\
+	ECL_FUNC(clGetSamplerInfo,10),			\
+	ECL_FUNC(clCreateProgramWithSource,10),		\
+	ECL_FUNC(clCreateProgramWithBinary,10),		\
+	ECL_FUNC(clCreateProgramWithBuiltInKernels,12), \
+	ECL_FUNC(clRetainProgram,10),			\
+	ECL_FUNC(clReleaseProgram,10),			\
+	ECL_FUNC(clBuildProgram,10),			\
+	ECL_FUNC(clCompileProgram,12),			\
+	ECL_FUNC(clLinkProgram,12),			\
+	ECL_FUNC(clUnloadPlatformCompiler,12),		\
+	ECL_FUNC(clGetProgramInfo,10),			\
+	ECL_FUNC(clGetProgramBuildInfo,10),		\
+	ECL_FUNC(clCreateKernel,10),			\
+	ECL_FUNC(clCreateKernelsInProgram,10),		\
+	ECL_FUNC(clSetKernelArg,10),			\
+	ECL_FUNC(clSetKernelArgSVMPointer,20),		\
+	ECL_FUNC(clSetKernelExecInfo,20),		\
+	ECL_FUNC(clRetainKernel,10),			\
+	ECL_FUNC(clReleaseKernel,10),			\
+	ECL_FUNC(clGetKernelInfo,10),			\
+	ECL_FUNC(clGetKernelArgInfo,12),		\
+	ECL_FUNC(clGetKernelWorkGroupInfo,10),		\
+	ECL_FUNC(clWaitForEvents,10),			\
+	ECL_FUNC(clGetEventInfo,10),			\
+	ECL_FUNC(clCreateUserEvent,11),			\
+	ECL_FUNC(clRetainEvent,10),			\
+	ECL_FUNC(clReleaseEvent,10),			\
+	ECL_FUNC(clSetUserEventStatus,11),		\
+	ECL_FUNC(clSetEventCallback,11),		\
+	ECL_FUNC(clGetEventProfilingInfo,10),		\
+	ECL_FUNC(clFlush,10),				\
+	ECL_FUNC(clFinish,10),				\
+	ECL_FUNC(clEnqueueReadBuffer,10),		\
+	ECL_FUNC(clEnqueueReadBufferRect,11),		\
+	ECL_FUNC(clEnqueueWriteBuffer,10),		\
+	ECL_FUNC(clEnqueueWriteBufferRect,11),		\
+	ECL_FUNC(clEnqueueFillBuffer,12),		\
+	ECL_FUNC(clEnqueueCopyBuffer,10),		\
+	ECL_FUNC(clEnqueueCopyBufferRect,11),		\
+	ECL_FUNC(clEnqueueReadImage,10),		\
+	ECL_FUNC(clEnqueueWriteImage,10),		\
+	ECL_FUNC(clEnqueueFillImage,12),		\
+	ECL_FUNC(clEnqueueCopyImage,10),		\
+	ECL_FUNC(clEnqueueCopyImageToBuffer,10),	\
+	ECL_FUNC(clEnqueueCopyBufferToImage,10),	\
+	ECL_FUNC(clEnqueueMapBuffer,10),		\
+	ECL_FUNC(clEnqueueMapImage,10),			\
+	ECL_FUNC(clEnqueueUnmapMemObject,10),		\
+	ECL_FUNC(clEnqueueMigrateMemObjects,12),	\
+	ECL_FUNC(clEnqueueNDRangeKernel,10),		\
+	ECL_FUNC(clEnqueueTask,10),			\
+	ECL_FUNC(clEnqueueNativeKernel,10),		\
+	ECL_FUNC(clEnqueueMarkerWithWaitList,12),	\
+	ECL_FUNC(clEnqueueBarrierWithWaitList,12),	\
+	ECL_FUNC(clEnqueueSVMFree,20),			\
+	ECL_FUNC(clEnqueueSVMMemcpy,20),		\
+	ECL_FUNC(clEnqueueSVMMemFill,20),		\
+	ECL_FUNC(clEnqueueSVMMap,20),				\
+	ECL_FUNC(clEnqueueSVMUnmap,20),				\
+	ECL_FUNC(clGetExtensionFunctionAddressForPlatform,12),	\
+	ECL_FUNC(clCreateImage2D,10),				\
+	ECL_FUNC(clCreateImage3D,10),				\
+	ECL_FUNC(clEnqueueMarker,10),				\
+	ECL_FUNC(clEnqueueWaitForEvents,10),			\
+	ECL_FUNC(clEnqueueBarrier,10),				\
+	ECL_FUNC(clUnloadCompiler,10),				\
+	ECL_FUNC(clGetExtensionFunctionAddress,10)
+
+#include "ecl_types.h"
+
+#undef  ECL_FUNC
+#define ECL_FUNC(nm,vsn) i_##nm
+typedef enum {
+    ECL_FUNC_LIST
+} ecl_func_index_t;
+
+#undef  ECL_FUNC
+#define ECL_FUNC(nm,vsn)			\
+    [i_##nm] = { .name = #nm, .func = NULL, .version = (vsn) }
+
+ecl_func_t ecl_function[] = {
+    ECL_FUNC_LIST,
+    { NULL, NULL, 0 }
+};
+
+#define ECL_FUNC_PTR(nm) ecl_function[i_##nm].func
+#define ECL_FUNC_VERSION(nm) ecl_function[i_##nm].version
+#define ECL_CALL(nm) ((t_##nm)(ecl_function[i_##nm].func))
 
 static void* ecl_context_main(void* arg);
-
 
 static int ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info);
 
@@ -331,7 +445,7 @@ static int ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 
 static void ecl_unload(ErlNifEnv* env, void* priv_data);
 
-static void ecl_load_dynfunctions(ecl_env_t* ecl);
+static int ecl_load_dynfunctions(ecl_env_t* ecl);
 
 static ERL_NIF_TERM ecl_versions(ErlNifEnv* env, int argc, 
 				 const ERL_NIF_TERM argv[]);
@@ -387,12 +501,6 @@ static ERL_NIF_TERM ecl_create_image(ErlNifEnv* env, int argc,
 				     const ERL_NIF_TERM argv[]);
 #endif
 
-typedef cl_mem (* ECL_CREATE_IMAGE)(cl_context,cl_mem_flags,
-				    const cl_image_format * ,
-				    const cl_image_desc *,
-				    void *, cl_int *);
-ECL_CREATE_IMAGE eclCreateImage;
-
 static ERL_NIF_TERM ecl_get_supported_image_formats(ErlNifEnv* env, int argc, 
 						    const ERL_NIF_TERM argv[]);
 
@@ -427,8 +535,6 @@ static ERL_NIF_TERM ecl_async_compile_program(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_async_link_program(ErlNifEnv* env, int argc,
 					   const ERL_NIF_TERM argv[]);
 #endif
-typedef cl_int (* ECL_UNLOAD_PLATFORM_COMPILER)(cl_platform_id);
-ECL_UNLOAD_PLATFORM_COMPILER eclUnloadPlatformCompiler;
 
 static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[]);
@@ -473,14 +579,6 @@ static ERL_NIF_TERM ecl_enqueue_barrier_with_wait_list(ErlNifEnv* env,
 						       int argc,
 						       const ERL_NIF_TERM argv[]);
 #endif
-
-typedef cl_int (* ECL_ENQUEUE_MARKER_WITH_WAIT_LIST)(cl_command_queue, cl_uint,
-						     const cl_event *, cl_event *);
-ECL_ENQUEUE_MARKER_WITH_WAIT_LIST eclEnqueueMarkerWithWaitList;
-typedef cl_int (* ECL_ENQUEUE_BARRIER_WITH_WAIT_LIST)(cl_command_queue, cl_uint,
-						      const cl_event *, cl_event *);
-ECL_ENQUEUE_BARRIER_WITH_WAIT_LIST eclEnqueueBarrierWithWaitList;
-
 
 static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc, 
 						const ERL_NIF_TERM argv[]);
@@ -1624,7 +1722,7 @@ ecl_info_t device_info[] =
 #endif
 #endif
 
-    /* cl_nv_device_attribute_query extension */
+    // cl_nv_device_attribute_query extension
 #ifdef CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV
     { &ATOM(compute_capability_major_nv), CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV, false, OCL_UINT, 0},
 #endif
@@ -3140,7 +3238,7 @@ static void* ecl_context_main(void* arg)
 	    cl_int err;
 
 	    DBG("ecl_context_main: flush q=%lu", (unsigned long) m.queue);
-	    err = clFlush(m.queue->queue);
+	    err = ECL_CALL(clFlush)(m.queue->queue);
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
 		ERL_NIF_TERM reply;
@@ -3161,7 +3259,7 @@ static void* ecl_context_main(void* arg)
 	case ECL_MESSAGE_FINISH: {  // finish message queue
 	    cl_int err;
 	    DBG("ecl_context_main: finish q=%lu", (unsigned long) m.queue);
-	    err = clFlush(m.queue->queue);
+	    err = ECL_CALL(clFlush)(m.queue->queue);
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
 		int res;
@@ -3185,7 +3283,7 @@ static void* ecl_context_main(void* arg)
 	    DBG("ecl_context_main: wait_for_event e=%lu",
 		(unsigned long) m.event);
 	    list[0] = m.event->obj.event;
-	    err = clWaitForEvents(1, list);
+	    err = ECL_CALL(clWaitForEvents)(1, list);
 	    DBG("ecl_context_main: wait_for_event err=%d", err);
 	    // reply to caller pid !
 	    if (m.env) {
@@ -3288,7 +3386,7 @@ static ERL_NIF_TERM ecl_get_platform_ids(ErlNifEnv* env, int argc,
     UNUSED(argc);
     UNUSED(argv);
 
-    if ((err = clGetPlatformIDs(MAX_PLATFORMS, platform_id, &num_platforms)))
+    if ((err = ECL_CALL(clGetPlatformIDs)(MAX_PLATFORMS, platform_id, &num_platforms)))
 	return ecl_make_error(env, err);
 
     for (i = 0; i < num_platforms; i++)
@@ -3306,8 +3404,8 @@ static ERL_NIF_TERM ecl_get_platform_info(ErlNifEnv* env, int argc,
 
     if (!get_ecl_object(env, argv[0], &platform_r, false, &o_platform))
 	return enif_make_badarg(env);
-    return make_object_info(env, argv[1], o_platform, 
-			    (info_fn_t*) clGetPlatformInfo, 
+    return make_object_info(env, argv[1], o_platform,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetPlatformInfo),
 			    platform_info, 
 			    sizeof_array(platform_info));
 }
@@ -3330,8 +3428,8 @@ static ERL_NIF_TERM ecl_get_device_ids(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     if (!get_bitfields(env, argv[1], &device_type, kv_device_type))
 	return enif_make_badarg(env);
-    if ((err = clGetDeviceIDs(platform, device_type, MAX_DEVICES, 
-			      device_id, &num_devices)))
+    if ((err = ECL_CALL(clGetDeviceIDs)(platform, device_type, MAX_DEVICES, 
+					device_id, &num_devices)))
 	return ecl_make_error(env, err);
     
     for (i = 0; i < num_devices; i++)
@@ -3435,8 +3533,8 @@ static ERL_NIF_TERM ecl_create_sub_devices(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     properties[num_property] = 0;
 
-    err = clCreateSubDevices(d->device, properties, MAX_DEVICES,
-			     out_devices, &num_devices);
+    err = ECL_CALL(clCreateSubDevices)(d->device, properties, MAX_DEVICES,
+				       out_devices, &num_devices);
     if (err)
 	return ecl_make_error(env, err);
     for (i = 0; i < num_devices; i++) {
@@ -3521,10 +3619,10 @@ static ERL_NIF_TERM ecl_create_context(ErlNifEnv* env, int argc,
     bp->tid = enif_thread_self();
     DBG("ecl_create_context: self %p", bp->tid);
 
-    context = clCreateContext(0, num_devices, device_list, 
-			      ecl_context_notify,
-			      bp,
-			      &err);
+    context = ECL_CALL(clCreateContext)(0, num_devices, device_list, 
+					ecl_context_notify,
+					bp,
+					&err);
     if (context) {
 	cl_uint i;
 	ERL_NIF_TERM t;
@@ -3552,7 +3650,7 @@ static ERL_NIF_TERM ecl_get_context_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_context,
-			    (info_fn_t*) clGetContextInfo,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetContextInfo),
 			    context_info,
 			    sizeof_array(context_info));
 }
@@ -3574,7 +3672,7 @@ static ERL_NIF_TERM ecl_create_queue(ErlNifEnv* env, int argc,
     if (!get_bitfields(env, argv[2], &properties,
 		       kv_command_queue_properties))
 	return enif_make_badarg(env);
-    queue = clCreateCommandQueue(o_context->context, device, properties,
+    queue = ECL_CALL(clCreateCommandQueue)(o_context->context, device, properties,
 				 &err);
     if (queue) {
 	ERL_NIF_TERM t;
@@ -3593,7 +3691,7 @@ static ERL_NIF_TERM ecl_get_queue_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_queue, 
-			    (info_fn_t*) clGetCommandQueueInfo, 
+			    (info_fn_t*) ECL_FUNC_PTR(clGetCommandQueueInfo), 
 			    queue_info,
 			    sizeof_array(queue_info));
 }
@@ -3634,8 +3732,8 @@ static ERL_NIF_TERM ecl_create_buffer(ErlNifEnv* env, int argc,
     else if (size)
 	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
 
-    mem = clCreateBuffer(o_context->context, mem_flags, size,
-			 host_ptr, &err);
+    mem = ECL_CALL(clCreateBuffer)(o_context->context, mem_flags, size,
+				   host_ptr, &err);
 
     if (!err) {
 	ERL_NIF_TERM t;
@@ -3678,9 +3776,9 @@ static ERL_NIF_TERM ecl_create_sub_buffer(ErlNifEnv* env, int argc,
     if (!ecl_get_sizet(env, info_arg2, &reg.size))
 	return enif_make_badarg(env);
 
-    mem = clCreateSubBuffer(o_buf->mem, mem_flags,
-			    CL_BUFFER_CREATE_TYPE_REGION,
-			    &reg, &err);
+    mem = ECL_CALL(clCreateSubBuffer)(o_buf->mem, mem_flags,
+				      CL_BUFFER_CREATE_TYPE_REGION,
+				      &reg, &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &mem_r,(void*) mem, o_buf);
@@ -3720,7 +3818,6 @@ static int get_image_format(ErlNifEnv* env, ERL_NIF_TERM arg,
     return 1;
 }
 
-#if CL_VERSION_1_2 == 1
 //
 // format {'cl_image_desc',image_type,image_width,image_height,image_depth,
 //             image_array_size,image_row_pitch,image_slice_pitch,
@@ -3758,9 +3855,51 @@ static int get_image_desc(ErlNifEnv* env, ERL_NIF_TERM arg,
 	return 0;
     return 1;
 }
-#endif
 
-static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc, 
+// 1.0, 1,1 wrapper where clCreateImage
+cl_mem e_clCreateImage(cl_context context,
+		       cl_mem_flags flags,
+		       const cl_image_format image_format,
+		       const cl_image_desc* image_desc, 
+		       void* host_ptr,
+		       cl_int* errcode_ret)
+{
+    *errcode_ret = CL_INVALID_OPERATION;
+    return NULL;
+}
+
+// 1.2 -> 1.0 wrapper: clCreateImage2D using clCreateImage
+cl_mem eclCreateImage2D(cl_context context,
+			 cl_mem_flags mem_flags,
+			 const cl_image_format * format,
+			 size_t width,
+			 size_t height,
+			 size_t row_pitch, 
+			 void * host_ptr,
+			 cl_int *err)
+{
+    cl_image_desc desc;
+	
+    desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+    desc.image_width = width;
+    desc.image_height = height;
+    desc.image_depth = 1;       // used with IMAGE3D
+    desc.image_array_size = 1;  // used with IMAGE2D/3D_ARRAY?
+    desc.image_row_pitch = row_pitch;
+    desc.image_slice_pitch = 0;  // maybe 0 for 2D image
+    desc.num_mip_levels = 0;  // must be 0
+    desc.num_samples= 0;      // must be 0
+    desc.buffer = NULL;       // used when CL_MEM_OBJECT_IMAGE1D_BUFFER
+
+    return ECL_CALL(clCreateImage)(context,
+				   mem_flags,
+				   format,
+				   &desc,
+				   host_ptr,
+				   err);
+}
+
+static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
 					const ERL_NIF_TERM argv[])
 {
     ecl_object_t* o_context;
@@ -3800,31 +3939,9 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
     }
     else if (width && height)
 	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
-    if(o_context->version >= 12) {
-	cl_image_desc desc;
-
-	desc.image_type = CL_MEM_OBJECT_IMAGE2D;
-	desc.image_width = width;
-	desc.image_height = height;
-	desc.image_depth = 1;       // used with IMAGE3D
-	desc.image_array_size = 1;  // used with IMAGE2D/3D_ARRAY?
-	desc.image_row_pitch = row_pitch;
-	desc.image_slice_pitch = 0;  // maybe 0 for 2D image
-	desc.num_mip_levels = 0;  // must be 0
-	desc.num_samples= 0;      // must be 0
-	desc.buffer = NULL;       // used when CL_MEM_OBJECT_IMAGE1D_BUFFER
-
-	mem = eclCreateImage(o_context->context,
-			     mem_flags,
-			     &format,
-			     &desc,
-			     host_ptr,
-			     &err);
-    } else {
-	mem = clCreateImage2D(o_context->context, mem_flags, &format,
-			      width, height, row_pitch,
-			      host_ptr, &err);
-    }
+    mem = ECL_CALL(clCreateImage2D)(o_context->context, mem_flags, &format,
+				    width, height, row_pitch,
+				    host_ptr, &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
@@ -3832,6 +3949,40 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
     }
     return ecl_make_error(env, err);
 }
+
+// 1.2 -> 1.1 wrapper: clCreateImage3D using clCreateImage
+cl_mem eclCreateImage3D(cl_context context,
+			cl_mem_flags mem_flags,
+			const cl_image_format* format,
+			size_t width, 
+			size_t height,
+			size_t depth, 
+			size_t row_pitch, 
+			size_t slice_pitch, 
+			void * host_ptr,
+			cl_int *err)
+{
+    cl_image_desc desc;
+
+    desc.image_type = CL_MEM_OBJECT_IMAGE3D;
+    desc.image_width = width;
+    desc.image_height = height;
+    desc.image_depth = depth;       // used with IMAGE3D
+    desc.image_array_size = 1;  // used with IMAGE2D/3D_ARRAY?
+    desc.image_row_pitch = row_pitch;
+    desc.image_slice_pitch = slice_pitch;  // maybe 0 for 2D image
+    desc.num_mip_levels = 0;  // must be 0
+    desc.num_samples= 0;      // must be 0
+    desc.buffer = NULL;       // used when CL_MEM_OBJECT_IMAGE1D_BUFFER
+
+    return ECL_CALL(clCreateImage)(context,
+				   mem_flags,
+				   format,
+				   &desc,
+				   host_ptr,
+				   err);
+}
+
 
 static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
@@ -3879,31 +4030,10 @@ static ERL_NIF_TERM ecl_create_image3d(ErlNifEnv* env, int argc,
     }
     else if (width && height && depth)
 	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
-    if(o_context->version >= 12) {
-	cl_image_desc desc;
-
-	desc.image_type = CL_MEM_OBJECT_IMAGE3D;
-	desc.image_width = width;
-	desc.image_height = height;
-	desc.image_depth = depth;       // used with IMAGE3D
-	desc.image_array_size = 1;  // used with IMAGE2D/3D_ARRAY?
-	desc.image_row_pitch = row_pitch;
-	desc.image_slice_pitch = slice_pitch;  // maybe 0 for 2D image
-	desc.num_mip_levels = 0;  // must be 0
-	desc.num_samples= 0;      // must be 0
-	desc.buffer = NULL;       // used when CL_MEM_OBJECT_IMAGE1D_BUFFER
-
-	mem = eclCreateImage(o_context->context,
-			     mem_flags,
-			     &format,
-			     &desc,
-			     host_ptr,
-			     &err);
-    } else {
-	mem = clCreateImage3D(o_context->context, mem_flags, &format,
-			      width, height, depth, row_pitch, slice_pitch,
-			      host_ptr, &err);
-    }
+    mem = ECL_CALL(clCreateImage3D)(o_context->context, mem_flags, &format,
+				    width, height, depth, row_pitch, 
+				    slice_pitch,
+				    host_ptr, &err);
     if (mem) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
@@ -3951,13 +4081,12 @@ static ERL_NIF_TERM ecl_create_image(ErlNifEnv* env, int argc,
     else if (desc.image_width && desc.image_height && desc.image_depth)
 	mem_flags |= CL_MEM_ALLOC_HOST_PTR;
 
-    // use clCreateImage here ?
-    mem = eclCreateImage(o_context->context,
-			 mem_flags,
-			 &format,
-			 &desc,
-			 host_ptr,
-			 &err);
+    mem = ECL_CALL(clCreateImage)(o_context->context,
+				  mem_flags,
+				  &format,
+				  &desc,
+				  host_ptr,
+				  &err);
     if (mem) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
@@ -3984,10 +4113,10 @@ static ERL_NIF_TERM ecl_get_supported_image_formats(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);	
     if (!get_enum(env, argv[2], &image_type, kv_mem_object_type))
 	return enif_make_badarg(env);	
-    err = clGetSupportedImageFormats(context, flags, image_type,
-				     MAX_IMAGE_FORMATS,
-				     image_format,
-				     &num_image_formats);
+    err = ECL_CALL(clGetSupportedImageFormats)(context, flags, image_type,
+					       MAX_IMAGE_FORMATS,
+					       image_format,
+					       &num_image_formats);
     if (!err) {
 	int i = (int) num_image_formats;
 	ERL_NIF_TERM list = enif_make_list(env, 0);
@@ -4020,7 +4149,7 @@ static ERL_NIF_TERM ecl_get_mem_object_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &mem_r, false, &o_mem))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_mem, 
-			    (info_fn_t*) clGetMemObjectInfo,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetMemObjectInfo),
 			    mem_info,
 			    sizeof_array(mem_info));
 }
@@ -4034,7 +4163,7 @@ static ERL_NIF_TERM ecl_get_image_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &mem_r, false, &o_mem))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_mem,
-			    (info_fn_t*) clGetImageInfo,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetImageInfo),
 			    image_info, 
 			    sizeof_array(image_info));
 }
@@ -4066,9 +4195,9 @@ static ERL_NIF_TERM ecl_create_sampler(ErlNifEnv* env, int argc,
     if (!get_enum(env, argv[3], &filter_mode, kv_filter_mode))
 	return enif_make_badarg(env);
 
-    sampler = clCreateSampler(o_context->context,
-			      normalized_coords, addressing_mode, filter_mode,
-			      &err);
+    sampler = ECL_CALL(clCreateSampler)(o_context->context,
+					normalized_coords, addressing_mode, filter_mode,
+					&err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &sampler_r,(void*) sampler, o_context);
@@ -4087,7 +4216,7 @@ static ERL_NIF_TERM ecl_get_sampler_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &sampler_r, false, &o_sampler))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_sampler,
-			    (info_fn_t*) clGetSamplerInfo,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetSamplerInfo),
 			    sampler_info,
 			    sizeof_array(sampler_info));
 }
@@ -4113,11 +4242,11 @@ static ERL_NIF_TERM ecl_create_program_with_source(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     strings[0] = (char*) source.data;
     lengths[0] = source.size;
-    program = clCreateProgramWithSource(o_context->context,
-					1,
-					(const char**) strings,
-					lengths,
-					&err);
+    program = ECL_CALL(clCreateProgramWithSource)(o_context->context,
+						  1,
+						  (const char**) strings,
+						  lengths,
+						  &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &program_r,(void*) program, o_context);
@@ -4162,13 +4291,13 @@ static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc,
 	lengths[i] = binary_list[i].size;
 	data[i]    = binary_list[i].data;
     }
-    program = clCreateProgramWithBinary(o_context->context,
-					num_devices,
-					(const cl_device_id*) device_list,
-					(const size_t*) lengths,
-					(const unsigned char**) data,
-					status,
-					&err);
+    program = ECL_CALL(clCreateProgramWithBinary)(o_context->context,
+						  num_devices,
+						  (const cl_device_id*) device_list,
+						  (const size_t*) lengths,
+						  (const unsigned char**) data,
+						  status,
+						  &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &program_r,(void*) program, o_context);
@@ -4208,7 +4337,7 @@ static ERL_NIF_TERM ecl_create_program_with_builtin_kernels(
 			 ERL_NIF_LATIN1))
 	return enif_make_badarg(env);
 
-    program = clCreateProgramWithBuiltInKernels(
+    program = ECL_CALL(clCreateProgramWithBuiltInKernels)(
 	o_context->context,
 	num_devices,
 	(const cl_device_id*) device_list,
@@ -4313,12 +4442,12 @@ static ERL_NIF_TERM ecl_async_build_program(ErlNifEnv* env, int argc,
     bp->tid = enif_thread_self();
     enif_keep_resource(o_program);    // keep while operation is running
 
-    err = clBuildProgram(o_program->program,
-			 num_devices,
-			 device_list,
-			 (const char*) options,
-			 ecl_build_notify,
-			 bp);
+    err = ECL_CALL(clBuildProgram)(o_program->program,
+				   num_devices,
+				   device_list,
+				   (const char*) options,
+				   ecl_build_notify,
+				   bp);
     DBG("ecl_async_build_program: err=%d user_data=%p", err, bp);
 
     if ((err==CL_SUCCESS) ||
@@ -4346,7 +4475,8 @@ static ERL_NIF_TERM ecl_unload_platform_compiler(ErlNifEnv* env, int argc,
 	return ecl_make_error(env, CL_INVALID_OPERATION);
     if (!get_object(env, argv[0], &platform_r, true,(void**)&platform))
 	return enif_make_badarg(env);
-    err = eclUnloadPlatformCompiler(platform);
+    err = ECL_CALL(clUnloadPlatformCompiler)(platform);
+    // err = eclUnloadPlatformCompiler(platform);
     if (err)
 	return ecl_make_error(env, err);
     return ATOM(ok);    
@@ -4414,16 +4544,16 @@ static ERL_NIF_TERM ecl_async_compile_program(ErlNifEnv* env, int argc,
     DBG("ecl_async_compile_program: program: %p, num_input_headers: %d, bp=%p",
 	o_program->program, num_input_headers, bp);
 
-    err = clCompileProgram(o_program->program,
-			   num_devices,
-			   device_list,
-			   (const char*) options,
-			   num_input_headers,
-			   num_input_headers ? input_headers : NULL,
-			   num_input_headers ?
-			   (const char**)header_include_names : NULL,
-			   ecl_build_notify,
-			   bp);
+    err = ECL_CALL(clCompileProgram)(o_program->program,
+				     num_devices,
+				     device_list,
+				     (const char*) options,
+				     num_input_headers,
+				     num_input_headers ? input_headers : NULL,
+				     num_input_headers ?
+				     (const char**)header_include_names : NULL,
+				     ecl_build_notify,
+				     bp);
     DBG("ecl_async_compile_program: err=%d user_data=%p", err, bp);
 
     if ((err==CL_SUCCESS) || (err==CL_BUILD_PROGRAM_FAILURE)) {
@@ -4497,15 +4627,15 @@ static ERL_NIF_TERM ecl_async_link_program(ErlNifEnv* env, int argc,
 	o_context->context, num_input_programs, bp);
 
     // lock callback inorder avoid race?
-    program = clLinkProgram(o_context->context,
-			    num_devices,
-			    num_devices ? device_list : NULL,
-			    (const char*) options,
-			    num_input_programs,
-			    input_programs,
+    program = ECL_CALL(clLinkProgram)(o_context->context,
+				      num_devices,
+				      num_devices ? device_list : NULL,
+				      (const char*) options,
+				      num_input_programs,
+				      input_programs,
 			    ecl_build_notify,
-			    bp,
-			    &err);
+				      bp,
+				      &err);
     DBG("ecl_async_link_program: err=%d program %p, user_data=%p",
 	err, program, bp);
 
@@ -4536,9 +4666,10 @@ static ERL_NIF_TERM ecl_unload_compiler(ErlNifEnv* env, int argc,
 	if (ecl->nplatforms <= 0)
 	    return ecl_make_error(env, CL_INVALID_VALUE);
 	platform = (cl_platform_id) ecl->platform[0].o_platform->opaque;
-	err = eclUnloadPlatformCompiler(platform);
+	err = ECL_CALL(clUnloadPlatformCompiler)(platform);
+	// err = eclUnloadPlatformCompiler(platform);
     } else {
-	err = clUnloadCompiler();
+	err = ECL_CALL(clUnloadCompiler)();
     }
     if (err)
 	return ecl_make_error(env, err);
@@ -4553,23 +4684,25 @@ static int program_may_have_binaries(cl_program program)
     cl_device_id devices[MAX_DEVICES];
     int i;
 
-    if (clGetProgramInfo(program,
-			 CL_PROGRAM_NUM_DEVICES,
-			 sizeof(num_devices),
-			 &num_devices,
-			 &returned_size) != CL_SUCCESS)
+    if (ECL_CALL(clGetProgramInfo)
+	(program,
+	 CL_PROGRAM_NUM_DEVICES,
+	 sizeof(num_devices),
+	 &num_devices,
+	 &returned_size) != CL_SUCCESS)
 	return 0;
 
-    if (clGetProgramInfo(program, CL_PROGRAM_DEVICES,
-			 num_devices*sizeof(cl_device_id),
-			 devices, NULL) != CL_SUCCESS)
+    if (ECL_CALL(clGetProgramInfo)(program, CL_PROGRAM_DEVICES,
+				   num_devices*sizeof(cl_device_id),
+				   devices, NULL) != CL_SUCCESS)
 	return 0;
 
     for (i = 0; i < num_devices; i++) {
 	cl_build_status build_status = CL_BUILD_NONE;
-        if (clGetProgramBuildInfo(program, devices[i], CL_PROGRAM_BUILD_STATUS,
-				  sizeof(build_status), 
-				  &build_status, NULL) != CL_SUCCESS)
+        if (ECL_CALL(clGetProgramBuildInfo)
+	    (program, devices[i], CL_PROGRAM_BUILD_STATUS,
+	     sizeof(build_status), 
+	     &build_status, NULL) != CL_SUCCESS)
 	    return 0;
 	if (build_status != CL_BUILD_SUCCESS) return 0;
     }
@@ -4589,19 +4722,21 @@ static ERL_NIF_TERM make_program_binary_sizes(ErlNifEnv* env,
 
     memset(size, 0,     sizeof(size));
 
-    if ((err = clGetProgramInfo(program,
-				CL_PROGRAM_NUM_DEVICES,
-				sizeof(num_devices),
-				&num_devices,
-				&returned_size)))
+    if ((err = ECL_CALL(clGetProgramInfo)
+	 (program,
+	  CL_PROGRAM_NUM_DEVICES,
+	  sizeof(num_devices),
+	  &num_devices,
+	  &returned_size)))
 	return ecl_make_error(env, err);
 
     if (program_may_have_binaries(program)) {
-	if ((err = clGetProgramInfo(program,
-				    CL_PROGRAM_BINARY_SIZES,
-				    num_devices*sizeof(size_t),
-				    &size[0],
-				    &returned_size)))
+	if ((err = ECL_CALL(clGetProgramInfo)
+	     (program,
+	      CL_PROGRAM_BINARY_SIZES,
+	      num_devices*sizeof(size_t),
+	      &size[0],
+	      &returned_size)))
 	    return ecl_make_error(env, err);
     }
     list = enif_make_list(env, 0);
@@ -4622,11 +4757,12 @@ static ERL_NIF_TERM make_program_binaries(ErlNifEnv* env, cl_program program)
     cl_uint num_devices;
     int i;
 
-    if ((err = clGetProgramInfo(program,
-				CL_PROGRAM_NUM_DEVICES,
-				sizeof(num_devices),
-				&num_devices,
-				&returned_size)))
+    if ((err = ECL_CALL(clGetProgramInfo)
+	 (program,
+	  CL_PROGRAM_NUM_DEVICES,
+	  sizeof(num_devices),
+	  &num_devices,
+	  &returned_size)))
 	return ecl_make_error(env, err);
 
     if (!program_may_have_binaries(program)) {
@@ -4650,11 +4786,12 @@ static ERL_NIF_TERM make_program_binaries(ErlNifEnv* env, cl_program program)
 	memset(size, 0,     sizeof(size));
 	memset(binary, 0,   sizeof(binary));
 
-	if ((err = clGetProgramInfo(program,
-				    CL_PROGRAM_BINARY_SIZES,
-				    num_devices*sizeof(size_t),
-				    &size[0],
-				    &returned_size)))
+	if ((err = ECL_CALL(clGetProgramInfo)
+	     (program,
+	      CL_PROGRAM_BINARY_SIZES,
+	      num_devices*sizeof(size_t),
+	      &size[0],
+	      &returned_size)))
 	    return ecl_make_error(env, err);
 	i = 0;
 	while (i < (int) num_devices) {
@@ -4665,11 +4802,12 @@ static ERL_NIF_TERM make_program_binaries(ErlNifEnv* env, cl_program program)
 	    data[i] = binary[i].data;
 	    i++;
 	}
-	if ((err = clGetProgramInfo(program,
-				    CL_PROGRAM_BINARIES,
-				    sizeof(unsigned char*)*num_devices,
-				    data,
-				    &returned_size)))
+	if ((err = ECL_CALL(clGetProgramInfo)
+	     (program,
+	      CL_PROGRAM_BINARIES,
+	      sizeof(unsigned char*)*num_devices,
+	      data,
+	      &returned_size)))
 	    goto cleanup;
 
 	list = enif_make_list(env, 0);
@@ -4703,7 +4841,7 @@ static ERL_NIF_TERM ecl_get_program_info(ErlNifEnv* env, int argc,
 	return make_program_binary_sizes(env, o_program->program);
     else
 	return make_object_info(env, argv[1], o_program,
-				(info_fn_t*) clGetProgramInfo,
+				(info_fn_t*) ECL_FUNC_PTR(clGetProgramInfo),
 				program_info,
 				sizeof_array(program_info));
 }
@@ -4720,7 +4858,7 @@ static ERL_NIF_TERM ecl_get_program_build_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[1], &device_r, false, &o_device))
 	return enif_make_badarg(env);
     return make_object_info2(env, argv[2], o_program, o_device->opaque,
-			     (info2_fn_t*) clGetProgramBuildInfo,
+			     (info2_fn_t*) ECL_FUNC_PTR(clGetProgramBuildInfo),
 			     build_info,
 			     sizeof_array(build_info));
 }
@@ -4741,7 +4879,7 @@ static ERL_NIF_TERM ecl_create_kernel(ErlNifEnv* env, int argc,
 			 ERL_NIF_LATIN1))
 	return enif_make_badarg(env);
 
-    kernel = clCreateKernel(o_program->program,kernel_name, &err);
+    kernel = ECL_CALL(clCreateKernel)(o_program->program,kernel_name, &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_kernel(env, kernel, o_program);
@@ -4770,10 +4908,11 @@ static ERL_NIF_TERM ecl_create_kernels_in_program(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &program_r, false, &o_program))
 	return enif_make_badarg(env);
 
-    err = clCreateKernelsInProgram(o_program->program,
-				   MAX_KERNELS,
-				   kernel,
-				   &num_kernels_ret);
+    err = ECL_CALL(clCreateKernelsInProgram)
+	(o_program->program,
+	 MAX_KERNELS,
+	 kernel,
+	 &num_kernels_ret);
     if (err)
 	return ecl_make_error(env, err);
     for (i = 0; i < num_kernels_ret; i++) {
@@ -4974,10 +5113,11 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
     return enif_make_badarg(env);
 
 do_kernel_arg:
-    err = clSetKernelArg(o_kernel->obj.kernel,
-			 arg_index,
-			 arg_size,
-			 arg_value);
+    err = ECL_CALL(clSetKernelArg)
+	(o_kernel->obj.kernel,
+	 arg_index,
+	 arg_size,
+	 arg_value);
     if (!err) {
 	set_kernel_arg(o_kernel, arg_index, arg_type, ptr_arg);
 	return ATOM(ok);
@@ -5008,10 +5148,11 @@ static ERL_NIF_TERM ecl_set_kernel_arg_size(ErlNifEnv* env, int argc,
     if (!ecl_get_sizet(env, argv[2], &arg_size))
 	return enif_make_badarg(env);
 
-    err = clSetKernelArg(o_kernel->obj.kernel,
-			 arg_index,
-			 arg_size,
-			 arg_value);
+    err = ECL_CALL(clSetKernelArg)
+	(o_kernel->obj.kernel,
+	 arg_index,
+	 arg_size,
+	 arg_value);
     if (!err) {
 	set_kernel_arg(o_kernel, arg_index, KERNEL_ARG_OTHER, (void*) 0);
 	return ATOM(ok);
@@ -5029,7 +5170,7 @@ static ERL_NIF_TERM ecl_get_kernel_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &kernel_r, false, &o_kernel))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_kernel,
-			    (info_fn_t*) clGetKernelInfo, 
+			    (info_fn_t*) ECL_FUNC_PTR(clGetKernelInfo),
 			    kernel_info,
 			    sizeof_array(kernel_info));
 }
@@ -5046,7 +5187,7 @@ static ERL_NIF_TERM ecl_get_kernel_workgroup_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[1], &device_r, false, &o_device))
 	return enif_make_badarg(env);
     return make_object_info2(env, argv[2], o_kernel, o_device->opaque,
-			     (info2_fn_t*) clGetKernelWorkGroupInfo,
+			     (info2_fn_t*) ECL_FUNC_PTR(clGetKernelWorkGroupInfo),
 			     workgroup_info,
 			     sizeof_array(workgroup_info));
 }
@@ -5065,7 +5206,7 @@ static ERL_NIF_TERM ecl_get_kernel_arg_info(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     return make_object_info2(env, argv[2], o_kernel,
 			     (void*) (unsigned long) arg_index,
-			     (info2_fn_t*) clGetKernelArgInfo,
+			     (info2_fn_t*) ECL_FUNC_PTR(clGetKernelArgInfo),
 			     arg_info,
 			     sizeof_array(arg_info));
 }
@@ -5098,11 +5239,12 @@ static ERL_NIF_TERM ecl_enqueue_task(ErlNifEnv* env, int argc,
     if (!get_bool(env, argv[3], &want_event))
 	return enif_make_badarg(env);
 
-    err = clEnqueueTask(o_queue->queue, 
-			kernel,
-			num_events,
-			num_events ? wait_list : NULL,
-			want_event ? &event : NULL);
+    err = ECL_CALL(clEnqueueTask)
+	(o_queue->queue, 
+	 kernel,
+	 num_events,
+	 num_events ? wait_list : NULL,
+	 want_event ? &event : NULL);
     if (!err) {
 	if (want_event) {
 	    ERL_NIF_TERM t;
@@ -5158,14 +5300,15 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     }
 
-    err = clEnqueueNDRangeKernel(o_queue->queue, kernel,
-				 (cl_uint) work_dim,
-				 0, // global_work_offset,
-				 global_work_size,
-				 temp_dim ? local_work_size : NULL,
-				 num_events, 
-				 num_events ? wait_list : NULL,
-				 want_event ? &event : NULL);
+    err = ECL_CALL(clEnqueueNDRangeKernel)
+	(o_queue->queue, kernel,
+	 (cl_uint) work_dim,
+	 0, // global_work_offset,
+	 global_work_size,
+	 temp_dim ? local_work_size : NULL,
+	 num_events, 
+	 num_events ? wait_list : NULL,
+	 want_event ? &event : NULL);
     if (!err) {
 	if (want_event) {
 	    ERL_NIF_TERM t;
@@ -5177,32 +5320,45 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
     return ecl_make_error(env, err);    
 }
 
+// 1.2 -> 1.1 wrapper: clEnqueueMarkerWithWaitList implement clEnqueueMarker
+cl_int eclEnqueueMarker(cl_command_queue queue,
+			cl_event * event)
+{
+    return ECL_CALL(clEnqueueMarkerWithWaitList)(queue,0, NULL,event);
+}
+
 static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[])
 {
     ecl_object_t*    o_queue;
     cl_event event;
     cl_int err;
+    ERL_NIF_TERM t;
     UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
-    if(o_queue->version >= 12) {
-	if (!(err = eclEnqueueMarkerWithWaitList(o_queue->queue,
-						 0, NULL,
-						 &event))) {
-	    ERL_NIF_TERM t;
-	    t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
-	    return enif_make_tuple2(env, ATOM(ok), t);
-	}
+    if (o_queue->version >= 12) {
+	err = eclEnqueueMarker(o_queue->queue, &event);
     } else { // deprecated in 1.2 available in 1.1
-	if (!(err = clEnqueueMarker(o_queue->queue, &event))) {
-	    ERL_NIF_TERM t;
-	    t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
-	    return enif_make_tuple2(env, ATOM(ok), t);
-	}
+	err = ECL_CALL(clEnqueueMarker)(o_queue->queue, &event);
+    }
+    if (!err) {
+	t = ecl_make_event(env, event, false, false, 0, 0, o_queue);
+	return enif_make_tuple2(env, ATOM(ok), t);
     }
     return ecl_make_error(env, err);
+}
+
+// 1.2 -> 1.1 wrapper: clEnqueueMarkerWithWaitList implement clEnqueueWaitForEvents
+cl_int eclEnqueueWaitForEvents(cl_command_queue queue,
+			       cl_uint num_events,
+			       const cl_event * event_list)
+{
+    return ECL_CALL(clEnqueueMarkerWithWaitList)(queue,
+						 num_events,
+						 num_events ? event_list : NULL,
+						 NULL);
 }
 
 //
@@ -5224,14 +5380,13 @@ static ERL_NIF_TERM ecl_enqueue_wait_for_events(ErlNifEnv* env, int argc,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
     if(o_queue->version >= 12) {
-	err = eclEnqueueMarkerWithWaitList(o_queue->queue,
-					   num_events,
-					   num_events ? wait_list : NULL,
-					   NULL);
+	err = eclEnqueueWaitForEvents(o_queue->queue,
+				      num_events,
+				      num_events ? wait_list : NULL);
     } else {
-	err = clEnqueueWaitForEvents(o_queue->queue,
-				     num_events,
-				     num_events ? wait_list : NULL);
+	err = ECL_CALL(clEnqueueWaitForEvents)(o_queue->queue,
+					       num_events,
+					       num_events ? wait_list : NULL);
     }
     if (!err)
 	return ATOM(ok);
@@ -5274,14 +5429,15 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer(ErlNifEnv* env, int argc,
 	enif_free(bin);
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?	
     }
-    err = clEnqueueReadBuffer(o_queue->queue, buffer,
-			      CL_FALSE,
-			      offset,
-			      size,
-			      bin->data,
-			      num_events,
-			      num_events ? wait_list : 0,
-			      &event);
+    err = ECL_CALL(clEnqueueReadBuffer)
+	(o_queue->queue, buffer,
+	 CL_FALSE,
+	 offset,
+	 size,
+	 bin->data,
+	 num_events,
+	 num_events ? wait_list : 0,
+	 &event);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_event(env, event, true, false, 0, bin, o_queue);
@@ -5346,7 +5502,7 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     }
 
-    err = clEnqueueWriteBuffer(o_queue->queue, buffer,
+    err = ECL_CALL(clEnqueueWriteBuffer)(o_queue->queue, buffer,
 			       !want_event, // FALSE for async
 			       offset,
 			       size,
@@ -5421,7 +5577,7 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
 	enif_free(bin);
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?	
     }
-    err = clEnqueueReadImage(o_queue->queue, buffer,
+    err = ECL_CALL(clEnqueueReadImage)(o_queue->queue, buffer,
 			     CL_FALSE,
 			     origin,
 			     region,
@@ -5507,7 +5663,7 @@ static ERL_NIF_TERM ecl_enqueue_read_buffer_rect(ErlNifEnv* env, int argc,
 	enif_free(bin);
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
     }
-    err = clEnqueueReadBufferRect(o_queue->queue, buffer,
+    err = ECL_CALL(clEnqueueReadBufferRect)(o_queue->queue, buffer,
 				  CL_FALSE,
 				  buffer_origin,
 				  host_origin,
@@ -5607,7 +5763,7 @@ static ERL_NIF_TERM ecl_enqueue_write_buffer_rect(ErlNifEnv* env, int argc,
     if (bin.size < size) {   // FIXME: handle offset!
 	return enif_make_badarg(env);
     }
-    err = clEnqueueWriteBufferRect(o_queue->queue, buffer,
+    err = ECL_CALL(clEnqueueWriteBufferRect)(o_queue->queue, buffer,
 				   CL_FALSE,
 				   buffer_origin,
 				   host_origin,
@@ -5667,7 +5823,7 @@ static ERL_NIF_TERM ecl_enqueue_fill_buffer(ErlNifEnv* env, int argc,
 
     // Note: pattern must not be retained, it can be freed after this call
     // according to spec.
-    err = clEnqueueFillBuffer(o_queue->queue, buffer,
+    err = ECL_CALL(clEnqueueFillBuffer)(o_queue->queue, buffer,
 			      pattern.data,
 			      pattern.size,
 			      offset,
@@ -5746,7 +5902,7 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     }
 
-    err = clEnqueueWriteImage(o_queue->queue, buffer,
+    err = ECL_CALL(clEnqueueWriteImage)(o_queue->queue, buffer,
 			      !want_event, // FALSE for ASYNC
 			      origin,
 			      region,
@@ -5807,7 +5963,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    err = clEnqueueCopyBuffer(o_queue->queue,
+    err = ECL_CALL(clEnqueueCopyBuffer)(o_queue->queue,
 			      src_buffer,
 			      dst_buffer,
 			      src_offset,
@@ -5887,7 +6043,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_rect(ErlNifEnv* env, int argc,
     if (!(bin = enif_alloc(sizeof(ErlNifBinary))))
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
 
-    err = clEnqueueCopyBufferRect(o_queue->queue,
+    err = ECL_CALL(clEnqueueCopyBufferRect)(o_queue->queue,
 				  src_buffer, dst_buffer,
 				  src_origin, dst_origin,
 				  region,
@@ -5944,7 +6100,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    err = clEnqueueCopyImage(o_queue->queue, src_image, dst_image,
+    err = ECL_CALL(clEnqueueCopyImage)(o_queue->queue, src_image, dst_image,
 			     src_origin,
 			     dst_origin,
 			     region,
@@ -6003,7 +6159,7 @@ static ERL_NIF_TERM ecl_enqueue_fill_image(ErlNifEnv* env, int argc,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
 
-    err = clEnqueueFillImage(o_queue->queue, image,
+    err = ECL_CALL(clEnqueueFillImage)(o_queue->queue, image,
 			     fill_color.data, // validate size etc!
 			     origin,
 			     region,
@@ -6056,7 +6212,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_image_to_buffer(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    err = clEnqueueCopyImageToBuffer(o_queue->queue, 
+    err = ECL_CALL(clEnqueueCopyImageToBuffer)(o_queue->queue, 
 				     src_image,
 				     dst_buffer,
 				     origin,
@@ -6111,7 +6267,7 @@ static ERL_NIF_TERM ecl_enqueue_copy_buffer_to_image(ErlNifEnv* env, int argc,
     if (!get_object_list(env, argv[6], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    err = clEnqueueCopyBufferToImage(o_queue->queue, 
+    err = ECL_CALL(clEnqueueCopyBufferToImage)(o_queue->queue, 
 				     src_buffer,
 				     dst_image,
 				     src_offset,
@@ -6262,7 +6418,7 @@ static ERL_NIF_TERM ecl_enqueue_unmap_mem_object(ErlNifEnv* env, int argc,
 	return enif_make_badarg(env);
     mapped_ptr = 0;  // FIXME!!!!
     
-    err = clEnqueueUnmapMemObject(o_queue->queue, memobj,
+    err = ECL_CALL(clEnqueueUnmapMemObject)(o_queue->queue, memobj,
 				  mapped_ptr,
 				  num_events,
 				  num_events ? wait_list : 0,
@@ -6302,7 +6458,7 @@ static ERL_NIF_TERM ecl_enqueue_migrate_mem_objects(ErlNifEnv* env, int argc,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
 
-    err = clEnqueueMigrateMemObjects(o_queue->queue,
+    err = ECL_CALL(clEnqueueMigrateMemObjects)(o_queue->queue,
 				     num_mem_objects,
 				     num_mem_objects ? mem_objects : NULL,
 				     flags,
@@ -6318,6 +6474,11 @@ static ERL_NIF_TERM ecl_enqueue_migrate_mem_objects(ErlNifEnv* env, int argc,
 }
 #endif
 
+cl_int eclEnqueueBarrier(cl_command_queue queue)
+{
+    return ECL_CALL(clEnqueueBarrierWithWaitList)(queue,0,NULL,NULL);
+}
+
 static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc, 
 					const ERL_NIF_TERM argv[])
 {
@@ -6328,11 +6489,11 @@ static ERL_NIF_TERM ecl_enqueue_barrier(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &command_queue_r, false, &o_queue))
 	return enif_make_badarg(env);
     if(o_queue->version >= 12) {
-	if (!(err = eclEnqueueBarrierWithWaitList(o_queue->queue,0,NULL,NULL))) {
+	if (!(err = eclEnqueueBarrier(o_queue->queue))) {
 	    return ATOM(ok);
 	}
     } else {  // deprecated in 1.2, available in 1.1
-	if (!(err = clEnqueueBarrier(o_queue->queue))) {
+	if (!(err = ECL_CALL(clEnqueueBarrier)(o_queue->queue))) {
 	    return ATOM(ok);
 	}
     }
@@ -6362,9 +6523,9 @@ static ERL_NIF_TERM ecl_enqueue_barrier_with_wait_list(ErlNifEnv* env,
     if (!get_object_list(env, argv[1], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    err = eclEnqueueBarrierWithWaitList(o_queue->queue,num_events,
-					num_events ? wait_list : NULL,
-					want_event ? &event : NULL );
+    err = ECL_CALL(clEnqueueBarrierWithWaitList)(o_queue->queue,num_events,
+						 num_events ? wait_list : NULL,
+						 want_event ? &event : NULL );
     if (!err) {
 	if (want_event) {
 	    ERL_NIF_TERM t;
@@ -6398,9 +6559,9 @@ static ERL_NIF_TERM ecl_enqueue_marker_with_wait_list(ErlNifEnv* env,
     if (!get_object_list(env, argv[1], &event_r, false,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
-    err = eclEnqueueMarkerWithWaitList(o_queue->queue,num_events,
-				       num_events ? wait_list : NULL,
-				       want_event ? &event : NULL );
+    err = ECL_CALL(clEnqueueMarkerWithWaitList)(o_queue->queue,num_events,
+						num_events ? wait_list : NULL,
+						want_event ? &event : NULL );
     if (!err) {
 	if (want_event) {
 	    ERL_NIF_TERM t;
@@ -6549,7 +6710,8 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
     cl_uint          i;
     cl_int           err;
     
-    if ((err = clGetPlatformIDs(MAX_PLATFORMS, platform_id, &num_platforms))) {
+    if ((err = ECL_CALL(clGetPlatformIDs)
+	 (MAX_PLATFORMS, platform_id, &num_platforms))) {
 	*rerr = err;
 	return -1;
     }
@@ -6566,15 +6728,17 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
 	char             version[128];
 	cl_int           ver = -1;
 
-	if(CL_SUCCESS == clGetPlatformInfo(platform_id[i], CL_PLATFORM_VERSION, 64, version, NULL)) {
+	if(CL_SUCCESS == ECL_CALL(clGetPlatformInfo)
+	   (platform_id[i], CL_PLATFORM_VERSION, 64, version, NULL)) {
 	    if((ver = get_version(version)) > ecl->icd_version)
 		ecl->icd_version = ver;
 	}
 	obj = ecl_new(env, &platform_r,platform_id[i],0,ver);
 	ecl->platform[i].o_platform = obj;
 
-	if ((err = clGetDeviceIDs(platform_id[i], CL_DEVICE_TYPE_ALL,
-				  MAX_DEVICES, device_id, &num_devices))) {
+	if ((err = ECL_CALL(clGetDeviceIDs)
+	     (platform_id[i], CL_DEVICE_TYPE_ALL,
+	      MAX_DEVICES, device_id, &num_devices))) {
 	    *rerr = err;
 	    return -1;
 	}
@@ -6582,7 +6746,8 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
 	ecl->platform[i].ndevices = num_devices;
 	for (j = 0; j < num_devices; j++) {
 	    ver = ecl->icd_version;
-	    if(CL_SUCCESS == clGetDeviceInfo(device_id[j], CL_DEVICE_VERSION, 64, version, NULL)) {
+	    if(CL_SUCCESS == ECL_CALL(clGetDeviceInfo)
+	       (device_id[j], CL_DEVICE_VERSION, 64, version, NULL)) {
 		ver = get_version(version);
 	    }
 	    obj = ecl_new(env, &device_r, device_id[j],0, ver);
@@ -6619,6 +6784,10 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 
     DBG("ecl_load: ecl=%p", ecl);
     DBG("ecl_load: ecl->context_list_lock=%p", ecl->context_list_lock);
+
+    // load OpenCL functions
+    if (ecl_load_dynfunctions(ecl) < 0)
+	return -1;
 
     // Load atoms
 
@@ -7153,8 +7322,6 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 	CL_ERROR("ecl_pre_load: error code = %d", err);
     }
 
-    ecl_load_dynfunctions(ecl);
-
     return 0;
 }
 
@@ -7178,20 +7345,47 @@ typedef void * DL_LIB_P;
 # endif
 #endif
 
-static void ecl_load_dynfunctions(ecl_env_t* ecl)
+static int ecl_load_dynfunctions(ecl_env_t* ecl)
 {
     DL_LIB_P handle;
-    if(ecl->icd_version < 12)
-	return;
-    if((handle = dlopen(OPENCL_LIB, RTLD_LAZY))) {
-        eclUnloadPlatformCompiler = dlsym(handle, "clUnloadPlatformCompiler");
-	eclEnqueueMarkerWithWaitList = dlsym(handle, "clEnqueueMarkerWithWaitList");
-	eclEnqueueBarrierWithWaitList = dlsym(handle, "clEnqueueBarrierWithWaitList");
-	eclCreateImage = dlsym(handle, "clCreateImage");
-	return;
+//    if(ecl->icd_version < 12)
+//	return;
+    if ((handle = dlopen(OPENCL_LIB, RTLD_LAZY))) {
+	int i = 0;
+
+	while(ecl_function[i].name != NULL) {
+	    if (ecl_function[i].func != NULL) {
+		fprintf(stderr, "function %s already loaded\r\n",
+			ecl_function[i].name);
+	    }
+	    else {
+		ecl_function[i].func = dlsym(handle, ecl_function[i].name);
+		if (ecl_function[i].func == NULL) {
+		    fprintf(stderr, "unabled to load function %s\r\n",
+			    ecl_function[i].name);
+		}
+		else {
+		    fprintf(stderr, "load function %s/%d.%d @ %p\r\n",
+			    ecl_function[i].name,
+			    ecl_function[i].version / 10,
+			    ecl_function[i].version % 10,
+			    ecl_function[i].func);
+		}
+	    }
+	    i++;
+	}
+	if (ecl_function[i_clCreateImage].func == NULL)
+	    ecl_function[i_clCreateImage].func = e_clCreateImage;
+
+	// patch functions not present or deprecated functions when possible
+	if (ecl->icd_version >= 12) {
+	    ecl_function[i_clCreateImage2D].func = eclCreateImage2D;
+	    ecl_function[i_clCreateImage3D].func = eclCreateImage3D;
+	}
+	return 0;
     }
     fprintf(stderr, "Failed open OpenCL dynamic library\r\n");
-    ecl->icd_version = 11;
+    return -1;
 }
 
 static int ecl_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
