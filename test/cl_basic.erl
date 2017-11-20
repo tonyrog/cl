@@ -1,12 +1,27 @@
 %% Basic tests
 -module(cl_basic).
 
--compile(export_all).
+-export([init_per_suite/1, end_per_suite/1]).
+-export([test/0, ct_test/1, test/1]).
+
+
 -import(lists, [foreach/2]).
 
 -include("../include/cl.hrl").
 
+-spec init_per_suite(Config0::list(tuple())) ->
+                            (Config1::list(tuple())) | 
+                            {skip,Reason::term()} | 
+                            {skip_and_save,Reason::term(),
+			     Config1::list(tuple())}.
+
 init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
+-spec end_per_suite(Config::list(tuple())) -> ok.
+
+end_per_suite(_Config) ->
+    ok.
+
 
 test() ->
     test(all).
@@ -51,6 +66,8 @@ test(DevType) ->
     foreach(fun(Device) ->
 		    test_sampler(E, Device)  end, 
 	    E#cl.devices),
+
+    test_buffer(E),
 
     test_program(E#cl.context, E#cl.devices),
 

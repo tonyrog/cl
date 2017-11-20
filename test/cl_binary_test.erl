@@ -5,9 +5,21 @@
 
 -module(cl_binary_test).
 
--export([test/0, ct_test/1, init_per_suite/1]).
+-export([test/0, ct_test/1, init_per_suite/1, end_per_suite/1]).
+
+-spec init_per_suite(Config0::list(tuple())) ->
+                            (Config1::list(tuple())) | 
+                            {skip,Reason::term()} | 
+                            {skip_and_save,Reason::term(),
+			     Config1::list(tuple())}.
 
 init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
+-spec end_per_suite(Config::list(tuple())) -> ok.
+
+end_per_suite(_Config) ->
+    ok.
+
 
 ct_test(_) ->
     test().

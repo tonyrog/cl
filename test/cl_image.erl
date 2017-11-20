@@ -6,11 +6,33 @@
 %%% Created :  9 May 2014 by Tony Rogvall <tony@rogvall.se>
 
 -module(cl_image).
--compile(export_all).
+
+-export([init_per_suite/1, end_per_suite/1]).
+-export([all/0,
+	 create_image2d_a/1, 
+	 create_image2d_b/1,
+	 create_image2d_c/1,
+	 create_image2d_d/1,
+	 create_image3d_a/1,
+	 create_image3d_b/1,
+	 create_image3d_c/1,
+	 create_image3d_d/1,
+	 pixop/1]).
 
 -include_lib("cl/include/cl.hrl").
 
+-spec init_per_suite(Config0::list(tuple())) ->
+                            (Config1::list(tuple())) | 
+                            {skip,Reason::term()} | 
+                            {skip_and_save,Reason::term(),
+			     Config1::list(tuple())}.
+
 init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
+-spec end_per_suite(Config::list(tuple())) -> ok.
+
+end_per_suite(_Config) ->
+    ok.
     
 
 all() ->

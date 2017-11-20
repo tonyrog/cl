@@ -7,12 +7,29 @@
 
 -module(cl_test).
 
--compile(export_all).
+-export([init_per_suite/1, end_per_suite/1]).
+-export([all/0, ct_test0/1, ct_test1/1]).
+
+-export([test0/0, test0/2]).
+-export([test1/0, test1/2]).
+
 -import(lists, [foreach/2]).
 
 -define(BUFFER_SIZE, 1024*256).
 
+-spec init_per_suite(Config0::list(tuple())) ->
+                            (Config1::list(tuple())) | 
+                            {skip,Reason::term()} | 
+                            {skip_and_save,Reason::term(),
+			     Config1::list(tuple())}.
+
 init_per_suite(Config) -> cl_SUITE:init_per_suite(Config).
+
+-spec end_per_suite(Config::list(tuple())) -> ok.
+
+end_per_suite(_Config) ->
+    ok.
+
 
 all() -> [ct_test0, ct_test1].
 

@@ -61,7 +61,6 @@ typedef cl_bool bool;
 #define ecl_make_sizet(a1,a2) enif_make_ulong(a1,a2)
 #endif
 
-
 #define UNUSED(a) ((void) a)
 
 #include "erl_nif.h"
@@ -2971,6 +2970,7 @@ static size_t ecl_sizeof(ocl_type_t type)
 #if CL_VERSION_1_2 == 1
     case OCL_DEVICE_PARTITION: return sizeof(cl_device_partition_property);
 #endif
+    case OCL_NUM_TYPES:
     default:
 	DBG("info_size: unknown type %d detected", type);
 	return sizeof(cl_int);
@@ -3082,6 +3082,7 @@ static ERL_NIF_TERM make_info_element(ErlNifEnv* env, ocl_type_t type, void* ptr
 	break;
     }
 #endif
+    case OCL_NUM_TYPES:
     default:
 	return ATOM(undefined);
     }
@@ -3219,6 +3220,11 @@ static void* ecl_context_main(void* arg)
 	    DBG("ecl_context_main: %p got sync", self);
 	    m.type = ECL_MESSAGE_SYNC_ACK;
 	    ecl_queue_put(&ctx->obj.env->q, &m);
+	    break;
+
+	case ECL_MESSAGE_SYNC_ACK:
+	    // Should not end up here 
+	    DBG("ecl_context_main: sync ack received");
 	    break;
 
 	case ECL_MESSAGE_STOP: {
@@ -3525,6 +3531,7 @@ static ERL_NIF_TERM ecl_create_sub_devices(ErlNifEnv* env, int argc,
     cl_device_partition_property properties[128];
     size_t num_property =  128-1;
     cl_int err;
+    UNUSED(argc);
 
     // fixme calc length of properties !
     if (!get_ecl_object(env, argv[0], &device_r, false, &d))
@@ -3864,6 +3871,12 @@ cl_mem e_clCreateImage(cl_context context,
 		       void* host_ptr,
 		       cl_int* errcode_ret)
 {
+    UNUSED(context);
+    UNUSED(flags);
+    UNUSED(image_format);
+    UNUSED(image_desc);
+    UNUSED(host_ptr);
+
     *errcode_ret = CL_INVALID_OPERATION;
     return NULL;
 }
@@ -5081,6 +5094,8 @@ static ERL_NIF_TERM ecl_set_kernel_arg(ErlNifEnv* env, int argc,
 		case OCL_PROGRAM:
 		case OCL_COMMAND_QUEUE:
 		case OCL_IMAGE_FORMAT:
+		case OCL_DEVICE_PARTITION:
+		case OCL_NUM_TYPES:
 		default:
 		    return enif_make_badarg(env);
 		}
@@ -7361,15 +7376,19 @@ static int ecl_load_dynfunctions(ecl_env_t* ecl)
 	    else {
 		ecl_function[i].func = dlsym(handle, ecl_function[i].name);
 		if (ecl_function[i].func == NULL) {
+#ifdef DEBUG
 		    fprintf(stderr, "unabled to load function %s\r\n",
 			    ecl_function[i].name);
+#endif
 		}
 		else {
+#ifdef DEBUG
 		    fprintf(stderr, "load function %s/%d.%d @ %p\r\n",
 			    ecl_function[i].name,
 			    ecl_function[i].version / 10,
 			    ecl_function[i].version % 10,
 			    ecl_function[i].func);
+#endif
 		}
 	    }
 	    i++;
