@@ -3249,6 +3249,7 @@ static void* ecl_context_main(void* arg)
 	    if (m.env) {
 		ERL_NIF_TERM reply;
 		int res;
+		UNUSED(res);
 		reply = !err ? ATOM(ok) : ecl_make_error(m.env, err);
 		res = enif_send(0, &m.sender, m.env, 
 				enif_make_tuple3(m.env, 
@@ -3270,7 +3271,7 @@ static void* ecl_context_main(void* arg)
 	    if (m.env) {
 		int res;
 		ERL_NIF_TERM reply;
-
+		UNUSED(res);
 		reply = !err ? ATOM(ok) : ecl_make_error(m.env, err);
 		res = enif_send(0, &m.sender, m.env, 
 				enif_make_tuple3(m.env, 
@@ -3295,7 +3296,8 @@ static void* ecl_context_main(void* arg)
 	    if (m.env) {
 		ERL_NIF_TERM reply;
 		int res;
-
+		
+		UNUSED(res);
 		if (!err) {
 		    cl_int status;
 		    // read status COMPLETE | ERROR
