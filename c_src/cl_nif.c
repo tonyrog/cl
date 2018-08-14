@@ -3866,7 +3866,7 @@ static int get_image_desc(ErlNifEnv* env, ERL_NIF_TERM arg,
 }
 
 // 1.0, 1,1 wrapper where clCreateImage
-cl_mem e_clCreateImage(cl_context context,
+cl_mem CL_CALLBACK e_clCreateImage(cl_context context,
 		       cl_mem_flags flags,
 		       const cl_image_format image_format,
 		       const cl_image_desc* image_desc, 
@@ -3884,7 +3884,7 @@ cl_mem e_clCreateImage(cl_context context,
 }
 
 // 1.2 -> 1.0 wrapper: clCreateImage2D using clCreateImage
-cl_mem eclCreateImage2D(cl_context context,
+cl_mem CL_CALLBACK eclCreateImage2D(cl_context context,
 			 cl_mem_flags mem_flags,
 			 const cl_image_format * format,
 			 size_t width,
@@ -3966,7 +3966,7 @@ static ERL_NIF_TERM ecl_create_image2d(ErlNifEnv* env, int argc,
 }
 
 // 1.2 -> 1.1 wrapper: clCreateImage3D using clCreateImage
-cl_mem eclCreateImage3D(cl_context context,
+cl_mem CL_CALLBACK eclCreateImage3D(cl_context context,
 			cl_mem_flags mem_flags,
 			const cl_image_format* format,
 			size_t width, 
@@ -5222,7 +5222,7 @@ static ERL_NIF_TERM ecl_get_kernel_arg_info(ErlNifEnv* env, int argc,
     if (!enif_get_uint(env, argv[1], &arg_index))
 	return enif_make_badarg(env);
     return make_object_info2(env, argv[2], o_kernel,
-			     (void*) (unsigned long) arg_index,
+			     (void*) (size_t) arg_index,
 			     (info2_fn_t*) ECL_FUNC_PTR(clGetKernelArgInfo),
 			     arg_info,
 			     sizeof_array(arg_info));
@@ -5338,7 +5338,7 @@ static ERL_NIF_TERM ecl_enqueue_nd_range_kernel(ErlNifEnv* env, int argc,
 }
 
 // 1.2 -> 1.1 wrapper: clEnqueueMarkerWithWaitList implement clEnqueueMarker
-cl_int eclEnqueueMarker(cl_command_queue queue,
+cl_int CL_CALLBACK eclEnqueueMarker(cl_command_queue queue,
 			cl_event * event)
 {
     return ECL_CALL(clEnqueueMarkerWithWaitList)(queue,0, NULL,event);
@@ -5368,7 +5368,7 @@ static ERL_NIF_TERM ecl_enqueue_marker(ErlNifEnv* env, int argc,
 }
 
 // 1.2 -> 1.1 wrapper: clEnqueueMarkerWithWaitList implement clEnqueueWaitForEvents
-cl_int eclEnqueueWaitForEvents(cl_command_queue queue,
+cl_int CL_CALLBACK eclEnqueueWaitForEvents(cl_command_queue queue,
 			       cl_uint num_events,
 			       const cl_event * event_list)
 {
@@ -7351,6 +7351,7 @@ void * dlsym(HMODULE Lib, const char *func) {
 }
 
 HMODULE dlopen(const CHAR *DLL, int unused) {
+  UNUSED(unused);
   return LoadLibrary(DLL);
 }
 #else
