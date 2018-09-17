@@ -232,6 +232,7 @@ typedef struct {
     bool           is_array;    // return type is a vector of data
     ocl_type_t     info_type;   // info data type
     void*          extern_info; // Encode/Decode enum/bitfields
+    size_t         def_size;    // Def size in bytes (if == 0 query driver)
 } ecl_info_t;
 
 typedef enum {
@@ -1627,121 +1628,121 @@ DECL_ATOM(device_integrated_memory_nv);
 // Map device info index 0...N => cl_device_info x Data type
 ecl_info_t device_info[] = 
 {
-    { &ATOM(type), CL_DEVICE_TYPE, false, OCL_DEVICE_TYPE, kv_device_type },
-    { &ATOM(vendor_id), CL_DEVICE_VENDOR_ID, false, OCL_UINT, 0 },
-    { &ATOM(max_compute_units), CL_DEVICE_MAX_COMPUTE_UNITS, false, OCL_UINT, 0 },
-    { &ATOM(max_work_item_dimensions), CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, false, OCL_UINT, 0 },
-    { &ATOM(max_work_group_size), CL_DEVICE_MAX_WORK_GROUP_SIZE, false, OCL_SIZE, 0 },
-    { &ATOM(max_work_item_sizes), CL_DEVICE_MAX_WORK_ITEM_SIZES, true, OCL_SIZE, 0 },
-    { &ATOM(preferred_vector_width_char), CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR, false, OCL_UINT, 0 },
-    { &ATOM(preferred_vector_width_short), CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT, false, OCL_UINT,  0 },
-    { &ATOM(preferred_vector_width_int), CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT, false, OCL_UINT, 0 },
-    { &ATOM(preferred_vector_width_long), CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG, false,OCL_UINT, 0 },
-    { &ATOM(preferred_vector_width_float), CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, false, OCL_UINT, 0 },
-    { &ATOM(preferred_vector_width_double), CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE, false, OCL_UINT, 0 },
-    { &ATOM(max_clock_frequency), CL_DEVICE_MAX_CLOCK_FREQUENCY, false, OCL_UINT, 0 },
-    { &ATOM(address_bits), CL_DEVICE_ADDRESS_BITS, false, OCL_UINT, 0 },
-    { &ATOM(max_read_image_args), CL_DEVICE_MAX_READ_IMAGE_ARGS, false, OCL_UINT, 0 },
-    { &ATOM(max_write_image_args), CL_DEVICE_MAX_WRITE_IMAGE_ARGS, false, OCL_UINT, 0 },
-    { &ATOM(max_mem_alloc_size), CL_DEVICE_MAX_MEM_ALLOC_SIZE, false, OCL_ULONG, 0 },
-    { &ATOM(image2d_max_width), CL_DEVICE_IMAGE2D_MAX_WIDTH, false, OCL_SIZE, 0 },
-    { &ATOM(image2d_max_height), CL_DEVICE_IMAGE2D_MAX_HEIGHT, false, OCL_SIZE, 0 },
-    { &ATOM(image3d_max_width), CL_DEVICE_IMAGE3D_MAX_WIDTH, false, OCL_SIZE, 0 },
-    { &ATOM(image3d_max_height), CL_DEVICE_IMAGE3D_MAX_HEIGHT, false, OCL_SIZE, 0 },
-    { &ATOM(image3d_max_depth), CL_DEVICE_IMAGE3D_MAX_DEPTH, false, OCL_SIZE, 0 },
-    { &ATOM(image_support), CL_DEVICE_IMAGE_SUPPORT, false, OCL_BOOL, 0 },
-    { &ATOM(max_parameter_size), CL_DEVICE_MAX_PARAMETER_SIZE, false, OCL_SIZE, 0 },
-    { &ATOM(max_samplers), CL_DEVICE_MAX_SAMPLERS, false, OCL_UINT, 0 },
-     { &ATOM(mem_base_addr_align), CL_DEVICE_MEM_BASE_ADDR_ALIGN, false, OCL_UINT, 0 },
-    { &ATOM(min_data_type_align_size), CL_DEVICE_MIN_DATA_TYPE_ALIGN_SIZE, false, OCL_UINT, 0 },
-    { &ATOM(single_fp_config), CL_DEVICE_SINGLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
-    { &ATOM(global_mem_cache_type), CL_DEVICE_GLOBAL_MEM_CACHE_TYPE, false, OCL_DEVICE_GLOBAL_MEM_CACHE_TYPE, kv_mem_cache_type },
-    { &ATOM(global_mem_cacheline_size), CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, false, OCL_UINT, 0 },
-    { &ATOM(global_mem_cache_size), CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, false, OCL_ULONG, 0 },
-    { &ATOM(global_mem_size), CL_DEVICE_GLOBAL_MEM_SIZE, false, OCL_ULONG, 0 },
-    { &ATOM(max_constant_buffer_size), CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE,  false, OCL_ULONG, 0 },
-    { &ATOM(max_constant_args), CL_DEVICE_MAX_CONSTANT_ARGS, false, OCL_UINT, 0 },
-    { &ATOM(local_mem_type), CL_DEVICE_LOCAL_MEM_TYPE, false, OCL_DEVICE_LOCAL_MEM_TYPE, kv_local_mem_type },
-    { &ATOM(local_mem_size), CL_DEVICE_LOCAL_MEM_SIZE,  false, OCL_ULONG, 0 },
-    { &ATOM(error_correction_support), CL_DEVICE_ERROR_CORRECTION_SUPPORT, false,  OCL_BOOL, 0 },
-    { &ATOM(profiling_timer_resolution), CL_DEVICE_PROFILING_TIMER_RESOLUTION, false,  OCL_SIZE, 0 },
-    { &ATOM(endian_little), CL_DEVICE_ENDIAN_LITTLE, false, OCL_BOOL, 0},
-    { &ATOM(available), CL_DEVICE_AVAILABLE,  false, OCL_BOOL, 0 },
-    { &ATOM(compiler_available), CL_DEVICE_COMPILER_AVAILABLE, false, OCL_BOOL, 0 },
-    { &ATOM(execution_capabilities), CL_DEVICE_EXECUTION_CAPABILITIES, false, OCL_DEVICE_EXEC_CAPABILITIES, kv_exec_capabilities },
-    { &ATOM(queue_properties), CL_DEVICE_QUEUE_PROPERTIES, false, OCL_QUEUE_PROPERTIES, kv_command_queue_properties },
-    { &ATOM(name), CL_DEVICE_NAME, false, OCL_STRING, 0 }, 
-    { &ATOM(vendor), CL_DEVICE_VENDOR, false, OCL_STRING, 0 }, 
-    { &ATOM(driver_version), CL_DRIVER_VERSION, false, OCL_STRING, 0 },
-    { &ATOM(profile), CL_DEVICE_PROFILE, false, OCL_STRING, 0 },
-    { &ATOM(version), CL_DEVICE_VERSION, false, OCL_STRING, 0 },
-    { &ATOM(extensions), CL_DEVICE_EXTENSIONS, false, OCL_STRING, 0 },
-    { &ATOM(platform), CL_DEVICE_PLATFORM, false, OCL_PLATFORM, 0 },
+    { &ATOM(type), CL_DEVICE_TYPE, false, OCL_DEVICE_TYPE, kv_device_type, 0 },
+    { &ATOM(vendor_id), CL_DEVICE_VENDOR_ID, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_compute_units), CL_DEVICE_MAX_COMPUTE_UNITS, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_work_item_dimensions), CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_work_group_size), CL_DEVICE_MAX_WORK_GROUP_SIZE, false, OCL_SIZE, 0, 0 },
+    { &ATOM(max_work_item_sizes), CL_DEVICE_MAX_WORK_ITEM_SIZES, true, OCL_SIZE, 0, 0 },
+    { &ATOM(preferred_vector_width_char), CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR, false, OCL_UINT, 0, 0 },
+    { &ATOM(preferred_vector_width_short), CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT, false, OCL_UINT,  0, 0 },
+    { &ATOM(preferred_vector_width_int), CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT, false, OCL_UINT, 0, 0 },
+    { &ATOM(preferred_vector_width_long), CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG, false,OCL_UINT, 0, 0 },
+    { &ATOM(preferred_vector_width_float), CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, false, OCL_UINT, 0, 0 },
+    { &ATOM(preferred_vector_width_double), CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_clock_frequency), CL_DEVICE_MAX_CLOCK_FREQUENCY, false, OCL_UINT, 0, 0 },
+    { &ATOM(address_bits), CL_DEVICE_ADDRESS_BITS, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_read_image_args), CL_DEVICE_MAX_READ_IMAGE_ARGS, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_write_image_args), CL_DEVICE_MAX_WRITE_IMAGE_ARGS, false, OCL_UINT, 0, 0 },
+    { &ATOM(max_mem_alloc_size), CL_DEVICE_MAX_MEM_ALLOC_SIZE, false, OCL_ULONG, 0, 0 },
+    { &ATOM(image2d_max_width), CL_DEVICE_IMAGE2D_MAX_WIDTH, false, OCL_SIZE, 0, 0 },
+    { &ATOM(image2d_max_height), CL_DEVICE_IMAGE2D_MAX_HEIGHT, false, OCL_SIZE, 0, 0 },
+    { &ATOM(image3d_max_width), CL_DEVICE_IMAGE3D_MAX_WIDTH, false, OCL_SIZE, 0, 0 },
+    { &ATOM(image3d_max_height), CL_DEVICE_IMAGE3D_MAX_HEIGHT, false, OCL_SIZE, 0, 0 },
+    { &ATOM(image3d_max_depth), CL_DEVICE_IMAGE3D_MAX_DEPTH, false, OCL_SIZE, 0, 0 },
+    { &ATOM(image_support), CL_DEVICE_IMAGE_SUPPORT, false, OCL_BOOL, 0, 0 },
+    { &ATOM(max_parameter_size), CL_DEVICE_MAX_PARAMETER_SIZE, false, OCL_SIZE, 0, 0 },
+    { &ATOM(max_samplers), CL_DEVICE_MAX_SAMPLERS, false, OCL_UINT, 0, 0 },
+    { &ATOM(mem_base_addr_align), CL_DEVICE_MEM_BASE_ADDR_ALIGN, false, OCL_UINT, 0, 0 },
+    { &ATOM(min_data_type_align_size), CL_DEVICE_MIN_DATA_TYPE_ALIGN_SIZE, false, OCL_UINT, 0, 0 },
+    { &ATOM(single_fp_config), CL_DEVICE_SINGLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config, 0 },
+    { &ATOM(global_mem_cache_type), CL_DEVICE_GLOBAL_MEM_CACHE_TYPE, false, OCL_DEVICE_GLOBAL_MEM_CACHE_TYPE, kv_mem_cache_type, 0 },
+    { &ATOM(global_mem_cacheline_size), CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, false, OCL_UINT, 0, 0 },
+    { &ATOM(global_mem_cache_size), CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, false, OCL_ULONG, 0, 0 },
+    { &ATOM(global_mem_size), CL_DEVICE_GLOBAL_MEM_SIZE, false, OCL_ULONG, 0, 0 },
+    { &ATOM(max_constant_buffer_size), CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE,  false, OCL_ULONG, 0, 0 },
+    { &ATOM(max_constant_args), CL_DEVICE_MAX_CONSTANT_ARGS, false, OCL_UINT, 0, 0 },
+    { &ATOM(local_mem_type), CL_DEVICE_LOCAL_MEM_TYPE, false, OCL_DEVICE_LOCAL_MEM_TYPE, kv_local_mem_type, 0 },
+    { &ATOM(local_mem_size), CL_DEVICE_LOCAL_MEM_SIZE,  false, OCL_ULONG, 0, 0 },
+    { &ATOM(error_correction_support), CL_DEVICE_ERROR_CORRECTION_SUPPORT, false,  OCL_BOOL, 0, 0 },
+    { &ATOM(profiling_timer_resolution), CL_DEVICE_PROFILING_TIMER_RESOLUTION, false,  OCL_SIZE, 0, 0 },
+    { &ATOM(endian_little), CL_DEVICE_ENDIAN_LITTLE, false, OCL_BOOL, 0, 0 },
+    { &ATOM(available), CL_DEVICE_AVAILABLE,  false, OCL_BOOL, 0, 0 },
+    { &ATOM(compiler_available), CL_DEVICE_COMPILER_AVAILABLE, false, OCL_BOOL, 0, 0 },
+    { &ATOM(execution_capabilities), CL_DEVICE_EXECUTION_CAPABILITIES, false, OCL_DEVICE_EXEC_CAPABILITIES, kv_exec_capabilities, 0 },
+    { &ATOM(queue_properties), CL_DEVICE_QUEUE_PROPERTIES, false, OCL_QUEUE_PROPERTIES, kv_command_queue_properties, 0 },
+    { &ATOM(name), CL_DEVICE_NAME, false, OCL_STRING, 0, 0 },
+    { &ATOM(vendor), CL_DEVICE_VENDOR, false, OCL_STRING, 0, 0 },
+    { &ATOM(driver_version), CL_DRIVER_VERSION, false, OCL_STRING, 0, 0 },
+    { &ATOM(profile), CL_DEVICE_PROFILE, false, OCL_STRING, 0, 0 },
+    { &ATOM(version), CL_DEVICE_VERSION, false, OCL_STRING, 0, 0 },
+    { &ATOM(extensions), CL_DEVICE_EXTENSIONS, false, OCL_STRING, 0, 0 },
+    { &ATOM(platform), CL_DEVICE_PLATFORM, false, OCL_PLATFORM, 0, 0 },
 #if CL_VERSION_1_1 == 1
-    { &ATOM(preferred_vector_width_half), CL_DEVICE_PREFERRED_VECTOR_WIDTH_HALF,false, OCL_UINT, 0},
-    { &ATOM(host_unified_memory), CL_DEVICE_HOST_UNIFIED_MEMORY,false,OCL_BOOL,0},
-    { &ATOM(native_vector_width_char), CL_DEVICE_NATIVE_VECTOR_WIDTH_CHAR,false,OCL_UINT, 0},
-    { &ATOM(native_vector_width_short), CL_DEVICE_NATIVE_VECTOR_WIDTH_SHORT,false,OCL_UINT, 0},
-    { &ATOM(native_vector_width_int), CL_DEVICE_NATIVE_VECTOR_WIDTH_INT,false,OCL_UINT, 0},
-    { &ATOM(native_vector_width_long), CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG,false,OCL_UINT, 0},
-    { &ATOM(native_vector_width_float), CL_DEVICE_NATIVE_VECTOR_WIDTH_FLOAT,false,OCL_UINT, 0},
-    { &ATOM(native_vector_width_double), CL_DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE,false,OCL_UINT, 0},
-    { &ATOM(native_vector_width_half), CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF,false,OCL_UINT, 0},
-    { &ATOM(opencl_c_version), CL_DEVICE_OPENCL_C_VERSION,false,OCL_STRING, 0},
+    { &ATOM(preferred_vector_width_half), CL_DEVICE_PREFERRED_VECTOR_WIDTH_HALF,false, OCL_UINT, 0, 0 },
+    { &ATOM(host_unified_memory), CL_DEVICE_HOST_UNIFIED_MEMORY,false,OCL_BOOL,0, 0},
+    { &ATOM(native_vector_width_char), CL_DEVICE_NATIVE_VECTOR_WIDTH_CHAR,false,OCL_UINT, 0, 0},
+    { &ATOM(native_vector_width_short), CL_DEVICE_NATIVE_VECTOR_WIDTH_SHORT,false,OCL_UINT, 0, 0},
+    { &ATOM(native_vector_width_int), CL_DEVICE_NATIVE_VECTOR_WIDTH_INT,false,OCL_UINT, 0, 0},
+    { &ATOM(native_vector_width_long), CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG,false,OCL_UINT, 0, 0},
+    { &ATOM(native_vector_width_float), CL_DEVICE_NATIVE_VECTOR_WIDTH_FLOAT,false,OCL_UINT, 0, 0},
+    { &ATOM(native_vector_width_double), CL_DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE,false,OCL_UINT, 0, 0},
+    { &ATOM(native_vector_width_half), CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF,false,OCL_UINT, 0, 0},
+    { &ATOM(opencl_c_version), CL_DEVICE_OPENCL_C_VERSION,false,OCL_STRING, 0, 0},
 #endif
     // cl_khr_fp64 extension || CL_VERSION_1_2 == 1
 #if CL_DEVICE_DOUBLE_FP_CONFIG
-    { &ATOM(double_fp_config), CL_DEVICE_DOUBLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
+    { &ATOM(double_fp_config), CL_DEVICE_DOUBLE_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config, 0 },
 #endif
     // cl_khr_fp16 extension || CL_VERSION_1_2 == 1
 #if CL_DEVICE_HALF_FP_CONFIG
-    { &ATOM(half_fp_config), CL_DEVICE_HALF_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config },
+    { &ATOM(half_fp_config), CL_DEVICE_HALF_FP_CONFIG, false, OCL_DEVICE_FP_CONFIG, kv_fp_config, 0 },
 #endif
 #if CL_VERSION_1_2 == 1
-    { &ATOM(linker_available), CL_DEVICE_LINKER_AVAILABLE,false,OCL_BOOL, 0},
-    { &ATOM(built_in_kernels), CL_DEVICE_BUILT_IN_KERNELS,false, OCL_STRING, 0},
-    { &ATOM(image_max_buffer_size), CL_DEVICE_IMAGE_MAX_BUFFER_SIZE,false,OCL_SIZE, 0},
-    { &ATOM(image_max_array_size), CL_DEVICE_IMAGE_MAX_ARRAY_SIZE,false,OCL_SIZE, 0},
-    { &ATOM(parent_device), CL_DEVICE_PARENT_DEVICE,false,OCL_DEVICE, 0},
-    { &ATOM(partition_max_sub_devices), CL_DEVICE_PARTITION_MAX_SUB_DEVICES,false,OCL_SIZE, 0},
+    { &ATOM(linker_available), CL_DEVICE_LINKER_AVAILABLE,false,OCL_BOOL, 0, 0},
+    { &ATOM(built_in_kernels), CL_DEVICE_BUILT_IN_KERNELS,false, OCL_STRING, 0, 0},
+    { &ATOM(image_max_buffer_size), CL_DEVICE_IMAGE_MAX_BUFFER_SIZE,false,OCL_SIZE, 0, 0},
+    { &ATOM(image_max_array_size), CL_DEVICE_IMAGE_MAX_ARRAY_SIZE,false,OCL_SIZE, 0, 0},
+    { &ATOM(parent_device), CL_DEVICE_PARENT_DEVICE,false,OCL_DEVICE, 0, 0},
+    { &ATOM(partition_max_sub_devices), CL_DEVICE_PARTITION_MAX_SUB_DEVICES,false,OCL_SIZE, 0, 0},
     { &ATOM(partition_properties), CL_DEVICE_PARTITION_PROPERTIES,true,
-      OCL_ENUM, kv_device_partition_property },
+      OCL_ENUM, kv_device_partition_property, 0},
 
-    { &ATOM(partition_affinity_domain), CL_DEVICE_PARTITION_AFFINITY_DOMAIN,false,OCL_ENUM, kv_device_affinity_domain },
+    { &ATOM(partition_affinity_domain), CL_DEVICE_PARTITION_AFFINITY_DOMAIN,false,OCL_ENUM, kv_device_affinity_domain, 0 },
 
-    { &ATOM(partition_type), CL_DEVICE_PARTITION_TYPE, false, OCL_DEVICE_PARTITION, 0},
-    { &ATOM(reference_count), CL_DEVICE_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(preferred_interop_user_sync), CL_DEVICE_PREFERRED_INTEROP_USER_SYNC,false, OCL_BOOL, 0},
-    { &ATOM(printf_buffer_size), CL_DEVICE_PRINTF_BUFFER_SIZE,false, OCL_SIZE, 0 },
+    { &ATOM(partition_type), CL_DEVICE_PARTITION_TYPE, false, OCL_DEVICE_PARTITION, 0, 0},
+    { &ATOM(reference_count), CL_DEVICE_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(preferred_interop_user_sync), CL_DEVICE_PREFERRED_INTEROP_USER_SYNC,false, OCL_BOOL, 0, 0},
+    { &ATOM(printf_buffer_size), CL_DEVICE_PRINTF_BUFFER_SIZE,false, OCL_SIZE, 0, 0 },
 #ifdef CL_DEVICE_IMAGE_PITCH_ALIGNMENT
-    { &ATOM(image_pitch_alignment), CL_DEVICE_IMAGE_PITCH_ALIGNMENT, false, OCL_SIZE, 0 },
+    { &ATOM(image_pitch_alignment), CL_DEVICE_IMAGE_PITCH_ALIGNMENT, false, OCL_SIZE, 0, 0 },
 #endif
 #ifdef CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT
-    { &ATOM(image_base_address_alignment), CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT, false, OCL_SIZE, 0 },
+    { &ATOM(image_base_address_alignment), CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT, false, OCL_SIZE, 0, 0 },
 #endif
 #endif
 
     // cl_nv_device_attribute_query extension
 #ifdef CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV
-    { &ATOM(compute_capability_major_nv), CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV, false, OCL_UINT, 0},
+    { &ATOM(compute_capability_major_nv), CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV, false, OCL_UINT, 0, 0},
 #endif
 #ifdef CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV
-    { &ATOM(compute_capability_minor_nv), CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV, false, OCL_UINT, 0},
+    { &ATOM(compute_capability_minor_nv), CL_DEVICE_COMPUTE_CAPABILITY_MINOR_NV, false, OCL_UINT, 0, 0},
 #endif
 #ifdef CL_DEVICE_REGISTERS_PER_BLOCK_NV
-    { &ATOM(registers_per_block_nv),CL_DEVICE_REGISTERS_PER_BLOCK_NV, false, OCL_UINT, 0},
+    { &ATOM(registers_per_block_nv),CL_DEVICE_REGISTERS_PER_BLOCK_NV, false, OCL_UINT, 0, 0},
 #endif
 #ifdef CL_DEVICE_WARP_SIZE_NV
-    { &ATOM(warp_size_nv),CL_DEVICE_WARP_SIZE_NV, false, OCL_UINT, 0},
+    { &ATOM(warp_size_nv),CL_DEVICE_WARP_SIZE_NV, false, OCL_UINT, 0, 0},
 #endif
 #ifdef CL_DEVICE_GPU_OVERLAP_NV
-    { &ATOM(gpu_overlap_nv),CL_DEVICE_GPU_OVERLAP_NV, false, OCL_BOOL, 0},
+    { &ATOM(gpu_overlap_nv),CL_DEVICE_GPU_OVERLAP_NV, false, OCL_BOOL, 0, 0},
 #endif
 #ifdef CL_DEVICE_KERNEL_EXEC_TIMEOUT_NV
-    { &ATOM(kernel_exec_timeout_nv), CL_DEVICE_KERNEL_EXEC_TIMEOUT_NV, false, OCL_BOOL, 0},
+    { &ATOM(kernel_exec_timeout_nv), CL_DEVICE_KERNEL_EXEC_TIMEOUT_NV, false, OCL_BOOL, 0, 0},
 #endif
 #ifdef CL_DEVICE_INTEGRATED_MEMORY_NV
-    { &ATOM(device_integrated_memory_nv),CL_DEVICE_INTEGRATED_MEMORY_NV, false, OCL_BOOL, 0},
+    { &ATOM(device_integrated_memory_nv),CL_DEVICE_INTEGRATED_MEMORY_NV, false, OCL_BOOL, 0, 0},
 #endif
 
 };
@@ -1749,105 +1750,105 @@ ecl_info_t device_info[] =
 // Map device info index 0...N => cl_device_info x Data type
 ecl_info_t platform_info[] = 
 {
-    { &ATOM(profile), CL_PLATFORM_PROFILE, false, OCL_STRING, 0 },
-    { &ATOM(version), CL_PLATFORM_VERSION, false, OCL_STRING, 0 },
-    { &ATOM(name),    CL_PLATFORM_NAME,    false, OCL_STRING, 0 },
-    { &ATOM(vendor),  CL_PLATFORM_VENDOR,  false, OCL_STRING, 0 },
-    { &ATOM(extensions), CL_PLATFORM_EXTENSIONS, false, OCL_STRING, 0}
+    { &ATOM(profile), CL_PLATFORM_PROFILE, false, OCL_STRING, 0, 0 },
+    { &ATOM(version), CL_PLATFORM_VERSION, false, OCL_STRING, 0, 0 },
+    { &ATOM(name),    CL_PLATFORM_NAME,    false, OCL_STRING, 0, 0 },
+    { &ATOM(vendor),  CL_PLATFORM_VENDOR,  false, OCL_STRING, 0, 0 },
+    { &ATOM(extensions), CL_PLATFORM_EXTENSIONS, false, OCL_STRING, 0, 0 }
 };
 
 ecl_info_t context_info[] =
 {
-    { &ATOM(reference_count), CL_CONTEXT_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(devices), CL_CONTEXT_DEVICES, true, OCL_DEVICE, 0 },
-    { &ATOM(properties), CL_CONTEXT_PROPERTIES, true, OCL_INT, 0 }
+    { &ATOM(reference_count), CL_CONTEXT_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(devices), CL_CONTEXT_DEVICES, true, OCL_DEVICE, 0, 0 },
+    { &ATOM(properties), CL_CONTEXT_PROPERTIES, true, OCL_INT, 0, 0 }
 };
 
 ecl_info_t queue_info[] = 
 {
-    { &ATOM(context), CL_QUEUE_CONTEXT, false, OCL_CONTEXT, 0 },
-    { &ATOM(device),  CL_QUEUE_DEVICE, false, OCL_DEVICE, 0 },
-    { &ATOM(reference_count), CL_QUEUE_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(properties), CL_QUEUE_PROPERTIES, false, OCL_QUEUE_PROPERTIES, kv_command_queue_properties }
+    { &ATOM(context), CL_QUEUE_CONTEXT, false, OCL_CONTEXT, 0, 0 },
+    { &ATOM(device),  CL_QUEUE_DEVICE, false, OCL_DEVICE, 0, 0 },
+    { &ATOM(reference_count), CL_QUEUE_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(properties), CL_QUEUE_PROPERTIES, false, OCL_QUEUE_PROPERTIES, kv_command_queue_properties, 0 }
 };
 
 ecl_info_t mem_info[] =
 {
-    { &ATOM(object_type), CL_MEM_TYPE, false, OCL_MEM_OBJECT_TYPE, kv_mem_object_type },
-    { &ATOM(flags), CL_MEM_FLAGS, false, OCL_MEM_FLAGS, kv_mem_flags },
-    { &ATOM(size),  CL_MEM_SIZE,  false, OCL_SIZE, 0 },
+    { &ATOM(object_type), CL_MEM_TYPE, false, OCL_MEM_OBJECT_TYPE, kv_mem_object_type, 0 },
+    { &ATOM(flags), CL_MEM_FLAGS, false, OCL_MEM_FLAGS, kv_mem_flags, 0 },
+    { &ATOM(size),  CL_MEM_SIZE,  false, OCL_SIZE, 0, 0 },
     // FIXME: pointer!! map it (binary resource?)
-    { &ATOM(host_ptr), CL_MEM_HOST_PTR, false, OCL_POINTER, 0 }, 
-    { &ATOM(map_count), CL_MEM_MAP_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(reference_count), CL_MEM_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(context), CL_MEM_CONTEXT, false, OCL_CONTEXT, 0 }
+    { &ATOM(host_ptr), CL_MEM_HOST_PTR, false, OCL_POINTER, 0, 0 }, 
+    { &ATOM(map_count), CL_MEM_MAP_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(reference_count), CL_MEM_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(context), CL_MEM_CONTEXT, false, OCL_CONTEXT, 0, 0 }
 };
 
 ecl_info_t image_info[] =
 {
-    { &ATOM(format), CL_IMAGE_FORMAT, false, OCL_IMAGE_FORMAT, 0 },
-    { &ATOM(element_size), CL_IMAGE_ELEMENT_SIZE, false, OCL_SIZE, 0 },
-    { &ATOM(row_pitch),  CL_IMAGE_ROW_PITCH,  false, OCL_SIZE, 0 },
-    { &ATOM(slice_pitch), CL_IMAGE_SLICE_PITCH, false, OCL_SIZE, 0 },
-    { &ATOM(width), CL_IMAGE_WIDTH, false, OCL_SIZE, 0 },
-    { &ATOM(height), CL_IMAGE_HEIGHT, false, OCL_SIZE, 0 },
-    { &ATOM(depth), CL_IMAGE_DEPTH, false, OCL_SIZE, 0 }
+    { &ATOM(format), CL_IMAGE_FORMAT, false, OCL_IMAGE_FORMAT, 0, 0 },
+    { &ATOM(element_size), CL_IMAGE_ELEMENT_SIZE, false, OCL_SIZE, 0, 0 },
+    { &ATOM(row_pitch),  CL_IMAGE_ROW_PITCH,  false, OCL_SIZE, 0, 0 },
+    { &ATOM(slice_pitch), CL_IMAGE_SLICE_PITCH, false, OCL_SIZE, 0, 0 },
+    { &ATOM(width), CL_IMAGE_WIDTH, false, OCL_SIZE, 0, 0 },
+    { &ATOM(height), CL_IMAGE_HEIGHT, false, OCL_SIZE, 0, 0 },
+    { &ATOM(depth), CL_IMAGE_DEPTH, false, OCL_SIZE, 0, 0 }
 };
 
 ecl_info_t sampler_info[] = 
 {
-    { &ATOM(reference_count), CL_SAMPLER_REFERENCE_COUNT, false, OCL_UINT, 0},
-    { &ATOM(context), CL_SAMPLER_CONTEXT, false,  OCL_CONTEXT, 0 },
-    { &ATOM(normalized_coords), CL_SAMPLER_NORMALIZED_COORDS, false, OCL_BOOL, 0 },
-    {  &ATOM(addressing_mode), CL_SAMPLER_ADDRESSING_MODE, false, OCL_SAMPLER_ADDRESSING_MODE, kv_addressing_mode },
-    { &ATOM(filter_mode), CL_SAMPLER_FILTER_MODE, false, OCL_SAMPLER_FILTER_MODE, kv_filter_mode }
+    { &ATOM(reference_count), CL_SAMPLER_REFERENCE_COUNT, false, OCL_UINT, 0, 0},
+    { &ATOM(context), CL_SAMPLER_CONTEXT, false,  OCL_CONTEXT, 0, 0 },
+    { &ATOM(normalized_coords), CL_SAMPLER_NORMALIZED_COORDS, false, OCL_BOOL, 0, 0 },
+    {  &ATOM(addressing_mode), CL_SAMPLER_ADDRESSING_MODE, false, OCL_SAMPLER_ADDRESSING_MODE, kv_addressing_mode, 0 },
+    { &ATOM(filter_mode), CL_SAMPLER_FILTER_MODE, false, OCL_SAMPLER_FILTER_MODE, kv_filter_mode, 0 }
 };
 
 ecl_info_t program_info[] = {
-    { &ATOM(reference_count), CL_PROGRAM_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(context), CL_PROGRAM_CONTEXT, false, OCL_CONTEXT, 0},
-    { &ATOM(num_devices), CL_PROGRAM_NUM_DEVICES, false, OCL_UINT, 0},
-    { &ATOM(devices), CL_PROGRAM_DEVICES, true, OCL_DEVICE, 0 },
-    { &ATOM(source), CL_PROGRAM_SOURCE, false, OCL_STRING, 0 },
-    { &ATOM(binary_sizes), CL_PROGRAM_BINARY_SIZES, true, OCL_SIZE, 0 },
-    { &ATOM(binaries), CL_PROGRAM_BINARIES, true, OCL_STRING, 0 }
+    { &ATOM(reference_count), CL_PROGRAM_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(context), CL_PROGRAM_CONTEXT, false, OCL_CONTEXT, 0, 0 },
+    { &ATOM(num_devices), CL_PROGRAM_NUM_DEVICES, false, OCL_UINT, 0, 0 },
+    { &ATOM(devices), CL_PROGRAM_DEVICES, true, OCL_DEVICE, 0, 0 },
+    { &ATOM(source), CL_PROGRAM_SOURCE, false, OCL_STRING, 0, 0 },
+    { &ATOM(binary_sizes), CL_PROGRAM_BINARY_SIZES, true, OCL_SIZE, 0, 0 },
+    { &ATOM(binaries), CL_PROGRAM_BINARIES, true, OCL_STRING, 0, 0 }
 };
 
 ecl_info_t build_info[] = {
-    { &ATOM(status), CL_PROGRAM_BUILD_STATUS, false, OCL_BUILD_STATUS, kv_build_status },
-    { &ATOM(options), CL_PROGRAM_BUILD_OPTIONS, false, OCL_STRING, 0 },
-    { &ATOM(log), CL_PROGRAM_BUILD_LOG, false, OCL_STRING, 0 },
+    { &ATOM(status), CL_PROGRAM_BUILD_STATUS, false, OCL_BUILD_STATUS, kv_build_status, 0 },
+    { &ATOM(options), CL_PROGRAM_BUILD_OPTIONS, false, OCL_STRING, 0, 0 },
+    { &ATOM(log), CL_PROGRAM_BUILD_LOG, false, OCL_STRING, 0, 0 },
 #if CL_VERSION_1_2 == 1
-    { &ATOM(binary_type), CL_PROGRAM_BINARY_TYPE, false, OCL_PROGRAM_BINARY_TYPE, kv_program_binary_type },
+    { &ATOM(binary_type), CL_PROGRAM_BINARY_TYPE, false, OCL_PROGRAM_BINARY_TYPE, kv_program_binary_type, 0 },
 #endif
 };
 
 ecl_info_t kernel_info[] = {
-    { &ATOM(function_name), CL_KERNEL_FUNCTION_NAME, false, OCL_STRING, 0 },
-    { &ATOM(num_args), CL_KERNEL_NUM_ARGS, false, OCL_UINT, 0},
-    { &ATOM(reference_count), CL_KERNEL_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(context), CL_KERNEL_CONTEXT, false, OCL_CONTEXT, 0},
-    { &ATOM(program), CL_KERNEL_PROGRAM, false, OCL_PROGRAM, 0}
+    { &ATOM(function_name), CL_KERNEL_FUNCTION_NAME, false, OCL_STRING, 0, 0 },
+    { &ATOM(num_args), CL_KERNEL_NUM_ARGS, false, OCL_UINT, 0, 0 },
+    { &ATOM(reference_count), CL_KERNEL_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(context), CL_KERNEL_CONTEXT, false, OCL_CONTEXT, 0, 0 },
+    { &ATOM(program), CL_KERNEL_PROGRAM, false, OCL_PROGRAM, 0, 0 }
 };
 
 ecl_info_t workgroup_info[] = {
-    { &ATOM(work_group_size), CL_KERNEL_WORK_GROUP_SIZE, false, OCL_SIZE, 0 },
-    { &ATOM(compile_work_group_size), CL_KERNEL_COMPILE_WORK_GROUP_SIZE, true, OCL_SIZE, 0},
-    { &ATOM(local_mem_size), CL_KERNEL_LOCAL_MEM_SIZE, false, OCL_ULONG, 0 },
+    { &ATOM(work_group_size), CL_KERNEL_WORK_GROUP_SIZE, false, OCL_SIZE, 0, sizeof(size_t)},
+    { &ATOM(compile_work_group_size), CL_KERNEL_COMPILE_WORK_GROUP_SIZE, true, OCL_SIZE, 0, sizeof(size_t[3])},
+    { &ATOM(local_mem_size), CL_KERNEL_LOCAL_MEM_SIZE, false, OCL_ULONG, 0, sizeof(cl_ulong)},
 #if CL_VERSION_1_1 == 1
-    { &ATOM(preferred_work_group_size_multiple), CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE, false,  OCL_SIZE, 0},
-    { &ATOM(private_mem_size), CL_KERNEL_PRIVATE_MEM_SIZE, false, OCL_ULONG, 0 },
+    { &ATOM(preferred_work_group_size_multiple), CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE, false,  OCL_SIZE, 0, sizeof(size_t) },
+    { &ATOM(private_mem_size), CL_KERNEL_PRIVATE_MEM_SIZE, false, OCL_ULONG, 0, sizeof(cl_ulong)},
 #endif
 #if CL_VERSION_1_2 == 1
-    { &ATOM(global_work_size), CL_KERNEL_GLOBAL_WORK_SIZE, true, OCL_SIZE, 0},
+    { &ATOM(global_work_size), CL_KERNEL_GLOBAL_WORK_SIZE, true, OCL_SIZE, 0, sizeof(size_t[3])},
 #endif
 };
 
 ecl_info_t event_info[] = {
-    { &ATOM(command_queue),  CL_EVENT_COMMAND_QUEUE, false, OCL_COMMAND_QUEUE, 0},
-    { &ATOM(command_type),   CL_EVENT_COMMAND_TYPE, false,  OCL_ENUM, kv_command_type },
-    { &ATOM(reference_count), CL_EVENT_REFERENCE_COUNT, false, OCL_UINT, 0 },
-    { &ATOM(execution_status), CL_EVENT_COMMAND_EXECUTION_STATUS, false, OCL_ENUM, kv_execution_status }
+    { &ATOM(command_queue),  CL_EVENT_COMMAND_QUEUE, false, OCL_COMMAND_QUEUE, 0, 0 },
+    { &ATOM(command_type),   CL_EVENT_COMMAND_TYPE, false,  OCL_ENUM, kv_command_type, 0 },
+    { &ATOM(reference_count), CL_EVENT_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
+    { &ATOM(execution_status), CL_EVENT_COMMAND_EXECUTION_STATUS, false, OCL_ENUM, kv_execution_status, 0 }
 };
 
 // clGetKernelArgInfo 1.2
@@ -3174,7 +3175,9 @@ ERL_NIF_TERM make_object_info2(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* 
 	i++;
     if (i == num_info)
 	return enif_make_badarg(env);  // or error ?
-    if (!(err = (*func)(obj1->opaque, obj2, info[i].info_id,
+    returned_size = info[i].def_size;
+    if (returned_size > 0 ||
+        !(err = (*func)(obj1->opaque, obj2, info[i].info_id,
 			0, NULL, &returned_size))) {
 	if (!(buf = enif_alloc(returned_size)))
 	    return ecl_make_error(env, CL_OUT_OF_RESOURCES);
