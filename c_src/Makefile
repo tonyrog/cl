@@ -111,7 +111,6 @@ endif
 ifeq ($(WIN32_CL), Yes)
 ## Use Microsoft CL
   CC=cl.exe
-  MS2C = MSYS2_ARG_CONV_EXCL=*
   OUT_C = /Fo
   ifeq ($(OPENCL_DIR), )
     OPENCL_DIR = c:/msys64/opt/local/
