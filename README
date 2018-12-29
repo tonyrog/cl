@@ -1,6 +1,6 @@
 Welcome to the Erlang OpenCL binding
 
-To get started you need erlang, preferably R16B.
+To get started you need erlang, preferably R16B or later.
 You also need 'rebar3' and a 'C' compiler, i.e.
 GCC (or CL.EXE) and a machine with OpenCL installed.
 
@@ -9,6 +9,7 @@ To build and test: rebar3 do compile, edoc, ct
 To build examples: Goto the examples directory and run make.
 
 Windows Users:
+--------------
 The build look for the OpenCL files in /opt/local/ by default.
 You can also set the environment variable OPENCL_DIR to point
 to another location.
@@ -21,30 +22,22 @@ e.g. http://software.intel.com/en-us/vcsource/tools/opencl-sdk-2013
 cp -R /c/Intel SDK/lib /opt/local/
 cp -R /c/Intel SDK/include /opt/local/
 
-Example building 64b from CMD:
+Example building 64b
 ------------------------------
 Setup windows build environment
 
-c:\src\cl> "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+c:\src\cl> "c:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" x64
 
-Setup the paths
+before starting msys (with inherited env)
 
-c:\src\cl> set PATH="c:\Program Files\erl5.10.1\bin";%PATH%
-c:\src\cl> set PATH="c:\tools\git\cmd";%PATH%
-c:\src\cl> set OPENCL_DIR="c:\Intel~1\"
+cl> export PATH="/c/Program Files/erl5.10.1/bin";%PATH%
+cl> export PATH="/c/tools/git/cmd";%PATH%
+cl> export OPENCL_DIR="c:\Intel~1\"
 
 And build
 
-c:\src\cl> ..\rebar\rebar.cmd compile
+cl> ../rebar/rebar.cmd compile
 =======
-If you want to build with mingw gcc use:
-CC=gcc rebar compile
-
-NOTE: That mingw64-gcc can not be linked with MSVC libs, see
-http://sourceforge.net/apps/trac/mingw-w64/wiki/Answer%2064%20bit%20MSVC-generated%20x64%20.lib
-Follow the steps there to make a libOpenCL.dll.a and it should work.
-
-NOTE: OpenCL with ATI drivers for CPU usage don't work when erlang
-is started within a mingw shell but does if you start it from
-a Windows CMD.exe shell.  (This may depend on the AMD driver version)
+If you want to force build with mingw gcc use:
+NOCL=true rebar compile
 
