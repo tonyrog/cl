@@ -6704,13 +6704,13 @@ static cl_uint get_version(char *version)
 {
     cl_uint ver = 0;
     version += 7;
-    if(*version >= 48 && *version <= 57)
-	ver += (*version-48)*10;
+    if(*version >= '0' && *version <= '9')
+	ver += (*version-'0')*10;
     version++;
-    if(*version == 46) {
+    if(*version == '.') {
 	version++;
-	if(*version >= 48 && *version <= 57)
-	    ver += (*version-48);
+	if(*version >= '0' && *version <= '9')
+	    ver += (*version-'0');
     }
     /* fprintf(stderr, "V3 %s %d\r\n", version, ver); */
     return ver;
