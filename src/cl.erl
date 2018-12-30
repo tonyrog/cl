@@ -1844,8 +1844,15 @@ get_kernel_arg_info(Kernel) ->
 	{ok, N} ->
 	    {ok,
 	     lists:map(fun(I) ->
-			       {ok,Info} = get_kernel_arg_info(Kernel, I),
-			       {I,Info}
+			       try get_kernel_arg_info(Kernel, I) of
+				   {ok,Info} ->
+				       {I,Info};
+				   {error,Reason} ->
+				       {I,{error,Reason}}
+			       catch
+				   error:Reason ->
+				       {I,{error,Reason}}
+			       end
 		       end, lists:seq(0, N-1))};
 	Error ->
 	    Error

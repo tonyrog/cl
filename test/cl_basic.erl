@@ -142,7 +142,7 @@ __kernel void program1(int n, int m) {
 	      build_info(Program, Device)
       end, DeviceList),
 
-    case cl:build_program(Program, DeviceList, "-Dhello=1 -Dtest") of
+    case cl:build_program(Program, DeviceList, "-Dhello=1 -Dtest -cl-kernel-arg-info") of
 	ok ->
 	    foreach(
 	      fun(Device) ->
