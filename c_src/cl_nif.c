@@ -1879,11 +1879,11 @@ ecl_kv_t kv_type_qualifier[] = {
 };
 
 ecl_info_t arg_info[] = {
-    { &ATOM(address_qualifier), CL_KERNEL_ARG_ADDRESS_QUALIFIER, false, OCL_ENUM, kv_address_qualifier },
-    { &ATOM(access_qualifier), CL_KERNEL_ARG_ACCESS_QUALIFIER, false, OCL_ENUM, kv_access_qualifier },
-    { &ATOM(type_name), CL_KERNEL_ARG_TYPE_NAME, false, OCL_STRING, 0 },
-    { &ATOM(type_qualifier), CL_KERNEL_ARG_TYPE_QUALIFIER, false, OCL_ENUM, kv_type_qualifier },
-    { &ATOM(name),  CL_KERNEL_ARG_NAME, false, OCL_STRING, 0 },
+    { &ATOM(address_qualifier), CL_KERNEL_ARG_ADDRESS_QUALIFIER, false, OCL_ENUM, kv_address_qualifier, 0 },
+    { &ATOM(access_qualifier), CL_KERNEL_ARG_ACCESS_QUALIFIER, false, OCL_ENUM, kv_access_qualifier, 0 },
+    { &ATOM(type_name), CL_KERNEL_ARG_TYPE_NAME, false, OCL_STRING, 0, 0 },
+    { &ATOM(type_qualifier), CL_KERNEL_ARG_TYPE_QUALIFIER, false, OCL_ENUM, kv_type_qualifier, 0 },
+    { &ATOM(name),  CL_KERNEL_ARG_NAME, false, OCL_STRING, 0, 0 },
 };
 #endif
 
