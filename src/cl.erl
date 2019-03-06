@@ -173,7 +173,7 @@
 -export([nowait_enqueue_write_image/8]).
 -export([enqueue_copy_buffer/7]).
 -export([enqueue_copy_buffer_rect/11]).
--export([enqueue_copy_image/6]).
+-export([enqueue_copy_image/7]).
 -export([enqueue_fill_image/6]).
 -export([enqueue_copy_image_to_buffer/7]).
 -export([enqueue_copy_buffer_to_image/7]).
@@ -2173,7 +2173,7 @@ enqueue_copy_buffer_rect(_Queue, _SrcBuffer, _DstBuffer,
 			 _WaitList) ->
     ?nif_stub.
 
-enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _Origin, _Region, _WaitList) ->
+enqueue_copy_image(_QUeue, _SrcImage, _DstImage, _SourceOrigin, _DestOrigin, _Region, _WaitList) ->
     ?nif_stub.
 
 %%  FillColor = <<R:32/unsigned,G:32/unsigned,B:32/unsigned,A:32/unsigned>>

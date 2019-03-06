@@ -105,7 +105,7 @@
 -export([enqueue_write_image/8]).
 -export([enqueue_write_image/9]).
 -export([nowait_enqueue_write_image/8]).
--export([enqueue_copy_image/6]).
+-export([enqueue_copy_image/7]).
 -export([enqueue_copy_image_to_buffer/7]).
 -export([enqueue_copy_buffer_to_image/7]).
 -export([enqueue_map_buffer/6]).
@@ -230,8 +230,8 @@ enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8,A9) ->
     cl:enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8,A9).
 nowait_enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8) -> 
     cl:nowait_enqueue_write_image(A1,A2,A3,A4,A5,A6,A7,A8).
-enqueue_copy_image(A1,A2,A3,A4,A5,A6) ->
-    cl:enqueue_copy_image(A1,A2,A3,A4,A5,A6).
+enqueue_copy_image(A1,A2,A3,A4,A5,A6,A7) ->
+    cl:enqueue_copy_image(A1,A2,A3,A4,A5,A6,A7).
 enqueue_copy_image_to_buffer(A1,A2,A3,A4,A5,A6,A7) ->
     cl:enqueue_copy_image_to_buffer(A1,A2,A3,A4,A5,A6,A7).
 enqueue_copy_buffer_to_image(A1,A2,A3,A4,A5,A6,A7) ->
