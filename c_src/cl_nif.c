@@ -761,7 +761,7 @@ ErlNifFunc ecl_funcs[] =
 #if CL_VERSION_1_1 == 1
     { "enqueue_copy_buffer_rect",  11, ecl_enqueue_copy_buffer_rect },
 #endif
-    { "enqueue_copy_image",         6, ecl_enqueue_copy_image },
+    { "enqueue_copy_image",         7, ecl_enqueue_copy_image },
 #if CL_VERSION_1_2 == 1
     { "enqueue_fill_image",         6, ecl_enqueue_fill_image },
 #endif
