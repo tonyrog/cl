@@ -71,7 +71,7 @@
 -on_load(init/0).
 
 -export([start/0, start/1, stop/0]).
--export([noop/0]).
+-export([noop/0, noop_/0, dirty_noop/0]).
 -export([versions/0]).
 %% Platform
 -export([get_platform_ids/0]).
@@ -269,6 +269,12 @@ stop()  ->
 -spec noop() -> 'ok' | {'error', cl_error()}.
 
 noop() ->
+    ?nif_stub.
+
+noop_() ->  %% dynamic dirty noop
+    ?nif_stub.
+
+dirty_noop() ->  %% dirty noop
     ?nif_stub.
 
 %%

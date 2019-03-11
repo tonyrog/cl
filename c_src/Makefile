@@ -45,6 +45,9 @@ endif
 
 WORDSIZE = $(shell $(ERL) -noshell -eval "io:format([126,119,126,110],[erlang:system_info(wordsize)*8])" -s erlang halt)
 
+# uncomment to enable use of dirty scheduler
+# CFLAGS += -DUSE_DIRTY_SCHEDULER
+
 ifeq ($(OSNAME)$(WSLcross), Linux)
 LINUX = Yes
 CFLAGS += -I/usr/include/nvidia-current

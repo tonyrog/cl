@@ -33,6 +33,7 @@
 #endif
 
 #define CL_USE_DEPRECATED_OPENCL_1_1_APIS 1
+#define CL_TARGET_OPENCL_VERSION 120
 
 #ifdef DARWIN
 #include <OpenCL/opencl.h>
@@ -301,6 +302,7 @@ typedef struct _ecl_env_t {
     ErlNifRWLock* context_list_lock;
     ecl_context_t*  context_list;
     cl_int icd_version;
+    int dirty_scheduler_support;
 } ecl_env_t;
 
 typedef struct _ecl_func_t {
@@ -452,6 +454,8 @@ static ERL_NIF_TERM ecl_versions(ErlNifEnv* env, int argc,
 
 static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc, 
 			    const ERL_NIF_TERM argv[]);
+static ERL_NIF_TERM ecl_noop_(ErlNifEnv* env, int argc, 
+			      const ERL_NIF_TERM argv[]);
 
 static ERL_NIF_TERM ecl_get_platform_ids(ErlNifEnv* env, int argc, 
 					 const ERL_NIF_TERM argv[]);
@@ -658,125 +662,140 @@ static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[]);
 
+// Dirty optional since 2.7 and mandatory since 2.12
+#if (ERL_NIF_MAJOR_VERSION > 2) || ((ERL_NIF_MAJOR_VERSION == 2) && (ERL_NIF_MINOR_VERSION >= 7))
+#ifdef USE_DIRTY_SCHEDULER
+#define NIF_FUNC(name,arity,fptr) {(name),(arity),(fptr),(ERL_NIF_DIRTY_JOB_CPU_BOUND)}
+#define NIF_DIRTY_FUNC(name,arity,fptr) {(name),(arity),(fptr),(ERL_NIF_DIRTY_JOB_CPU_BOUND)}
+#else
+#define NIF_FUNC(name,arity,fptr) {(name),(arity),(fptr),(0)}
+#define NIF_DIRTY_FUNC(name,arity,fptr) {(name),(arity),(fptr),(ERL_NIF_DIRTY_JOB_CPU_BOUND)}
+#endif
+#else
+#define NIF_FUNC(name,arity,fptr) {(name),(arity),(fptr)}
+#define NIF_DIRTY_FUNC(name,arity,fptr) {(name),(arity),(fptr)}
+#endif
 
 ErlNifFunc ecl_funcs[] =
 {
-    { "noop",                        0, ecl_noop },
-    { "versions",                    0, ecl_versions },
+    NIF_FUNC( "noop",                        0, ecl_noop ),
+    NIF_FUNC( "noop_",                       0, ecl_noop_ ),
+    NIF_DIRTY_FUNC( "dirty_noop",            0, ecl_noop ),
+    NIF_FUNC( "versions",                    0, ecl_versions ),
     
     // Platform
-    { "get_platform_ids",           0, ecl_get_platform_ids },
-    { "get_platform_info",          2, ecl_get_platform_info },
+    NIF_FUNC( "get_platform_ids",           0, ecl_get_platform_ids ),
+    NIF_FUNC( "get_platform_info",          2, ecl_get_platform_info ),
 
     // Devices
-    { "get_device_ids",             2, ecl_get_device_ids },
+    NIF_FUNC( "get_device_ids",             2, ecl_get_device_ids ),
 #if CL_VERSION_1_2 == 1
-    { "create_sub_devices",         2, ecl_create_sub_devices },
+    NIF_FUNC( "create_sub_devices",         2, ecl_create_sub_devices ),
 #endif
-    { "get_device_info",            2, ecl_get_device_info },
+    NIF_FUNC( "get_device_info",            2, ecl_get_device_info ),
 
     // Context
-    { "create_context",             1, ecl_create_context },
-    { "get_context_info",           2, ecl_get_context_info },
+    NIF_FUNC( "create_context",             1, ecl_create_context ),
+    NIF_FUNC( "get_context_info",           2, ecl_get_context_info ),
 
     // Command queue
-    { "create_queue",               3, ecl_create_queue },
-    { "get_queue_info",             2, ecl_get_queue_info },
+    NIF_FUNC( "create_queue",               3, ecl_create_queue ),
+    NIF_FUNC( "get_queue_info",             2, ecl_get_queue_info ),
 
     // Memory object
-    { "create_buffer",              4, ecl_create_buffer },
+    NIF_FUNC( "create_buffer",              4, ecl_create_buffer ),
 #if CL_VERSION_1_1 == 1
-    { "create_sub_buffer",          4, ecl_create_sub_buffer },
+    NIF_FUNC( "create_sub_buffer",          4, ecl_create_sub_buffer ),
 #endif
 
-    { "get_mem_object_info",        2, ecl_get_mem_object_info },
-    { "get_image_info",             2, ecl_get_image_info },
+    NIF_FUNC( "get_mem_object_info",        2, ecl_get_mem_object_info ),
+    NIF_FUNC( "get_image_info",             2, ecl_get_image_info ),
 
-    { "create_image2d",            7, ecl_create_image2d },
-    { "create_image3d",            9, ecl_create_image3d },
+    NIF_FUNC( "create_image2d",            7, ecl_create_image2d ),
+    NIF_FUNC( "create_image3d",            9, ecl_create_image3d ),
 #if CL_VERSION_1_2 == 1
-    { "create_image",              5, ecl_create_image },
+    NIF_FUNC( "create_image",              5, ecl_create_image ),
 #endif
-    { "get_supported_image_formats",3, ecl_get_supported_image_formats },
+    NIF_FUNC( "get_supported_image_formats",3, ecl_get_supported_image_formats ),
 
     // Sampler 
-    { "create_sampler",             4, ecl_create_sampler },
-    { "get_sampler_info",           2, ecl_get_sampler_info },
+    NIF_FUNC( "create_sampler",             4, ecl_create_sampler ),
+    NIF_FUNC( "get_sampler_info",           2, ecl_get_sampler_info ),
 
     // Program
-    { "create_program_with_source", 2, ecl_create_program_with_source },
-    { "create_program_with_binary", 3, ecl_create_program_with_binary },
+    NIF_FUNC( "create_program_with_source", 2, ecl_create_program_with_source ),
+    NIF_FUNC( "create_program_with_binary", 3, ecl_create_program_with_binary ),
 #if CL_VERSION_1_2 == 1
-    { "create_program_with_builtin_kernels", 3, 
-      ecl_create_program_with_builtin_kernels },
+    NIF_FUNC( "create_program_with_builtin_kernels", 3, 
+	      ecl_create_program_with_builtin_kernels ),
 #endif
-    { "async_build_program",        3, ecl_async_build_program },
+    NIF_FUNC( "async_build_program",        3, ecl_async_build_program ),
 #if CL_VERSION_1_2 == 1
-    { "unload_platform_compiler",   1, ecl_unload_platform_compiler },
-#endif
-#if CL_VERSION_1_2 == 1
-    { "async_compile_program",      5,   ecl_async_compile_program },
+    NIF_FUNC( "unload_platform_compiler",   1, ecl_unload_platform_compiler ),
 #endif
 #if CL_VERSION_1_2 == 1
-    { "async_link_program",         4,   ecl_async_link_program },
+    NIF_FUNC( "async_compile_program",      5,   ecl_async_compile_program ),
 #endif
-    { "unload_compiler",            0, ecl_unload_compiler },
-    { "get_program_info",           2, ecl_get_program_info },
-    { "get_program_build_info",     3, ecl_get_program_build_info },
+#if CL_VERSION_1_2 == 1
+    NIF_FUNC( "async_link_program",         4,   ecl_async_link_program ),
+#endif
+    NIF_FUNC( "unload_compiler",            0, ecl_unload_compiler ),
+    NIF_FUNC( "get_program_info",           2, ecl_get_program_info ),
+    NIF_FUNC( "get_program_build_info",     3, ecl_get_program_build_info ),
 
     // Kernel
-    { "create_kernel",              2, ecl_create_kernel },
-    { "create_kernels_in_program",  1, ecl_create_kernels_in_program },
-    { "set_kernel_arg",             3, ecl_set_kernel_arg },
-    { "set_kernel_arg_size",        3, ecl_set_kernel_arg_size },
-    { "get_kernel_info",            2, ecl_get_kernel_info },
-    { "get_kernel_workgroup_info",  3, ecl_get_kernel_workgroup_info },
+    NIF_FUNC( "create_kernel",              2, ecl_create_kernel ),
+    NIF_FUNC( "create_kernels_in_program",  1, ecl_create_kernels_in_program ),
+    NIF_FUNC( "set_kernel_arg",             3, ecl_set_kernel_arg ),
+    NIF_FUNC( "set_kernel_arg_size",        3, ecl_set_kernel_arg_size ),
+    NIF_FUNC( "get_kernel_info",            2, ecl_get_kernel_info ),
+    NIF_FUNC( "get_kernel_workgroup_info",  3, ecl_get_kernel_workgroup_info ),
 #if CL_VERSION_1_2 == 1
-    { "get_kernel_arg_info",        3, ecl_get_kernel_arg_info },
+    NIF_FUNC( "get_kernel_arg_info",        3, ecl_get_kernel_arg_info ),
 #endif
     // Events
-    { "enqueue_task",               4, ecl_enqueue_task },
-    { "enqueue_nd_range_kernel",    6, ecl_enqueue_nd_range_kernel },
-    { "enqueue_marker",             1, ecl_enqueue_marker },
-    { "enqueue_barrier",            1, ecl_enqueue_barrier },
+    NIF_FUNC( "enqueue_task",               4, ecl_enqueue_task ),
+    NIF_FUNC( "enqueue_nd_range_kernel",    6, ecl_enqueue_nd_range_kernel ),
+    NIF_FUNC( "enqueue_marker",             1, ecl_enqueue_marker ),
+    NIF_FUNC( "enqueue_barrier",            1, ecl_enqueue_barrier ),
 #if CL_VERSION_1_2 == 1
-    { "enqueue_barrier_with_wait_list", 2, ecl_enqueue_barrier_with_wait_list },
-    { "enqueue_marker_with_wait_list",  2, ecl_enqueue_marker_with_wait_list },
+    NIF_FUNC( "enqueue_barrier_with_wait_list", 2, ecl_enqueue_barrier_with_wait_list ),
+    NIF_FUNC( "enqueue_marker_with_wait_list",  2, ecl_enqueue_marker_with_wait_list ),
 #endif
-    { "enqueue_wait_for_events",    2, ecl_enqueue_wait_for_events },
-    { "enqueue_read_buffer",        5, ecl_enqueue_read_buffer },
+    NIF_FUNC( "enqueue_wait_for_events",    2, ecl_enqueue_wait_for_events ),
+    NIF_FUNC( "enqueue_read_buffer",        5, ecl_enqueue_read_buffer ),
 #if CL_VERSION_1_1 == 1
-    { "enqueue_read_buffer_rect",   10, ecl_enqueue_read_buffer_rect },
+    NIF_FUNC( "enqueue_read_buffer_rect",   10, ecl_enqueue_read_buffer_rect ),
 #endif
-    { "enqueue_write_buffer",       7, ecl_enqueue_write_buffer },
+    NIF_FUNC( "enqueue_write_buffer",       7, ecl_enqueue_write_buffer ),
 #if CL_VERSION_1_1 == 1
-    { "enqueue_write_buffer_rect",  11, ecl_enqueue_write_buffer_rect },
+    NIF_FUNC( "enqueue_write_buffer_rect",  11, ecl_enqueue_write_buffer_rect ),
 #endif
 #if CL_VERSION_1_2 == 1
-    { "enqueue_fill_buffer",         6, ecl_enqueue_fill_buffer },
+    NIF_FUNC( "enqueue_fill_buffer",         6, ecl_enqueue_fill_buffer ),
 #endif
-    { "enqueue_read_image",         7, ecl_enqueue_read_image },
-    { "enqueue_write_image",        9, ecl_enqueue_write_image },
-    { "enqueue_copy_buffer",        7, ecl_enqueue_copy_buffer },
+    NIF_FUNC( "enqueue_read_image",         7, ecl_enqueue_read_image ),
+    NIF_FUNC( "enqueue_write_image",        9, ecl_enqueue_write_image ),
+    NIF_FUNC( "enqueue_copy_buffer",        7, ecl_enqueue_copy_buffer ),
 #if CL_VERSION_1_1 == 1
-    { "enqueue_copy_buffer_rect",  11, ecl_enqueue_copy_buffer_rect },
+    NIF_FUNC( "enqueue_copy_buffer_rect",  11, ecl_enqueue_copy_buffer_rect ),
 #endif
-    { "enqueue_copy_image",         7, ecl_enqueue_copy_image },
+    NIF_FUNC( "enqueue_copy_image",         7, ecl_enqueue_copy_image ),
 #if CL_VERSION_1_2 == 1
-    { "enqueue_fill_image",         6, ecl_enqueue_fill_image },
+    NIF_FUNC( "enqueue_fill_image",         6, ecl_enqueue_fill_image ),
 #endif
-    { "enqueue_copy_image_to_buffer", 7, ecl_enqueue_copy_image_to_buffer },
-    { "enqueue_copy_buffer_to_image", 7, ecl_enqueue_copy_buffer_to_image },
-    { "enqueue_map_buffer",           6, ecl_enqueue_map_buffer },
-    { "enqueue_map_image",            6, ecl_enqueue_map_image },
-    { "enqueue_unmap_mem_object",     3, ecl_enqueue_unmap_mem_object },
+    NIF_FUNC( "enqueue_copy_image_to_buffer", 7, ecl_enqueue_copy_image_to_buffer ),
+    NIF_FUNC( "enqueue_copy_buffer_to_image", 7, ecl_enqueue_copy_buffer_to_image ),
+    NIF_FUNC( "enqueue_map_buffer",           6, ecl_enqueue_map_buffer ),
+    NIF_FUNC( "enqueue_map_image",            6, ecl_enqueue_map_image ),
+    NIF_FUNC( "enqueue_unmap_mem_object",     3, ecl_enqueue_unmap_mem_object ),
 #if CL_VERSION_1_2 == 1
-    { "enqueue_migrate_mem_objects",  4, ecl_enqueue_migrate_mem_objects },
+    NIF_FUNC( "enqueue_migrate_mem_objects",  4, ecl_enqueue_migrate_mem_objects ),
 #endif
-    { "async_flush",                  1, ecl_async_flush },
-    { "async_finish",                 1, ecl_async_finish },
-    { "async_wait_for_event",         1, ecl_async_wait_for_event },
-    { "get_event_info",               2, ecl_get_event_info }
+    NIF_FUNC( "async_flush",                  1, ecl_async_flush ),
+    NIF_FUNC( "async_finish",                 1, ecl_async_finish ),
+    NIF_FUNC( "async_wait_for_event",         1, ecl_async_wait_for_event ),
+    NIF_FUNC( "get_event_info",               2, ecl_get_event_info )
 };
 
 static ecl_resource_t platform_r;
@@ -3358,6 +3377,18 @@ static ERL_NIF_TERM ecl_noop(ErlNifEnv* env, int argc,
     UNUSED(argc);
     UNUSED(argv);
     return ATOM(ok);
+}
+
+static ERL_NIF_TERM ecl_noop_(ErlNifEnv* env, int argc,
+				   const ERL_NIF_TERM argv[])
+{
+    ecl_env_t* ecl = enif_priv_data(env);
+
+    if (ecl->dirty_scheduler_support)
+	return enif_schedule_nif(env, "noop", ERL_NIF_DIRTY_JOB_CPU_BOUND,
+				 ecl_noop, argc, argv);
+    else
+	return ecl_noop(env, argc, argv);
 }
 
 // version - return list of API versions supported
@@ -6784,6 +6815,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     ecl_env_t* ecl;
     cl_int err;
     lhash_func_t func = { ref_hash, ref_cmp, ref_release, 0 };
+    ErlNifSysInfo sys_info;
     UNUSED(env);
     UNUSED(load_info);
 
@@ -6805,6 +6837,14 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     DBG("ecl_load: ecl=%p", ecl);
     DBG("ecl_load: ecl->context_list_lock=%p", ecl->context_list_lock);
 
+#if (ERL_NIF_MAJOR_VERSION > 2) || ((ERL_NIF_MAJOR_VERSION == 2) && (ERL_NIF_MINOR_VERSION >= 7))    
+    enif_system_info(&sys_info, sizeof(sys_info));
+    ecl->dirty_scheduler_support = sys_info.dirty_scheduler_support;
+#else
+    ecl->dirty_scheduler_support = 0;
+#endif
+    DBG("dirty_scheduler_support = %d", ecl->dirty_scheduler_support);
+    
     // load OpenCL functions
     if (ecl_load_dynfunctions(ecl) < 0)
 	return -1;
