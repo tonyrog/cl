@@ -1025,6 +1025,8 @@ DECL_ATOM(invalid_gl_object);
 DECL_ATOM(invalid_buffer_size);
 DECL_ATOM(invalid_mip_level);
 DECL_ATOM(invalid_global_work_size);
+DECL_ATOM(device_partition_failed);
+DECL_ATOM(invalid_device_partition_count);
 
 // cl_device_type
 DECL_ATOM(all);
@@ -1421,6 +1423,12 @@ ecl_kv_t kv_execution_status[] = { // enum
     { &ATOM(invalid_buffer_size), CL_INVALID_BUFFER_SIZE },
     { &ATOM(invalid_mip_level), CL_INVALID_MIP_LEVEL },
     { &ATOM(invalid_global_work_size), CL_INVALID_GLOBAL_WORK_SIZE },
+#ifdef CL_DEVICE_PARTITION_FAILED
+    { &ATOM(device_partition_failed), CL_DEVICE_PARTITION_FAILED },
+#endif
+#ifdef CL_INVALID_DEVICE_PARTITION_COUNT
+    { &ATOM(invalid_device_partition_count), CL_INVALID_DEVICE_PARTITION_COUNT },
+#endif
     { 0, 0 }
 };
 
@@ -2002,6 +2010,14 @@ ERL_NIF_TERM ecl_error(cl_int err)
 	return ATOM(invalid_mip_level);
     case CL_INVALID_GLOBAL_WORK_SIZE:
 	return ATOM(invalid_global_work_size);
+#ifdef CL_DEVICE_PARTITION_FAILED
+    case CL_DEVICE_PARTITION_FAILED:
+	return ATOM(device_partition_failed);
+#endif
+#ifdef CL_INVALID_DEVICE_PARTITION_COUNT
+    case CL_INVALID_DEVICE_PARTITION_COUNT:
+	return ATOM(invalid_device_partition_count);
+#endif
     default: 
 	return ATOM(unknown);
     }
@@ -7204,6 +7220,8 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(invalid_buffer_size);
     LOAD_ATOM(invalid_mip_level);
     LOAD_ATOM(invalid_global_work_size);
+    LOAD_ATOM(device_partition_failed);
+    LOAD_ATOM(invalid_device_partition_count);
 
     // cl_device_type
     LOAD_ATOM(all);
