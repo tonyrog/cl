@@ -205,4 +205,5 @@ typedef cl_int (CL_CALLBACK * t_clEnqueueBarrier)(cl_command_queue );
 typedef cl_int (CL_CALLBACK * t_clUnloadCompiler)(void);
 typedef void * (CL_CALLBACK * t_clGetExtensionFunctionAddress)(const char *);
 
+typedef cl_mem (CL_CALLBACK * t_clCreatePipe)(cl_context,cl_mem_flags,cl_uint,cl_uint, void*, cl_int*);
 #endif

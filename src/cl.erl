@@ -114,7 +114,8 @@
 -export([create_image/5]).
 -export([create_image2d/7]).
 -export([create_image3d/9]).
-
+%% pipe
+-export([create_pipe/4]).
 %% Sampler 
 -export([create_sampler/4]).
 -export([release_sampler/1]).
@@ -2321,7 +2322,7 @@ get_event_info(Event) when ?is_event(Event) ->
 get_supported_image_formats(_Context, _Flags, _ImageType) ->
     ?nif_stub.
 
--spec create_image2d(Conext::cl_context(), Flags::[cl_mem_flag()],
+-spec create_image2d(Context::cl_context(), Flags::[cl_mem_flag()],
 		     ImageFormat::#cl_image_format{},
 		     Width::non_neg_integer(),
 		     Height::non_neg_integer(),
@@ -2333,7 +2334,7 @@ create_image2d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Pitch,
 		_Data) ->
     ?nif_stub.
 
--spec create_image3d(Conext::cl_context(), Flags::[cl_mem_flag()],
+-spec create_image3d(Context::cl_context(), Flags::[cl_mem_flag()],
 		     ImageFormat::#cl_image_format{},
 		     Width::non_neg_integer(),
 		     Height::non_neg_integer(),
@@ -2354,6 +2355,14 @@ create_image3d(_Context, _MemFlags, _ImageFormat, _Width, _Height, _Depth,
     {'ok', cl_mem()} | {'error', cl_error()}.
 
 create_image(_Context, _MemFlags, _ImageFormat, _ImageDesc, _Data) ->
+    ?nif_stub.
+
+-spec create_pipe(Context::cl_context(), Flags::[cl_mem_flag()],
+		  PipePacketSize::non_neg_integer(),
+		  PipeMaxPackets::non_neg_integer()) ->
+			 {'ok', cl_mem()} | {'error', cl_error()}.
+
+create_pipe(_Context, _MemFlags, _PipePacketSize, _PipeMaxPackets) ->
     ?nif_stub.
 
 %% Wait for all events in EventList to complete

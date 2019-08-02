@@ -33,7 +33,7 @@
 #endif
 
 #define CL_USE_DEPRECATED_OPENCL_1_1_APIS 1
-#define CL_TARGET_OPENCL_VERSION 120
+#define CL_TARGET_OPENCL_VERSION 200
 
 #ifdef DARWIN
 #include <OpenCL/opencl.h>
@@ -662,6 +662,13 @@ static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[]);
 
+#if CL_VERSION_2_0 == 1
+
+static ERL_NIF_TERM ecl_create_pipe(ErlNifEnv* env, int argc,
+				    const ERL_NIF_TERM argv[]);
+#endif
+
+
 // Dirty optional since 2.7 and mandatory since 2.12
 #if (ERL_NIF_MAJOR_VERSION > 2) || ((ERL_NIF_MAJOR_VERSION == 2) && (ERL_NIF_MINOR_VERSION >= 7))
 #ifdef USE_DIRTY_SCHEDULER
@@ -795,7 +802,12 @@ ErlNifFunc ecl_funcs[] =
     NIF_FUNC( "async_flush",                  1, ecl_async_flush ),
     NIF_FUNC( "async_finish",                 1, ecl_async_finish ),
     NIF_FUNC( "async_wait_for_event",         1, ecl_async_wait_for_event ),
-    NIF_FUNC( "get_event_info",               2, ecl_get_event_info )
+    NIF_FUNC( "get_event_info",               2, ecl_get_event_info ),
+
+#if CL_VERSION_2_0 == 1
+    NIF_FUNC( "create_pipe",                  4,  ecl_create_pipe ),
+#endif
+
 };
 
 static ecl_resource_t platform_r;
@@ -1084,6 +1096,8 @@ DECL_ATOM(image2d_array);
 DECL_ATOM(image1d);
 DECL_ATOM(image1d_array);
 DECL_ATOM(image1d_buffer);
+// version2.0
+DECL_ATOM(pipe);
 
 // addressing_mode
 // DECL_ATOM(none);
@@ -1303,6 +1317,9 @@ ecl_kv_t kv_mem_object_type[] = { // enum
     { &ATOM(image1d), CL_MEM_OBJECT_IMAGE1D },
     { &ATOM(image1d_array), CL_MEM_OBJECT_IMAGE1D_ARRAY },
     { &ATOM(image1d_buffer), CL_MEM_OBJECT_IMAGE1D_BUFFER },
+#endif
+#if CL_VERSION_2_0 == 1
+    { &ATOM(pipe), CL_MEM_OBJECT_PIPE },
 #endif
     { 0, 0 }
 };
@@ -6750,6 +6767,48 @@ static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc,
 			    sizeof_array(event_info));
 }
 
+
+#if CL_VERSION_2_0 == 1
+
+static ERL_NIF_TERM ecl_create_pipe(ErlNifEnv* env, int argc,
+				    const ERL_NIF_TERM argv[])
+{
+    ecl_object_t* o_context;
+    cl_mem_flags flags;
+    cl_mem mem;
+    cl_uint pipe_packet_size;
+    cl_uint pipe_max_packets;
+    cl_int err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
+	return enif_make_badarg(env);
+    if (!get_bitfields(env, argv[1], &flags, kv_mem_flags))
+	return enif_make_badarg(env);
+    if (!enif_get_uint(env, argv[2], &pipe_packet_size))
+	return enif_make_badarg(env);
+    if (!enif_get_uint(env, argv[3], &pipe_max_packets))
+	return enif_make_badarg(env);
+
+    DBG("context version: %d", o_context->version);
+    if (o_context->version < 20)
+	err = CL_INVALID_CONTEXT;
+    else
+	mem = ECL_CALL(clCreatePipe)(o_context->context,
+				     flags,
+				     pipe_packet_size,
+				     pipe_max_packets,
+				     NULL, &err);
+    if (!err) {
+	ERL_NIF_TERM t;
+	t = ecl_make_object(env, &mem_r,(void*) mem, o_context);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+
+#endif
+
 static cl_uint get_version(char *version)
 {
     cl_uint ver = 0;
@@ -6773,6 +6832,7 @@ static cl_uint get_version(char *version)
 static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
 {
     cl_platform_id   platform_id[MAX_PLATFORMS];
+    cl_int           platform_ver[MAX_PLATFORMS];
     cl_uint          num_platforms;
     cl_uint          i;
     cl_int           err;
@@ -6787,6 +6847,18 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
     ecl->nplatforms = num_platforms;
     ecl->icd_version = 11;
 
+    // first calculate the icd_version (as max of platform versions)
+    for (i = 0; i < num_platforms; i++) {
+	char             version[128];
+	if(CL_SUCCESS == ECL_CALL(clGetPlatformInfo)
+	   (platform_id[i], CL_PLATFORM_VERSION, 64, version, NULL)) {
+	    platform_ver[i] = get_version(version);
+	    
+	    if (platform_ver[i] >  ecl->icd_version)
+		ecl->icd_version = platform_ver[i];
+	}
+    }
+
     for (i = 0; i < num_platforms; i++) {
 	ecl_object_t* obj;
 	cl_device_id     device_id[MAX_DEVICES];
@@ -6795,12 +6867,7 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
 	char             version[128];
 	cl_int           ver = -1;
 
-	if(CL_SUCCESS == ECL_CALL(clGetPlatformInfo)
-	   (platform_id[i], CL_PLATFORM_VERSION, 64, version, NULL)) {
-	    if((ver = get_version(version)) > ecl->icd_version)
-		ecl->icd_version = ver;
-	}
-	obj = ecl_new(env, &platform_r,platform_id[i],0,ver);
+	obj = ecl_new(env, &platform_r,platform_id[i],0,platform_ver[i]);
 	ecl->platform[i].o_platform = obj;
 
 	if ((err = ECL_CALL(clGetDeviceIDs)
@@ -6809,19 +6876,21 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
 	    *rerr = err;
 	    return -1;
 	}
+	DBG("platform: %d, ver=%d", i, platform_ver[i]);
 	ecl->platform[i].o_device=enif_alloc(num_devices*sizeof(ecl_object_t));
 	ecl->platform[i].ndevices = num_devices;
 	for (j = 0; j < num_devices; j++) {
-	    ver = ecl->icd_version;
+	    ver = ecl->icd_version; // assumed version
 	    if(CL_SUCCESS == ECL_CALL(clGetDeviceInfo)
 	       (device_id[j], CL_DEVICE_VERSION, 64, version, NULL)) {
 		ver = get_version(version);
 	    }
 	    obj = ecl_new(env, &device_r, device_id[j],0, ver);
 	    ecl->platform[i].o_device[j] = obj;
+	    DBG("  device:%d, ver=%d", j, ver);
 	}
     }
-
+    DBG("icd: ver=%d", ecl->icd_version);
     return 0;
 }
 
@@ -7278,6 +7347,7 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(image1d);
     LOAD_ATOM(image1d_array);
     LOAD_ATOM(image1d_buffer);
+    LOAD_ATOM(pipe);
 
     // addressing_mode
     LOAD_ATOM(none);
