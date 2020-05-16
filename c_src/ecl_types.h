@@ -93,6 +93,8 @@ typedef cl_program (CL_CALLBACK * t_clCreateProgramWithBinary)(cl_context,cl_uin
 
 typedef cl_program (CL_CALLBACK * t_clCreateProgramWithBuiltInKernels)(cl_context,cl_uint,const cl_device_id *,const char *,cl_int *);
 
+typedef cl_program (CL_CALLBACK * t_clCreateProgramWithIL)(cl_context,cl_uint,const void *,const size_t,cl_int *);
+
 typedef cl_int (CL_CALLBACK * t_clRetainProgram)(cl_program );
 
 typedef cl_int (CL_CALLBACK * t_clReleaseProgram)(cl_program );

@@ -33,7 +33,7 @@
 #endif
 
 #define CL_USE_DEPRECATED_OPENCL_1_1_APIS 1
-#define CL_TARGET_OPENCL_VERSION 200
+#define CL_TARGET_OPENCL_VERSION 210
 
 #ifdef DARWIN
 #include <OpenCL/opencl.h>
@@ -415,7 +415,8 @@ typedef struct _ecl_func_t {
 	ECL_FUNC(clEnqueueWaitForEvents,10),			\
 	ECL_FUNC(clEnqueueBarrier,10),				\
 	ECL_FUNC(clUnloadCompiler,10),				\
-	ECL_FUNC(clGetExtensionFunctionAddress,10)
+	ECL_FUNC(clGetExtensionFunctionAddress,10),		\
+	ECL_FUNC(clCreateProgramWithIL,21)
 
 #include "ecl_types.h"
 
@@ -524,6 +525,11 @@ static ERL_NIF_TERM ecl_create_program_with_source(ErlNifEnv* env, int argc,
 						   const ERL_NIF_TERM argv[]);
 static ERL_NIF_TERM ecl_create_program_with_binary(ErlNifEnv* env, int argc, 
 						   const ERL_NIF_TERM argv[]);
+#if CL_VERSION_2_1 == 1
+static ERL_NIF_TERM ecl_create_program_with_il(ErlNifEnv* env, int argc, 
+					       const ERL_NIF_TERM argv[]);
+#endif
+
 #if CL_VERSION_1_2 == 1
 static ERL_NIF_TERM ecl_create_program_with_builtin_kernels(
     ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]);
@@ -662,6 +668,9 @@ static ERL_NIF_TERM ecl_async_wait_for_event(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc, 
 				       const ERL_NIF_TERM argv[]);
 
+static ERL_NIF_TERM ecl_get_event_profiling_info(ErlNifEnv* env, int argc, 
+						 const ERL_NIF_TERM argv[]);
+
 #if CL_VERSION_2_0 == 1
 
 static ERL_NIF_TERM ecl_create_pipe(ErlNifEnv* env, int argc,
@@ -735,7 +744,7 @@ ErlNifFunc ecl_funcs[] =
 #if CL_VERSION_1_2 == 1
     NIF_FUNC( "create_program_with_builtin_kernels", 3, 
 	      ecl_create_program_with_builtin_kernels ),
-#endif
+#endif    
     NIF_FUNC( "async_build_program",        3, ecl_async_build_program ),
 #if CL_VERSION_1_2 == 1
     NIF_FUNC( "unload_platform_compiler",   1, ecl_unload_platform_compiler ),
@@ -803,9 +812,14 @@ ErlNifFunc ecl_funcs[] =
     NIF_FUNC( "async_finish",                 1, ecl_async_finish ),
     NIF_FUNC( "async_wait_for_event",         1, ecl_async_wait_for_event ),
     NIF_FUNC( "get_event_info",               2, ecl_get_event_info ),
+    NIF_FUNC( "get_event_profiling_info",     2, ecl_get_event_profiling_info ),
 
 #if CL_VERSION_2_0 == 1
     NIF_FUNC( "create_pipe",                  4,  ecl_create_pipe ),
+#endif
+
+#if CL_VERSION_2_1 == 1
+    NIF_FUNC( "create_program_with_il",       2, ecl_create_program_with_il ),
 #endif
 
 };
@@ -981,6 +995,13 @@ DECL_ATOM(command_queue);
 DECL_ATOM(command_type);
 // DECL_ATOM(reference_count);
 DECL_ATOM(execution_status);
+
+// Event Profile Info
+DECL_ATOM(command_queued);
+DECL_ATOM(command_submit);
+DECL_ATOM(command_start);
+DECL_ATOM(command_end);
+DECL_ATOM(command_complete);
 
 // Workgroup info
 DECL_ATOM(work_group_size);
@@ -1596,6 +1617,8 @@ DECL_ATOM(max_clock_frequency);
 DECL_ATOM(address_bits);
 DECL_ATOM(max_read_image_args);
 DECL_ATOM(max_write_image_args);
+DECL_ATOM(max_read_write_image_args);
+DECL_ATOM(il_version);    
 DECL_ATOM(max_mem_alloc_size);
 DECL_ATOM(image2d_max_width);
 DECL_ATOM(image2d_max_height);
@@ -1789,6 +1812,14 @@ ecl_info_t device_info[] =
     { &ATOM(device_integrated_memory_nv),CL_DEVICE_INTEGRATED_MEMORY_NV, false, OCL_BOOL, 0, 0},
 #endif
 
+#ifdef CL_DEVICE_MAX_READ_WRITE_IMAGE_ARGS
+    { &ATOM(max_read_write_image_args), CL_DEVICE_MAX_READ_WRITE_IMAGE_ARGS, false, OCL_UINT, 0, 0 },
+#endif
+
+#ifdef CL_DEVICE_IL_VERSION
+    { &ATOM(il_version), CL_DEVICE_IL_VERSION, false, OCL_STRING, 0, 0 },
+#endif
+
 };
 
 // Map device info index 0...N => cl_device_info x Data type
@@ -1893,6 +1924,16 @@ ecl_info_t event_info[] = {
     { &ATOM(command_type),   CL_EVENT_COMMAND_TYPE, false,  OCL_ENUM, kv_command_type, 0 },
     { &ATOM(reference_count), CL_EVENT_REFERENCE_COUNT, false, OCL_UINT, 0, 0 },
     { &ATOM(execution_status), CL_EVENT_COMMAND_EXECUTION_STATUS, false, OCL_ENUM, kv_execution_status, 0 }
+};
+
+ecl_info_t event_profile_info[] = {
+    { &ATOM(command_queued),  CL_PROFILING_COMMAND_QUEUED, false, OCL_ULONG, 0, 0 },
+    { &ATOM(command_submit),  CL_PROFILING_COMMAND_SUBMIT, false, OCL_ULONG, 0, 0 },
+    { &ATOM(command_start),   CL_PROFILING_COMMAND_START, false, OCL_ULONG, 0, 0 },
+    { &ATOM(command_end),     CL_PROFILING_COMMAND_END, false, OCL_ULONG, 0, 0 },
+#if CL_VERSION_2_0 == 1
+    { &ATOM(command_complete), CL_PROFILING_COMMAND_COMPLETE, false, OCL_ULONG, 0, 0 },
+#endif
 };
 
 // clGetKernelArgInfo 1.2
@@ -2430,11 +2471,11 @@ static void unref_kernel_arg(int type, void* val)
     switch(type) {
     case KERNEL_ARG_MEM:
 	if (val)
-	    clReleaseMemObject((cl_mem) val);
+	    ECL_CALL(clReleaseMemObject)((cl_mem) val);
 	break;
     case KERNEL_ARG_SAMPLER:
 	if (val)
-	    clReleaseSampler((cl_sampler) val);
+	    ECL_CALL(clReleaseSampler)((cl_sampler) val);
 	break;
     case KERNEL_ARG_OTHER:
     default:
@@ -2447,11 +2488,11 @@ static void ref_kernel_arg(int type, void* val)
     switch(type) {
     case KERNEL_ARG_MEM:
 	if (val)
-	    clRetainMemObject((cl_mem) val);
+	    ECL_CALL(clRetainMemObject)((cl_mem) val);
 	break;
     case KERNEL_ARG_SAMPLER:
 	if (val)
-	    clRetainSampler((cl_sampler) val);
+	    ECL_CALL(clRetainSampler)((cl_sampler) val);
 	break;
     case KERNEL_ARG_OTHER:
     default:
@@ -2501,7 +2542,7 @@ static void ecl_queue_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
     UNUSED(env);
     DBG("ecl_queue_dtor: %p", obj);
-    clReleaseCommandQueue(obj->queue);
+    ECL_CALL(clReleaseCommandQueue)(obj->queue);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
 }
@@ -2510,7 +2551,7 @@ static void ecl_mem_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
     UNUSED(env);
     DBG("ecl_mem_dtor: %p", obj);
-    clReleaseMemObject(obj->mem);
+    ECL_CALL(clReleaseMemObject)(obj->mem);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
 }
@@ -2519,7 +2560,7 @@ static void ecl_sampler_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
     UNUSED(env);
     DBG("ecl_sampler_dtor: %p", obj);
-    clReleaseSampler(obj->sampler);
+    ECL_CALL(clReleaseSampler)(obj->sampler);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
 }
@@ -2528,7 +2569,7 @@ static void ecl_program_dtor(ErlNifEnv* env, ecl_object_t* obj)
 {
     UNUSED(env);
     DBG("ecl_program_dtor: %p", obj);
-    clReleaseProgram(obj->program);
+    ECL_CALL(clReleaseProgram)(obj->program);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
 }
@@ -2542,7 +2583,7 @@ static void ecl_kernel_dtor(ErlNifEnv* env, ecl_object_t* obj)
     for (i = 0; i < kern->num_args; i++)
 	unref_kernel_arg(kern->arg[i].type, kern->arg[i].value);
     enif_free(kern->arg);
-    clReleaseKernel(kern->obj.kernel);
+    ECL_CALL(clReleaseKernel)(kern->obj.kernel);
     object_erase(obj);
     if (obj->parent) enif_release_resource(obj->parent);
 }
@@ -2552,7 +2593,7 @@ static void ecl_event_dtor(ErlNifEnv* env, ecl_object_t* obj)
     ecl_event_t* evt = (ecl_event_t*) obj;
     UNUSED(env);
     DBG("ecl_event_dtor: %p", evt);
-    clReleaseEvent(evt->obj.event);
+    ECL_CALL(clReleaseEvent)(evt->obj.event);
     object_erase(obj);
     if (evt->bin) {
 	if (!evt->rl)
@@ -2581,7 +2622,7 @@ static void ecl_context_dtor(ErlNifEnv* env, ecl_object_t* obj)
     *pp = ctx->next;
     enif_rwlock_rwunlock(ecl->context_list_lock);
 
-    clReleaseContext(ctx->obj.context);
+    ECL_CALL(clReleaseContext)(ctx->obj.context);
     object_erase(obj);
     // parent is always = 0
     // kill the event thread
@@ -2932,7 +2973,8 @@ static ERL_NIF_TERM ecl_make_kernel(ErlNifEnv* env, cl_kernel kernel,
     size_t sz;
 
     // Get number of arguments, FIXME: check error return
-    clGetKernelInfo(kernel,CL_KERNEL_NUM_ARGS,sizeof(num_args),&num_args,0);
+    ECL_CALL(clGetKernelInfo)(kernel,CL_KERNEL_NUM_ARGS,
+			      sizeof(num_args),&num_args,0);
     sz = num_args*sizeof(ecl_kernel_arg_t);
 
     kern->arg = (ecl_kernel_arg_t*) enif_alloc(sz);
@@ -3357,9 +3399,9 @@ static void* ecl_context_main(void* arg)
 		    cl_int status;
 		    // read status COMPLETE | ERROR
 		    // FIXME: check error
-		    clGetEventInfo(m.event->obj.event,
-				   CL_EVENT_COMMAND_EXECUTION_STATUS,
-				   sizeof(status), &status, 0);
+		    ECL_CALL(clGetEventInfo)(m.event->obj.event,
+					     CL_EVENT_COMMAND_EXECUTION_STATUS,
+					     sizeof(status), &status, 0);
 		    switch(status) {
 		    case CL_COMPLETE:
 			DBG("ecl_context_main: wait_for_event complete");
@@ -3446,6 +3488,17 @@ static ERL_NIF_TERM ecl_versions(ErlNifEnv* env, int argc,
     vsn = enif_make_tuple2(env, enif_make_int(env, 1), enif_make_int(env, 2));
     list = enif_make_list_cell(env, vsn, list);
 #endif
+
+#if CL_VERSION_2_0 == 1
+    vsn = enif_make_tuple2(env, enif_make_int(env, 2), enif_make_int(env, 0));
+    list = enif_make_list_cell(env, vsn, list);
+#endif
+
+#if CL_VERSION_2_1 == 1
+    vsn = enif_make_tuple2(env, enif_make_int(env, 2), enif_make_int(env, 1));
+    list = enif_make_list_cell(env, vsn, list);
+#endif    
+
     return list;
 }
 
@@ -3634,7 +3687,7 @@ static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &device_r, false, &o_device))
 	return enif_make_badarg(env);	
     return make_object_info(env, argv[1], o_device, 
-			    (info_fn_t*) clGetDeviceInfo, 
+			    (info_fn_t*) ECL_FUNC_PTR(clGetDeviceInfo), 
 			    device_info, 
 			    sizeof_array(device_info));
 }
@@ -4425,6 +4478,38 @@ static ERL_NIF_TERM ecl_create_program_with_builtin_kernels(
 	(const cl_device_id*) device_list,
 	kernel_names,
 	&err);
+    if (!err) {
+	ERL_NIF_TERM t;
+	t = ecl_make_object(env, &program_r,(void*) program, o_context);
+	return enif_make_tuple2(env, ATOM(ok), t);
+    }
+    return ecl_make_error(env, err);
+}
+#endif
+
+#if CL_VERSION_2_1 == 1
+//
+// cl:create_program_with_il(Context::cl_context(), IL::iodata()) ->
+//   {'ok', cl_program()} | {'error', cl_error()}
+//
+static ERL_NIF_TERM ecl_create_program_with_il(ErlNifEnv* env, int argc, 
+					       const ERL_NIF_TERM argv[])
+{
+    ecl_object_t* o_context;
+    cl_program program;
+    ErlNifBinary il;
+    cl_int err;
+    UNUSED(argc);
+
+    if (!get_ecl_object(env, argv[0], &context_r, false, &o_context))
+	return enif_make_badarg(env);
+    if (!enif_inspect_iolist_as_binary(env, argv[1], &il))
+	return enif_make_badarg(env);
+    program = ECL_CALL(clCreateProgramWithIL)(o_context->context,
+					      1,
+					      (const void*) il.data,
+					      il.size,
+					      &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	t = ecl_make_object(env, &program_r,(void*) program, o_context);
@@ -5655,7 +5740,8 @@ static ERL_NIF_TERM ecl_enqueue_read_image(ErlNifEnv* env, int argc,
 	return ecl_make_error(env, CL_OUT_OF_RESOURCES);  // enomem?
 
     // calculate the read size of the image, FIXME: check error return
-    clGetImageInfo(buffer, CL_IMAGE_ELEMENT_SIZE, sizeof(psize), &psize, 0);
+    ECL_CALL(clGetImageInfo)(buffer, CL_IMAGE_ELEMENT_SIZE,
+			     sizeof(psize), &psize, 0);
     size = region[0]*region[1]*region[2]*psize;
     if (!enif_alloc_binary(size, bin)) {
 	enif_free(bin);
@@ -5980,7 +6066,8 @@ static ERL_NIF_TERM ecl_enqueue_write_image(ErlNifEnv* env, int argc,
     }
 
     // calculate the read size of the image FIXME: check error return
-    clGetImageInfo(buffer, CL_IMAGE_ELEMENT_SIZE, sizeof(psize), &psize, 0);
+    ECL_CALL(clGetImageInfo)(buffer, CL_IMAGE_ELEMENT_SIZE,
+			     sizeof(psize), &psize, 0);
     size = region[0]*region[1]*region[2]*psize;
     if (bin.size < size) {
 	return enif_make_badarg(env);
@@ -6398,16 +6485,16 @@ static ERL_NIF_TERM ecl_enqueue_map_buffer(ErlNifEnv* env, int argc,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
 
-    ptr = clEnqueueMapBuffer(o_queue->queue,
-			     buffer,
-			     CL_FALSE,
-			     map_flags,
-			     offset,
-			     size,
-			     num_events,
-			     num_events ? wait_list : 0,
-			     &event,
-			     &err);
+    ptr = ECL_CALL(clEnqueueMapBuffer)(o_queue->queue,
+				       buffer,
+				       CL_FALSE,
+				       map_flags,
+				       offset,
+				       size,
+				       num_events,
+				       num_events ? wait_list : 0,
+				       &event,
+				       &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	// FIXME: how should we handle ptr????
@@ -6456,18 +6543,18 @@ static ERL_NIF_TERM ecl_enqueue_map_image(ErlNifEnv* env, int argc,
 			 (void**) wait_list, &num_events))
 	return enif_make_badarg(env);
 
-    ptr = clEnqueueMapImage(o_queue->queue,
-			    image,
-			    CL_FALSE,
-			    map_flags,
-			    origin,
-			    region,
-			    &row_pitch,
-			    &slice_pitch,
-			    num_events,
-			    num_events ? wait_list : 0,
-			    &event,
-			    &err);
+    ptr = ECL_CALL(clEnqueueMapImage)(o_queue->queue,
+				      image,
+				      CL_FALSE,
+				      map_flags,
+				      origin,
+				      region,
+				      &row_pitch,
+				      &slice_pitch,
+				      num_events,
+				      num_events ? wait_list : 0,
+				      &event,
+				      &err);
     if (!err) {
 	ERL_NIF_TERM t;
 	// FIXME: send binary+event to event thread
@@ -6762,9 +6849,24 @@ static ERL_NIF_TERM ecl_get_event_info(ErlNifEnv* env, int argc,
     if (!get_ecl_object(env, argv[0], &event_r, false, &o_event))
 	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_event,
-			    (info_fn_t*) clGetEventInfo,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetEventInfo),
 			    event_info,
 			    sizeof_array(event_info));
+}
+
+// return event profiling info
+static ERL_NIF_TERM ecl_get_event_profiling_info(ErlNifEnv* env, int argc, 
+						 const ERL_NIF_TERM argv[])
+{
+    ecl_object_t* o_event;
+    UNUSED(argc);
+    
+    if (!get_ecl_object(env, argv[0], &event_r, false, &o_event))
+	return enif_make_badarg(env);
+    return make_object_info(env, argv[1], o_event,
+			    (info_fn_t*) ECL_FUNC_PTR(clGetEventProfilingInfo),
+			    event_profile_info,
+			    sizeof_array(event_profile_info));    
 }
 
 
@@ -7092,6 +7194,8 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(address_bits);
     LOAD_ATOM(max_read_image_args);
     LOAD_ATOM(max_write_image_args);
+    LOAD_ATOM(max_read_write_image_args);
+    LOAD_ATOM(il_version);    
     LOAD_ATOM(max_mem_alloc_size);
     LOAD_ATOM(image2d_max_width);
     LOAD_ATOM(image2d_max_height);
@@ -7233,6 +7337,13 @@ static int  ecl_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
     LOAD_ATOM(command_type);
     LOAD_ATOM(reference_count);
     LOAD_ATOM(execution_status);
+
+    // Event Profile Info
+    LOAD_ATOM(command_queued);
+    LOAD_ATOM(command_submit);
+    LOAD_ATOM(command_start);
+    LOAD_ATOM(command_end);
+    LOAD_ATOM(command_complete);
 
     // Workgroup info
     LOAD_ATOM(work_group_size);

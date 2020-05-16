@@ -126,6 +126,7 @@
 -export([create_program_with_source/2]).
 -export([create_program_with_binary/3]).
 -export([create_program_with_builtin_kernels/3]).
+-export([create_program_with_il/2]). %% 2.1!
 -export([release_program/1]).
 -export([retain_program/1]).
 -export([build_program/3, async_build_program/3]).
@@ -186,6 +187,8 @@
 -export([retain_event/1]).
 -export([event_info/0]).
 -export([get_event_info/1, get_event_info/2]).
+-export([event_profiling_info/0]).
+-export([get_event_profiling_info/1, get_event_profiling_info/2]).
 -export([wait/1, wait/2]).
 -export([wait_for_events/1]).
 
@@ -527,6 +530,7 @@ device_info() ->
       fun({1,2},Acc) -> device_info_12(Acc);
 	 ({1,1},Acc) -> device_info_11(Acc);
 	 ({1,0},Acc) -> device_info_10(Acc);
+	 ({2,1},Acc) -> device_info_21(Acc);
 	 (_, Acc) -> Acc
       end, [], versions()).
 
@@ -617,6 +621,10 @@ device_info_12(L) ->
 %%     image_pitch_alignment,
 %%     image_base_address_alignment
     ].
+
+device_info_21(_L) ->
+    [max_read_write_image_args,
+     il_version].
 
 %%
 %% @spec get_device_info(DevID::cl_device_id(), Info::cl_device_info_key()) ->
@@ -984,9 +992,9 @@ get_context_info(Context) when ?is_context(Context) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Command Queue (Queue)
 %% @type cl_queue_property() = { 'out_of_order_exec_mode_enable' | 
-%%			         'profiling_enabled' }
+%%			         'profiling_enable' }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--type cl_queue_property() :: 'out_of_order_exec_mode_enable' | 'profiling_enabled'.
+-type cl_queue_property() :: 'out_of_order_exec_mode_enable' | 'profiling_enable'.
 %%
 %% @spec create_queue(Context::cl_context(),Device::cl_device_id(),
 %%                    Properties::[cl_queue_property()]) ->
@@ -1000,7 +1008,7 @@ get_context_info(Context) when ?is_context(Context) ->
 %% are executed out-of-order. Otherwise, commands are executed
 %% in-order.</dd>
 %% 
-%% <dt>'profiling_enabled'</dt> <dd> Enable or disable profiling of
+%% <dt>'profiling_enable'</dt> <dd> Enable or disable profiling of
 %% commands in the command-queue. If set, the profiling of commands is
 %% enabled. Otherwise profiling of commands is disabled. See
 %% clGetEventProfilingInfo for more information.
@@ -1439,6 +1447,12 @@ create_program_with_binary(_Context, _DeviceList, _BinaryList) ->
     {'ok', cl_program()} | {'error', cl_error()}.
 
 create_program_with_builtin_kernels(_Context, _DeviceList, _KernelNames) ->
+    ?nif_stub.
+
+-spec create_program_with_il(Context::cl_context(), IL::iodata()) ->
+				    {'ok', cl_program()} | {'error', cl_error()}.
+
+create_program_with_il(_Context, _IL) ->
     ?nif_stub.
 
 %%
@@ -2315,6 +2329,33 @@ get_event_info(_Event, _Info) ->
 %% @doc Returns all specific information about the event object. 
 get_event_info(Event) when ?is_event(Event) ->
     get_info_list(Event, event_info(), fun get_event_info/2).
+
+
+event_profiling_info() ->
+    case lists:member({2,0}, cl:versions()) of
+	true ->
+	    [
+	     command_queued,
+	     command_submit,
+	     command_start,
+	     command_end,
+	     command_complete
+	    ];
+	false ->
+	    [
+	     command_queued,
+	     command_submit,
+	     command_start,
+	     command_end
+	    ]
+    end.
+
+get_event_profiling_info(_Event, _Info) ->
+    ?nif_stub.
+
+get_event_profiling_info(Event) ->
+get_info_list(Event, event_profiling_info(),
+	      fun get_event_profiling_info/2).    
 
 %% IMAGES
 %% @doc return a list of image formats [{Order,Type}]

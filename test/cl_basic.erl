@@ -169,7 +169,7 @@ __kernel void program1(int n, int m) {
 	      end, Kernels),
 	    foreach(
 	      fun(Device) ->
-		      {ok,Queue} = cl:create_queue(Context,Device,[]),
+		      {ok,Queue} = cl:create_queue(Context,Device,[profiling_enable]),
 		      foreach(
 			fun(Kernel) ->
 				cl:set_kernel_arg(Kernel, 0, 12),
@@ -179,7 +179,10 @@ __kernel void program1(int n, int m) {
 				io:format("EventInfo: ~p\n", [EventInfo]),
 				cl:flush(Queue),
 				io:format("Event Status:=~p\n", 
-					  [cl:wait(Event,1000)])
+					  [cl:wait(Event,1000)]),
+				{ok,ProfileInfo} = cl:get_event_profiling_info(Event),
+				io:format("EventProfilingInfo: ~p\n", [ProfileInfo])
+
 			end, Kernels)
 	      end, DeviceList),
 	    ok;
