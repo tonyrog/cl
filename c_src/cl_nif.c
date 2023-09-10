@@ -3215,7 +3215,7 @@ ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* o
 			      ecl_info_t* info, size_t num_info)
 {
     size_t returned_size = 0;
-    size_t size = MAX_INFO_SIZE;    
+    size_t size = MAX_INFO_SIZE;
     unsigned char buf[MAX_INFO_SIZE];
     void* ptr = buf;
     ERL_NIF_TERM res;
@@ -3235,6 +3235,12 @@ ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* o
         // try again allocate returned_size, returned_size does not
 	// (yet) return the actual needed bytes (by spec) 
 	// but it looks like it... ;-)
+	if (returned_size <= size) {
+	    err = (*func)(obj->opaque,info[i].info_id,0,NULL,&returned_size);
+	    if (returned_size <= size) {
+		return ecl_make_error(env, err);
+	    }
+	}
 	size = returned_size;
 	if (!(ptr = enif_alloc(size)))
 	    return ecl_make_error(env, CL_OUT_OF_HOST_MEMORY);
@@ -3245,8 +3251,9 @@ ERL_NIF_TERM make_object_info(ErlNifEnv* env,  ERL_NIF_TERM key, ecl_object_t* o
 	res = enif_make_tuple2(env, ATOM(ok), 
 			       make_info_value(env,&info[i],ptr,returned_size));
     }
-    else
+    else {
 	res = ecl_make_error(env, err);
+    }
     if (ptr != buf)
 	enif_free(ptr);
     return res;
@@ -3685,7 +3692,7 @@ static ERL_NIF_TERM ecl_get_device_info(ErlNifEnv* env, int argc,
     UNUSED(argc);
 
     if (!get_ecl_object(env, argv[0], &device_r, false, &o_device))
-	return enif_make_badarg(env);	
+	return enif_make_badarg(env);
     return make_object_info(env, argv[1], o_device, 
 			    (info_fn_t*) ECL_FUNC_PTR(clGetDeviceInfo), 
 			    device_info, 
