@@ -179,6 +179,9 @@ clean:
 release:
 	$(MAKE) nif TYPE=release
 
+aimax:
+	CFLAGS="-I/opt/rocm/include" LDFLAGS="-L/usr/lib/x86_64-linux-gnu" $(MAKE) nif TYPE=release
+
 nif: $(CL_NIF)
 
 cl_nif.$(OBJ): cl_hash.h

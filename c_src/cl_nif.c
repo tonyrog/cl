@@ -3014,7 +3014,8 @@ static ERL_NIF_TERM ecl_make_context(ErlNifEnv* env, cl_context context, cl_int 
 						  (void*)context,0,version);
     ecl = ctx->obj.env;
     ctx->upgrade_count = 0;  // first incarnation
-    ctx->thr = ecl_thread_start(ecl_context_main, ctx, 8); // 8K stack!
+    // stack size in kilowords; clWaitForEvents goes deep into the runtime
+    ctx->thr = ecl_thread_start(ecl_context_main, ctx, 64); // 512K stack
     res = make_object(env, context_r.type, (ecl_object_t*) ctx);
     enif_rwlock_rwlock(ecl->context_list_lock);
     // link contexts for upgrade
@@ -3370,7 +3371,7 @@ static void* ecl_context_main(void* arg)
 	case ECL_MESSAGE_FINISH: {  // finish message queue
 	    cl_int err;
 	    DBG("ecl_context_main: finish q=%lu", (unsigned long) m.queue);
-	    err = ECL_CALL(clFlush)(m.queue->queue);
+	    err = ECL_CALL(clFinish)(m.queue->queue);
 	    // send {cl_async, Ref, ok | {error,Reason}}
 	    if (m.env) {
 		int res;
@@ -6952,7 +6953,7 @@ static int ecl_pre_load(ErlNifEnv* env, ecl_env_t* ecl, cl_int* rerr)
 	return -1;
     }
 
-    ecl->platform = enif_alloc(num_platforms*sizeof(ecl_platform_t*));
+    ecl->platform = enif_alloc(num_platforms*sizeof(ecl_platform_t));
     ecl->nplatforms = num_platforms;
     ecl->icd_version = 11;
 
@@ -7608,7 +7609,8 @@ typedef void * DL_LIB_P;
 # ifdef DARWIN
 #   define OPENCL_LIB "/System/Library/Frameworks/OpenCL.framework/OpenCL"
 # else
-#   define OPENCL_LIB "libOpenCL.so"
+#   define OPENCL_LIB "libOpenCL.so.1"
+#   define OPENCL_LIB_ALT "libOpenCL.so"
 # endif
 #endif
 
@@ -7617,7 +7619,12 @@ static int ecl_load_dynfunctions(ecl_env_t* ecl)
     DL_LIB_P handle;
 //    if(ecl->icd_version < 12)
 //	return;
-    if ((handle = dlopen(OPENCL_LIB, RTLD_LAZY))) {
+    handle = dlopen(OPENCL_LIB, RTLD_LAZY);
+#ifdef OPENCL_LIB_ALT
+    if (!handle)
+	handle = dlopen(OPENCL_LIB_ALT, RTLD_LAZY);
+#endif
+    if (handle) {
 	int i = 0;
 
 	while(ecl_function[i].name != NULL) {
